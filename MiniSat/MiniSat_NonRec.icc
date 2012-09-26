@@ -1,0 +1,127 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : MiniSat_NonRec.icc
+//| Author(s)   : Niklas Een
+//| Module      : MiniSat
+//| Description : Non-recursive implementation of methods in 'MiniSat.cc'.
+//| 
+//| (C) Copyright 2010-2012, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//| The purpose of the non-recursive methods is purely to avoid stack-overflow. Most modern
+//| Linux distributions put a limit at 8 MB, which may be too small for certain degenerate SAT 
+//| problems. The recursive implementation should be considered the reference, sane, readable 
+//| implementation. These ugly implementation only exist because of an artificial problem
+//| created by people who don't appreciate recursion...
+//|________________________________________________________________________________________________
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// 'analyze_logOrder()':
+
+
+template<>
+void MiniSat<true>::analyze_logOrder(Lit p0, VarAttr& visit, Vec<Lit>& ord)
+{
+    Vec<AnalyzeRec>& stack = analyze_stack;     // -- explicit call stack
+
+    #define CallRec(new_p0) { stack.push(AnalyzeRec(p0, i, c)); p0 = new_p0; goto Top_; }
+    #define Return()        { goto Return_; }
+    #define Restore()       { p0 = stack.last().p0; i = stack.last().i; c = stack.last().c; stack.pop(); }
+
+    GClause r;
+    Clause* c;
+    uint    i;
+    Lit     p = lit_Undef;      // <<== (probably not needed)
+
+    if (visit[p0] & 8)
+        return;
+  Top_:
+    r = reason(p0); assert_debug(!r.isLit());
+    c = r.clause(MEM);
+
+    for (i = 1; i < c->size(); i++){
+        p = (*c)[i];
+        if (level(p) != 0 && (visit[p] & 9) == 0){
+            CallRec(p)
+
+          Return_:
+            if (stack.size() == 0) return;
+            Restore()
+        }
+    }
+
+    visit(p0) |= 8;
+    ord.push(p0);
+    Return()
+
+    #undef Restore
+    #undef Return
+    #undef CallRec
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// 'analyze_removable()':
+
+
+template<bool pfl>
+bool MiniSat<pfl>::analyze_removable(Lit p0, const IntZet<uint>& levels, VarAttr& visit, Vec<Lit>& result)
+{
+    bool     ret;       // -- explicit return value
+    Vec<AnalyzeRec>& stack = analyze_stack;     // -- explicit call stack
+
+    #define CallRec(new_p0) { stack.push(AnalyzeRec(p0, i | (quit ? 0x80000000 : 0), c)); p0 = new_p0; goto Top_; }
+    #define Return(value)   { ret = value; goto Return_; }
+    #define Restore()       { p0   = stack.last().p0; i = stack.last().i & 0x7FFFFFFF; quit = stack.last().i & 0x80000000; c = stack.last().c; stack.pop(); }
+
+    GClause r;
+    Clause* c;
+    uint    i;
+    Lit     p = lit_Undef;      // <<== (probably not needed)
+    bool    quit;
+
+  Top_:
+    if (visit[p0] & 2){
+        Return(bool(visit[p0] & 4)) }
+
+    r = reason(p0);
+    if (r == GClause_NULL){
+        visit(p0) |= 2; Return(false) }
+    c = r.isLit() ? ((*analyze_tmpbin.clause(MEM))[1] = r.lit(), analyze_tmpbin.clause(MEM)) : r.clause(MEM);
+
+    for (i = 1; i < c->size(); i++){
+        p = (*c)[i];
+
+        if (visit[p] & 1){
+            quit = false;
+
+        }else{
+            if (level(p) == 0 || visit[p] == 6) continue;
+            if (visit[p] == 2){ visit(p0) |= 2; Return(false) }
+
+            if (!levels.has(level(p))){ visit(p0) |= 2; Return(false) }
+
+            quit = true;
+        }
+        CallRec(p)
+
+      Return_:
+        if (stack.size() == 0) return ret;
+        Restore()
+
+        if (!ret && quit){
+            visit(p0) |= 2; Return(false) }
+    }
+
+    if (pfl && visit[p0] & 1){
+        result.push(p0); }
+
+    visit(p0) |= 6;
+    Return(true)
+
+    #undef Restore
+    #undef Return
+    #undef CallRec
+}
