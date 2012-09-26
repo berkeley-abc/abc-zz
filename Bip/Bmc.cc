@@ -256,7 +256,7 @@ lbool lookaheadBmc(BmcTrace& T, const Params_Bmc& P, Cex* cex, int* bf_depth, Ne
 
             Write " %_\f", d + step;
             Wire  w_bad  = T.insert(init_bad[1], d + step);
-            lbool result = T.solve(w_bad, uint64(pow(P.la_decay, step)* timeout_base));
+            lbool result = T.solve(w_bad, uint64(pow(P.la_decay, (double)step)* timeout_base));
 
             if (result == l_True){
                 NewLine;
