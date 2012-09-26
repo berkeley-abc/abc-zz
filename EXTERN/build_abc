@@ -1,0 +1,130 @@
+#!/usr/bin/env python
+
+import sys
+import os
+import re
+import shutil
+import tempfile
+
+
+##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+## Helpers:
+
+
+def abort(message):
+    pr("ERROR! %s\n" % message)
+    exit(255)
+
+
+def z(var):
+    return os.environ["ZB_" + var]
+
+
+def up_to_date(src, dst):
+    return os.path.exists(dst) and os.stat(dst).st_mtime + 0.001 > os.stat(src).st_mtime
+
+
+##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+## Build:
+
+
+# Will create write a new makefile to the output stream 'out':
+#
+#   - The ".o" suffix is changed to <obj-suffix>
+#   - The lib target is renamed to <lib-name>
+#   - The "OPTFLAGS := ..." line is replaced by "OPTFLAGS := <opt-flags>"
+#   - An implicit rule for building the renamed object files is added at the end.
+#
+def make_makefile(out, obj_suffix, opt_flags, lib_name):
+    with open("Makefile", "rt") as inp:
+        text = inp.read()
+
+        text = re.sub(r"\.o\b", "." + obj_suffix, text)
+        text = re.sub(r"OPTFLAGS *:=.*\n", "OPTFLAGS := " + opt_flags + "\n", text)
+        text = re.sub(r"lib\$\(PROG\)\.a", lib_name, text)
+        text = re.sub(r"-ldl", "", text)
+
+        out.write(text)
+        out.write("%." + obj_suffix + " : %.c\n\techo \`\` Compiling: $<\n\t$(CC) -c $(CFLAGS) $< -o $@\n")
+
+
+def build(suffix, clean):       # -- assumes we are in directory 'ZZ/EXTERN/abc'
+    # Setup compile flags:
+    flags = []
+    flags.append("-DABC_NO_DYNAMIC_LINKING")
+    pri   = z("PRI_TYPE")
+    secs  = z("SEC_TYPES")
+    # -- primary type:
+    if pri == "r": flags.append("-O3")
+    if pri == "p": flags.append("-O1 -pg")
+    if pri == "d": flags.append("-O1")
+    if pri == "q": flags.append("-O0")
+    # -- secondary types:
+    if "t" in secs: flags.append("-pthread")
+    if "a" in secs: flags.append("-DNDEBUG")
+    if "s" not in secs: flags.append("-ggdb")
+    opt_flags = " ".join(flags)
+
+    # Lib file exists?
+    public_target = z("LIB_DIR") + "/libabc.a"
+    if z("FAST_DEPS") == "1" and os.path.exists(public_target):
+        return      # (assume up-to-date to speed things up a bit)
+
+    # Create makefile:
+    lib_name = "libabc_" + suffix + ".a"
+    out = tempfile.NamedTemporaryFile("w")
+    make_makefile(out, "o_"+suffix, opt_flags, lib_name)
+    out.flush()
+
+    # Remove readline...
+    os.system("if grep readline src/base/main/mainUtils.c; then  patch src/base/main/mainUtils.c < ../abc_mainUtils.c.patch; fi")
+
+    # Call makefile:
+    target = lib_name if (not clean) else "clean"
+    ret = os.system("make -s -f %s -j%s %s" % (out.name, z("N_CORES"), target))
+
+    # Copy results:
+    if not clean and ret == 0:
+        if not up_to_date(target, public_target):
+            shutil.copy2(target, public_target)
+            print "`` Produced library: libabc.a"
+
+
+def create_header():        # -- assumes we are in directory 'ZZ/EXTERN/'
+    filename = z("INCLUDE_DIR") + "/abc.hh"
+    if not up_to_date("abc.hh", filename):
+        with open("abc.hh", "rt") as inp:
+            with open(filename, "wt") as out:
+                for line in inp:
+                    if line.strip() == "$MAKEFILE_DEFINES":
+                        # Expand gcc commandline defines into header file syntax:
+                        with os.popen("abc/arch_flags", "rt") as inp2:
+                            text = inp2.readline()
+                            text = re.sub(r" ", "\n", text)
+                            text = re.sub(r"-D", "#define ", text)
+                            text = re.sub(r"=", " ", text)
+                        out.write(text)
+                    else:
+                        out.write(line)
+        print "`` Created header: abc.hh"
+
+
+def main():
+    if z("CMD") == "build":
+        os.chdir("abc")
+        build(z("PRI_TYPE") + z("SEC_TYPES"), False)
+    elif z("CMD") == "header":
+        create_header()
+    elif z("CMD") == "clean":
+        versions = []
+        for f in os.listdir("abc/src/base/abc"):
+            if f.startswith("abcAig.o_"):       # (first file compiled)
+                versions.append(f[9:])
+
+        os.chdir("abc")
+        for v in versions:
+            build(v, True)
+    else:
+        abort("Unknown command: " + z("CMD"))
+
+main()
