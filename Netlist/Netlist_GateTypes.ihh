@@ -1,0 +1,107 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : Netlist_GateTypes.ihh
+//| Author(s)   : Niklas Een
+//| Module      : Netlist
+//| Description : Define arrays containing gatetype specific information.
+//| 
+//| (C) Copyright 2010-2012, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//|________________________________________________________________________________________________
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Gate types:
+
+
+#define GET_GATE_TYPES
+#include "GateDefs.ihh"
+
+
+#define Prefix_With_gate_And_Add_Comma(x) gate_##x,
+enum GateType {
+    gate_NULL,
+    Apply_To_All_GateTypes(Prefix_With_gate_And_Add_Comma)
+    GateType_size
+};
+
+
+extern cchar* GateType_name[GateType_size + 1];
+static const uint GATETYPE_BITS = Bits_Needed(GateType_size);
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Gate attributes:
+
+
+static const uint DYNAMIC_GATE_INPUTS = INT_MAX;
+
+
+struct Excp_AttrParseError : Excp {};
+    // -- throw this exception in the 'read()' method of 'GateAttr's if ill-formed.
+
+
+//=================================================================================================
+// -- Base classes:
+
+
+template<GateType t, uint n>
+struct GateAttr {
+    static const GateType type = t;
+    static const uint     n_inputs = n;
+
+    // Default implementations: 
+    void load      (In&  /*in*/        )       { assert(false); }               // }
+    void save      (Out& /*out*/       ) const { assert(false); }               // }- These HAVE to be overridden; we just define them to 
+    void read      (Str  /*text_in*/   )       { assert(false); }               // }  allow compilation and debugging before they are.
+    void write     (Out& /*text_out*/  ) const { assert(false); }               // }  (exception: if gate has an empty attribute struct)
+    bool operator==(const GateAttr&) const { assert(false); return false; }     // }
+        // <<==
+
+    // -- You should also make sure copy-constructor and assignment operator has correct semantics.
+};
+
+
+// 'GateAttr_Numbered' is a base class for all external gates (PIs, POs, some Flops). They
+// are identified by a number. The default number is 'num_NULL' which should only exist
+// in intermediary states.
+
+enum { num_NULL = INT_MIN, num_ERROR = INT_MIN+1 };
+
+template<GateType t, uint n>
+struct GateAttr_Numbered : GateAttr<t,n> {
+    int number;
+    GateAttr_Numbered()        : number(num_NULL) {}
+    GateAttr_Numbered(int num) : number(num) {}
+
+    void save(Out& out) const { puti(out, number); }
+    void load(In&  in )       { number = (int)geti(in); }
+
+    void write(Out& out) const {
+        if (number == num_NULL) out += '?';
+        else                    printInt(out, number); }
+
+    void read(Str in) {
+        if (in.size() == 1 && in[0] == '?') number = num_NULL;
+        else                                number = (int)stringToInt64(in, INT_MIN, INT_MAX); }
+
+    bool operator==(const GateAttr_Numbered& e) const {
+        return number == e.number; }
+};
+
+
+//=================================================================================================
+// -- User defined gate attributes:
+
+
+#define GET_GATE_ATTRIBUTES
+#include "GateDefs.ihh"
+
+
+extern uint gate_type_n_inputs[GateType_size+1];
+extern bool gate_type_has_attr[GateType_size+1];
+
+#define Shorter_TypeNames_For_GateAttr(gatetype) typedef GateAttr_##gatetype gatetype##_;
+Apply_To_All_GateTypes(Shorter_TypeNames_For_GateAttr)

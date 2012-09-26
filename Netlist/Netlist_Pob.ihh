@@ -1,0 +1,171 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : Netlist_Pob.ihh
+//| Author(s)   : Niklas Een
+//| Module      : Netlist
+//| Description : Pobs (persistent objects) are instances of Pecs (persistent embedded classes).
+//| 
+//| (C) Copyright 2010-2012, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//| REGISTRATION MACROS:
+//| 
+//|   Declare_Pob (obj_name, class_name)   -- in header file
+//|   Register_Pob(obj_name, class_name)   -- in cc-file
+//| 
+//| 
+//| POB ACCESS MACROS:
+//| 
+//| (1) Expression macros:
+//| 
+//|   Has_Pob   (N, obj_name) 
+//|   Remove_Pob(N, obj_name) 
+//| 
+//|   'Has' checks for existence of an object
+//|   'Remove' removes an object
+//| 
+//| (2) Statement macros:  (introduces variable 'obj_name'; includes ';' at the end)
+//| 
+//|   Get_Pob   (N, obj_name)    Get_Pob2   (N, obj_name, var_name)
+//|   Add_Pob   (N, obj_name)    Add_Pob2   (N, obj_name, var_name)    Add_Pob0   (N, obj_name)
+//|   Assure_Pob(N, obj_name)    Assure_Pob2(N, obj_name, var_name)    Assure_Pob0(N, obj_name)
+//|   Scoped_Pob(N, obj_name)    Scoped_Pob2(N, obj_name, var_name)
+//|   Auto_Pob  (N, obj_name)    Auto_Pob2  (N, obj_name, var_name)
+//| 
+//|   'Get' retrieves an object that must exist (assertion fails otherwise):
+//|   'Add' creates an object that must NOT already exist.
+//|   'Assure' gets an object or creates it if it doesn't exist.
+//|   'Scoped' = 'Add' + 'Remove' at the end of the scope (object must not exist before)
+//|   'Auto' = 'Assure' + conditional removal at end of scope if object didn't exist before.
+//|   
+//|   The default versions introduce a local variable with the same name as the object. The '2' 
+//|   versions allows you to give a different name to the local variable. The '0' versions
+//|   (only for 'Add' and 'Assure') does not introduce a local variable for the persistent object.
+//| 
+//|   Examples:
+//| 
+//|     if (!Has_Pob(N, strash)) printf("Strash object is missing!\n"), exit(42);
+//| 
+//|     Get_Pob(N, strash);     // -- introduces a local variable with the name 'strash'
+//|     [...]
+//|     strash.checkConsistency();
+//|________________________________________________________________________________________________
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// -- Pre-placed Pobs:
+
+
+struct PobInfo {
+    cchar*   class_name;        // -- we use 'cchar*' instead of string for performance reasons (want 'addPob()' to be fast);
+    PecInfo* class_info;        // the strings must not be freed before the object is disposed of.
+    cchar*   obj_name;
+    pob_id   obj_id;
+    PobInfo* next;
+};
+
+extern PobInfo* registered_pobs;
+
+
+macro PobInfo* getPobInfo(cchar* obj_name)
+{
+    for (PobInfo* p = registered_pobs; p; p = p->next){
+        if (strcmp(p->obj_name, obj_name) == 0)
+            return p;
+    }
+    return NULL;
+}
+
+
+// Creating an object of this type will ensure that every Pec-instance named 'instance_name' will
+// be given the same instance ID in all netlists (and hence placed in the same position in the
+// netlist vector 'pecs'). This allows for fast access to the object.
+//
+template<class PEC>
+struct RegisterPob : PobInfo {
+    void init(cchar* obj_name_, cchar* class_name_) {
+        class_name = class_name_;
+        class_info = NULL;
+        obj_name = obj_name_;
+        obj_id   = ~pec_id(0);
+        next = registered_pobs;
+        registered_pobs = this;
+    }
+
+    PEC& get(NetlistRef N) {
+        return static_cast<PEC&>(N.pob(obj_id)); }
+
+    PEC& add(NetlistRef N) {
+        return static_cast<PEC&>(N.addPob(obj_name, class_info, obj_id)); }
+
+    PEC& assure(NetlistRef N, bool& did_add) { // -- add if not exists ("assure existence of").
+        PEC& ret = get(N);
+        if (!ret){ did_add = true;  return add(N); }
+        else     { did_add = false; return ret;    } }
+
+    PEC& assure(NetlistRef N) {
+        PEC& ret = get(N);
+        if (!ret) return add(N);
+        else      return ret; }
+};
+
+
+struct PobDisposer {
+    Pec& pob;
+    PobDisposer(Pec& pob_) : pob(pob_) {}
+   ~PobDisposer() { netlist(pob.nl).removePob(pob); }
+};
+
+
+struct PobCondDisposer {
+    Pec& pob;
+    bool do_dispose;
+    PobCondDisposer(Pec& pob_, bool d) : pob(pob_), do_dispose(d) {}
+   ~PobCondDisposer() { if (do_dispose) netlist(pob.nl).removePob(pob); }
+};
+
+
+// You *register* a persistent object in the '.cc' file and *declare* it in the header file.
+// The class name will be prefixed with 'Pec_' (this is the convention for Pec classes).
+// The objected declared will be prefixed with 'regpob' for "registered pob".
+//
+#define Register_Pob(obj_name, class_name) \
+    RegisterPob<Pec_##class_name> regpob_##obj_name; \
+    ZZ_Initializer(REG_POB_##obj_name, -9049) { regpob_##obj_name.init(#obj_name, #class_name); } \
+    typedef Pec_##class_name PecType_of_object_##obj_name;
+
+#define Declare_Pob(obj_name, class_name) \
+    extern RegisterPob<Pec_ ## class_name> regpob_##obj_name; \
+    typedef Pec_##class_name PecType_of_object_##obj_name;
+
+
+// Add, remove, get etc. 
+//
+#define Has_Pob(N, obj_name) (!static_cast<Pec&>(regpob_##obj_name.get(N)).null())
+#define Remove_Pob(N, obj_name) N.removePob(regpob_##obj_name.get(N))
+
+#define Get_Pob2(   N, obj_name, var_name) PecType_of_object_##obj_name& var_name ___unused = regpob_##obj_name.get(N); assert(!var_name.Pec::null());
+#define Add_Pob2(   N, obj_name, var_name) PecType_of_object_##obj_name& var_name ___unused = regpob_##obj_name.add(N);
+#define Assure_Pob2(N, obj_name, var_name) PecType_of_object_##obj_name& var_name ___unused = regpob_##obj_name.assure(N);
+#define Get_PobText(N, obj_name, var_name) PecType_of_object_##obj_name& var_name ___unused = regpob_##obj_name.get(N)
+    // -- last macro is for internal use in other macros
+
+#define Scoped_Pob2(N, obj_name, var_name) \
+    PecType_of_object_##obj_name& var_name ___unused = regpob_##obj_name.add(N); \
+    PobDisposer regpob_disposer_##obj_name(obj_name);
+
+#define Auto_Pob2(N, obj_name, var_name) \
+    bool regpob_existed_##obj_name; \
+    PecType_of_object_##obj_name& var_name ___unused = regpob_##obj_name.assure(N, regpob_existed_##obj_name); \
+    PobCondDisposer regpob_disposer_##obj_name(var_name, regpob_existed_##obj_name);
+
+
+#define Get_Pob(   N, obj_name) Get_Pob2   (N, obj_name, obj_name)
+#define Add_Pob(   N, obj_name) Add_Pob2   (N, obj_name, obj_name)
+#define Assure_Pob(N, obj_name) Assure_Pob2(N, obj_name, obj_name)
+#define Scoped_Pob(N, obj_name) Scoped_Pob2(N, obj_name, obj_name)
+#define Auto_Pob(  N, obj_name) Auto_Pob2  (N, obj_name, obj_name)
+
+#define Add_Pob0(   N, obj_name) regpob_##obj_name.add(N);
+#define Assure_Pob0(N, obj_name) regpob_##obj_name.assure(N);

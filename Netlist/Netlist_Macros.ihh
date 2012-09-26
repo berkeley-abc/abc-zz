@@ -1,0 +1,69 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : Netlist_Macros.ihh
+//| Author(s)   : Niklas Een
+//| Module      : Netlist
+//| Description : Iteration macros over netlist and netlist elements.
+//| 
+//| (C) Copyright 2010-2012, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//|________________________________________________________________________________________________
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Macros:
+
+
+// Iterate over all non-deleted gates, starting from 'gid_FirstUser' (i.e. excluding constants):
+// NOTE! 'netlist' is used as an expression, 'w' as a name
+//
+#define For_Gates(netlist, w)                                              \
+    if (NetlistRef N__##w = NetlistRef()); else                            \
+    if (N__##w = (netlist), false); else                                   \
+    if (uind i__##w = 0); else                                             \
+    if (Wire w = Wire_NULL); else                                          \
+    for (i__##w = gid_FirstUser; i__##w < N__##w.size(); i__##w++)         \
+        if (N__##w.deleted(i__##w) || (w = N__##w[i__##w], false)); else
+
+// Same as 'For_Gates' but include constants:
+//
+#define For_All_Gates(netlist, w)                                          \
+    if (NetlistRef N__##w = NetlistRef()); else                            \
+    if (N__##w = (netlist), false); else                                   \
+    if (uind i__##w = 0); else                                             \
+    if (Wire w = Wire_NULL); else                                          \
+    for (i__##w = gid_FirstLegal; i__##w < N__##w.size(); i__##w++)        \
+        if (N__##w.deleted(i__##w) || (w = N__##w[i__##w], false)); else
+
+// Iterate over all gates of a given type.
+// NOTE! 'netlist' and 'type' are used as expressions, but 'w' as a name.
+//
+#define For_Gatetype(netlist, type, w)                                     \
+    if (NetlistRef N__##w = NetlistRef()); else                            \
+    if (N__##w = (netlist), false); else                                   \
+    if (uind i__##w = 0); else                                             \
+    if (uint off__##w = 0); else                                           \
+    if (Wire w = Wire_NULL); else                                          \
+    if (NetlistRef::GateBlock B__##w = NetlistRef::GateBlock()); else      \
+    for (i__##w = 0; i__##w < N__##w.nGateBlocks(type); i__##w++)          \
+        if (B__##w = N__##w.gateBlock(type, i__##w), false); else          \
+        for (off__##w = 0; off__##w < B__##w.end; off__##w = B__##w.next(off__##w)) \
+            if (B__##w.base[off__##w] == glit_NULL || (w = N__##w[B__##w.base[off__##w]], false)); else
+
+
+// Iterate over all non-NULL inputs of a given gate 'wire'.
+// NOTE 'wire' is an expression, but 'w' is a name.
+//
+#define For_Inputs(wire, w)                                                     \
+    if (Wire w0__##w = Wire_NULL); else                                         \
+    if (w0__##w = (wire), false); else                                          \
+    if (Wire w = Wire_NULL); else                                               \
+    for (uint i__##w = 0, size__##w = w0__##w.size(); i__##w < size__##w; i__##w++) \
+        if (w = w0__##w[i__##w], !w); else
+
+// Used inside 'For_Inputs', produces the pin number of wire 'w'
+// (second argument to 'For_Inputs').
+//
+#define Input_Pin_Num(w) Iter_Var(w)

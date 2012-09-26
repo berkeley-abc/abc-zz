@@ -1,0 +1,158 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : Netlist_PecComb.ihh
+//| Author(s)   : Niklas Een
+//| Module      : Netlist
+//| Description : Combinator templates for Pecs (persistent embedded classes).
+//| 
+//| (C) Copyright 2010-2012, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//|________________________________________________________________________________________________
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Pec Combinators:
+
+
+//=================================================================================================
+// -- Gate Attributes:
+
+
+// A "gate attribute" is any class that defines the methods:
+//
+//     void load   (In&  in       );
+//     void save   (Out& out      ) const;
+//     void read   (Str  text_in  );
+//     void write  (Out& text_out ) const;
+//
+// The intended meaning of the methods is to load or save attributes associated with a gate.
+// Unless some of the attributes contain wires, you can leave 'compact()' empty. This combinator
+// takes such a class and turns it into a Pec. You still have to register the pec by the macro:
+//
+//     Register_Pec(class_name)
+//
+// (without the 'Pec_' prefix). NOTE! The parser allows the same signal to be defined multiple 
+// times. Only the last occurrence will matter.
+//
+template<class GA>
+class Pec_GateAttr : public Pec {
+protected:
+    WMapL<GA>  data;
+
+public:
+    // Pec interface:
+    Pec_GateAttr(const Pec_base& base) : Pec(base) {}
+
+    void move(Pec& dst) {
+        data.moveTo(static_cast<Pec_GateAttr<GA>&>(dst).data); }
+
+    void copy(Pec& dst) const {
+        data.copyTo(static_cast<Pec_GateAttr<GA>&>(dst).data); }
+
+    bool equal(const Pec& dst) const {
+        const WMapL<GA>& data2 = static_cast<const Pec_GateAttr<GA>&>(dst).data;
+        if (data.nil != data2.nil)
+            return false;
+        const Vec<GA>& base  = data .base();
+        const Vec<GA>& base2 = data2.base();
+        uind lim = min_(base.size(), base2.size());
+        for (uind i = 0; i < lim; i++)
+            if (base[i] != base2[i]) return false;
+        if (base.size() > lim){
+            for (uind i = lim; i < base.size(); i++)
+                if (base[i] != data2.nil) return false;
+        }else if (base2.size() > lim){
+            for (uind i = lim; i < base2.size(); i++)
+                if (base2[i] != data.nil) return false;
+        }
+        return true;
+    }
+
+    void load(In& in) {
+        data.base().setSize((uind)getu(in));
+        for (uind i = 0; i < data.base().size(); i++){
+            GA attr;
+            attr.load(in);
+            data.base()[i] = attr;
+        }
+    }
+
+    void save(Out& out) const {
+        putu(out, data.base().size());
+        for (uind i = 0; i < data.base().size(); i++)
+            data.base()[i].save(out);
+    }
+
+    void read(In& in)   // PRE-CONDITION: The name store has reverse lookup enabled.
+    {
+        NetlistRef N = netlist(this->nl);
+        NameStore& names = N.names();
+        Vec<char> buf;
+        assert(names.hasLookup());
+
+        expect(in, " [ default = ");
+        gets(in, buf, IsChar(']'));
+        trimEnd(buf);
+        in++;
+        data.nil.read(slice(buf));
+
+        for(;;){
+            skipWS(in);
+            if (in.eof()) break;
+
+            gets(in, buf, IsChar('='));
+            trimEnd(buf);
+            in++;
+            buf.push(0);
+
+            GLit p = names.lookup(buf.base());
+            if (p == glit_NULL) throw String("Unknown variable used in embedded object: ") + String(buf.base());
+            if (type(N[p]) != GA::type) throw String("Gate has wrong type (") + GateType_name[type(N[p])] + String("). Should be: ") + GateType_name[GA::type];
+
+            skipWS(in);
+            gets(in, buf, IsChar('\n'));
+            trimEnd(buf);
+            data(N[p]).read(slice(buf));
+            in++;
+        }
+    }
+
+    void write(Out& out) const
+    {
+        NetlistRef N = netlist(this->nl);
+        NameStore& names = N.names();
+        Vec<char>  name;
+
+        out += "[default=";
+        data.nil.write(out);
+        out += "]\n";
+
+        // Iterate over all gates of type 'GA':
+        For_Gatetype(N, GA::type, w){
+            assert(names.size(w) > 0);    // -- all gates should have been named before getting here
+            if (data[w] != data.nil){
+                names.get(w, name, 0);
+                out += name.base();
+                out += '=';
+                data[w].write(out);
+                out += '\n';
+            }
+        }
+    }
+
+    // Interface for reading/writing in 'NetlistRef':
+    void readAttr  (Wire w, Str text_in)         { data(w).read (text_in ); }
+    void writeAttr (Wire w, Out& text_out) const { data[w].write(text_out); }
+    void clearAttr (Wire w)                      { data(w).~GA(); new (&data(w)) GA(); }
+    bool attrIsNull(Wire w)                const { return data[w] == data.nil; }
+
+    // Map-operators:
+    const GA& operator[](Wire w) const { return data.operator[](w); }
+    GA&       operator()(Wire w)       { return data.operator()(w); }
+
+    // Access to underlying 'WMapL':
+    Vec<GA>&       base()       { return data; }
+    const Vec<GA>& base() const { return data; }
+};

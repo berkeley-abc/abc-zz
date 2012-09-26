@@ -1,0 +1,127 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : Netlist_Maps.ihh
+//| Author(s)   : Niklas Een
+//| Module      : Netlist
+//| Description : Maps from 'Wire's to arbitrary type 'T' (and sets of 'Wire's).
+//| 
+//| (C) Copyright 2010-2012, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//| Maps (and sets) can be either sign-unaware (default) or sign-aware (postfix 'S'). They can
+//| be over all gates (default) or local for a gatetype (postfix 'L'). The same is true for sets.
+//|________________________________________________________________________________________________
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Wire Maps:
+
+
+template <bool gatetype_local, bool sign_matters>
+struct MkIndex_Wire {
+    typedef Wire Key;
+
+    uind operator()(Wire w) const
+        // -- If sign doesn't matter, just use gate ID or serial#. With sign, use 'ID*2 + sign'
+        // to get the order: x0, ~x0, x1, ~x1, ...
+    {
+        if (gatetype_local)
+            return sign_matters ? (sn(w) << 1) | gate_id(sign(w)) : sn(w);
+        else
+            return sign_matters ? (id(w) << 1) | gate_id(sign(w)) : id(w);
+    }
+};
+
+
+template<class Value, bool gatetype_local = false, bool sign_matters = false>
+struct WMap : IntMap<Wire,Value,MkIndex_Wire<gatetype_local, sign_matters> > {
+    WMap()          : IntMap<Wire,Value,MkIndex_Wire<gatetype_local, sign_matters> >()    {}
+    WMap(Value nil) : IntMap<Wire,Value,MkIndex_Wire<gatetype_local, sign_matters> >(nil) {}
+};
+
+template<class Value, bool gatetype_local = false, bool sign_matters = false>
+struct WTmpMap : IntTmpMap<Wire,Value,MkIndex_Wire<gatetype_local, sign_matters> > {
+    WTmpMap()          : IntTmpMap<Wire,Value,MkIndex_Wire<gatetype_local, sign_matters> >()    {}
+    WTmpMap(Value nil) : IntTmpMap<Wire,Value,MkIndex_Wire<gatetype_local, sign_matters> >(nil) {}
+};
+
+template<bool gatetype_local = false, bool sign_matters = false>
+struct WSet_ : IntSet<Wire, MkIndex_Wire<gatetype_local, sign_matters> > {
+    WSet_() : IntSet<Wire, MkIndex_Wire<gatetype_local, sign_matters> >() {}
+};
+
+template<bool gatetype_local = false, bool sign_matters = false>
+struct WZet_ : IntZet<Wire, MkIndex_Wire<gatetype_local, sign_matters> > {
+    WZet_() : IntZet<Wire, MkIndex_Wire<gatetype_local, sign_matters> >() {}
+};
+
+template<bool gatetype_local = false, bool sign_matters = false>
+struct WSeen_ : IntSeen<Wire, MkIndex_Wire<gatetype_local, sign_matters> > {
+    WSeen_() : IntSeen<Wire, MkIndex_Wire<gatetype_local, sign_matters> >() {}
+};
+// <<== Change 'Wire' into 'gate_sid' and add some method to get back to the Wire. Maps and
+// sets probably have to store a pointer to the netlist. Maybe constructor can also take
+// argument 'register' which will make it 'compact()' aware (anonymous netlist objects?)
+
+
+// Give short names to maps and sets: 'L' means "gate-type local", 'S' means "Sign matter"
+// -- these should have been 'typedef's, but C++ doesn't support partially instantiated templates yet.
+template<class V> struct WMapL  : WMap<V,true ,false> { WMapL () {} WMapL (V nil) : WMap<V,true ,false>(nil) {} };
+template<class V> struct WMapS  : WMap<V,false,true > { WMapS () {} WMapS (V nil) : WMap<V,false,true >(nil) {} };
+template<class V> struct WMapLS : WMap<V,true ,true > { WMapLS() {} WMapLS(V nil) : WMap<V,true ,true >(nil) {} };
+
+template<class V> struct WTmpMapL  : WTmpMap<V,true ,false> { WTmpMapL () {} WTmpMapL (V nil) : WTmpMap<V,true ,false>(nil) {} };
+template<class V> struct WTmpMapS  : WTmpMap<V,false,true > { WTmpMapS () {} WTmpMapS (V nil) : WTmpMap<V,false,true >(nil) {} };
+template<class V> struct WTmpMapLS : WTmpMap<V,true ,true > { WTmpMapLS() {} WTmpMapLS(V nil) : WTmpMap<V,true ,true >(nil) {} };
+
+typedef WSet_<false,false> WSet;
+typedef WSet_<false,true>  WSetS;
+typedef WSet_<true ,false> WSetL;
+typedef WSet_<true ,true>  WSetLS;
+
+typedef WZet_<false,false> WZet;
+typedef WZet_<false,true>  WZetS;
+typedef WZet_<true ,false> WZetL;
+typedef WZet_<true ,true>  WZetLS;
+
+typedef WSeen_<false,false> WSeen;
+typedef WSeen_<false,true>  WSeenS;
+typedef WSeen_<true ,false> WSeenL;
+typedef WSeen_<true ,true>  WSeenLS;
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Wire-to-Wire Maps: (actually, any literal type to any literal type)
+
+
+// 'Key' and 'Value' must be literal types (define 'sign(Key)' and 'operator^(Key,bool)')
+template<class Key_, class Value_>
+struct LLMapNorm {
+    typedef Key_   Key;
+    typedef Value_ Value;
+    typedef const Value_ RetValue;
+
+    Value get(Key key, Value val) const { return val ^ sign(key); }
+    bool isNormal(Key key) const { return !sign(key); }
+};
+
+
+template<class Key, class Value>
+struct LLMap : IntMap<Key, Value, MkIndex_GLit<false>, LLMapNorm<Key,Value> > {
+    LLMap()          : IntMap<Key, Value, MkIndex_GLit<false>, LLMapNorm<Key,Value> >()    {}
+    LLMap(Value nil) : IntMap<Key, Value, MkIndex_GLit<false>, LLMapNorm<Key,Value> >(nil) {}
+};
+
+
+typedef LLMap<GLit,GLit> WWMap;
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Compaction remap:
+
+
+struct NlRemap {
+    Vec<gate_id>        new_id; // 'new_id[old_id]' gives new gate ID after call to 'compact()'.
+    Vec<Vec<serial_t> > new_sn; // 'new_sn[gate_type][old_sn]' gives new serial number.
+};

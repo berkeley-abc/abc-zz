@@ -1,0 +1,35 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : Netlist_GateTypes.icc
+//| Author(s)   : Niklas Een
+//| Module      : Netlist
+//| Description : Define arrays containing gatetype specific information.
+//| 
+//| (C) Copyright 2010-2012, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//|________________________________________________________________________________________________
+
+
+#define Stringify_And_Add_Comma(x) #x,
+cchar* GateType_name[GateType_size + 1] = {
+    "NULL",
+    Apply_To_All_GateTypes(Stringify_And_Add_Comma)
+};
+
+
+#define Wrap_With_GateAttr_and_n_inputs_And_Add_Comma(x) GateAttr_##x::n_inputs,
+uint gate_type_n_inputs[GateType_size+1] = {
+    0,
+    Apply_To_All_GateTypes(Wrap_With_GateAttr_and_n_inputs_And_Add_Comma)
+    0
+};
+
+
+#define Check_If_Empty(x) !IsEmptyStruct<GateAttr_##x>::Result::value,
+bool gate_type_has_attr[GateType_size+1] = {
+    false,
+    Apply_To_All_GateTypes(Check_If_Empty)
+    false
+};

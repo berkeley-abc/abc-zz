@@ -1,0 +1,170 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : Netlist_Pec.ihh
+//| Author(s)   : Niklas Een
+//| Module      : Netlist
+//| Description : Pecs -- classes that can be stored together with the netlist.
+//|
+//| (C) Copyright 2010-2012, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//|
+//| To create a persistent embedded class (Pec), derive from 'Pec' and override the virtual
+//| functions (+ constructor taking a 'const Pec_base&'). The new class should be named
+//| 'Pec_<class_name>'. The constructor definition should look like:
+//|
+//|     Pec_<class_name>(const Pec_base& base) : Pec(base) { <initialization> }
+//|
+//| You should register the class in some C-file by a global declaration:
+//|
+//|     Register_Pec( <class_name> )
+//|
+//| without the 'Pec_' prefix. Any parse error should be reported by throwing a 'String' with the
+//| error message.
+//|________________________________________________________________________________________________
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Persistent Embedded Classes:
+
+
+struct PecInfo;
+typedef uint pec_id;        // 'Pec' is the class.
+typedef uint pob_id;        // 'Pob' is the object (instance of a 'Pec').
+
+
+struct Pec_base {
+    // Fields setup by netlist at creation:
+    netlist_id nl;
+    PecInfo*   class_info;
+    pob_id     obj_id;
+    cchar*     obj_name;        // -- does NOT own the name (must not be freed by caller until end of program)
+
+    Pec_base(netlist_id nl_, PecInfo* class_info_, pob_id obj_id_, cchar* obj_name_) : nl(nl_), class_info(class_info_), obj_id(obj_id_), obj_name(obj_name_) {}
+
+    // Null check:
+    bool null() const { return class_info == NULL; }
+    typedef netlist_id Pec_base::*bool_type;
+    operator bool_type() const { return null() ? 0 : &Pec_base::nl; }
+};
+
+
+// Derive your pecs from this class:
+struct Pec : Pec_base {
+    // Methods to define by overloading:
+    virtual ~Pec() {}
+    virtual void move   (Pec& dst      )       { assert(false); };
+    virtual void copy   (Pec& dst      ) const { assert(false); };
+    virtual bool equal  (const Pec& dst) const { assert(false); return false; };  // -- used for consistency checks (debugging)
+    virtual void load   (In&  in       )       { assert(false); };
+    virtual void save   (Out& out      ) const { assert(false); };
+    virtual void read   (In&  text_in  )       { assert(false); };
+    virtual void write  (Out& text_out ) const { assert(false); };
+    virtual void compact(NlRemap& remap) {}     // -- If you have no 'Wire's in your attribute, this should be left undefined.
+
+    // You must also define a constructor: 'Pec_<your-type>(Pec_base&)' that calls:
+    Pec(const Pec_base& base) : Pec_base(base) {}
+
+protected:
+    friend class NetlistRef;
+    virtual void readAttr (Wire w, Str  text_in) {}         // -- INTERNAL! Only used by gate attributes.
+    virtual void writeAttr(Wire w, Out& text_out) const {}  // -- INTERNAL! Only used by gate attributes.
+    virtual void clearAttr (Wire w) {}                      // -- INTERNAL! Only used by gate attributes.
+    virtual bool attrIsNull(Wire w) const { return false; } // -- INTERNAL! Only used by gate attributes.
+
+private:
+    friend class PecNull;
+    friend class Wire;
+    Pec() : Pec_base(nid_NULL, NULL, 0, "") {}
+};
+
+
+//=================================================================================================
+
+
+typedef void (*PecInit) (const Pec_base& base, void* mem);
+
+
+struct PecInfo {
+    pec_id      class_id;
+    cchar*      class_name;
+    uint        n_bytes;
+    PecInit     init;
+    PecInfo*    next;
+};
+
+
+extern PecInfo* registered_pecs   /*= NULL*/;
+extern uind     n_registered_pecs /*= GateType_size*/;
+
+
+template<class T>
+void pecConstruct(const Pec_base& base, void* mem) {
+    new (mem) T(base);
+}
+
+
+macro bool compareIgnoringWhitespaces(cchar* x, cchar* y)
+{
+    bool ix = false;
+    bool iy = false;
+    for(;;){
+        while (isWS(*x) && (!ix || !isIdentChar(x[1]))) x++;
+        while (isWS(*y) && (!iy || !isIdentChar(y[1]))) y++;
+        if (*x != *y) return false;
+        if (*x == 0)  return true;
+        ix = isIdentChar(*x);
+        iy = isIdentChar(*y);
+        x++; y++;
+    }
+}
+
+
+macro PecInfo* getPecInfo(cchar* class_name)
+{
+    for (PecInfo* p = registered_pecs; p; p = p->next){
+        if (compareIgnoringWhitespaces(p->class_name, class_name))
+            return p;
+    }
+    return NULL;
+}
+
+
+template<class P>
+void registerPec(cchar* class_name, uind class_id = UIND_MAX)
+{
+    assert(!getPecInfo(class_name));     // -- must only register a type once
+
+    PecInfo* p = new PecInfo;
+    if (class_id == UIND_MAX){
+        p->class_id = n_registered_pecs;
+        n_registered_pecs++;
+    }else
+        p->class_id = class_id;
+    p->class_name = class_name;
+    p->n_bytes   = (uint)sizeof(P);
+    p->init      = pecConstruct<P>;
+    p->next      = registered_pecs;
+    registered_pecs = p;
+}
+
+
+// Register pre-placed gate attribute class (INTERNAL!)
+#define Register_Pec_(class_name, class_id) \
+    ZZ_Initializer(REG_PEC_PREPLACED_##class_id, -9050) { registerPec<Pec_ ## class_name >(#class_name, class_id); }
+
+// Register user defined class. NOTE! 'class_name' will be prefixed with 'Pec_' and must not contain '<' or '>'.
+#define Register_Pec(class_name) \
+    ZZ_Initializer(REG_PEC_##class_name, -9050) { registerPec<Pec_##class_name >(#class_name); }
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Null Pec:
+
+
+struct PecNull : Pec {
+    PecNull() : Pec() {}
+};
+
+
+extern PecNull pob_NULL;

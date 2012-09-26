@@ -1,0 +1,246 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : Netlist_Core.ihh
+//| Author(s)   : Niklas Een
+//| Module      : Netlist
+//| Description : Defines memory layout and implementation of core operations.
+//| 
+//| (C) Copyright 2010-2012, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//|________________________________________________________________________________________________
+
+
+#if !defined(NL_CORE_IMPLEMENTATION)
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Gates Header:
+
+
+struct Netlist_data;
+
+struct GatesHeader {
+    serial_t      serial0;              // }-- these are the only fields that differs between different headers of the same type
+    uint          pos;                  // }   ('pos' is the offset (in 'GLit's not bytes), to the next unused element -- if block is full, points beyond last element)
+    GateType      type;
+    netlist_id    nl;
+    uint          n_inputs;             // Set to 'DYNAMIC_GATE_INPUTS' for dynamic gates.
+    uint          elem_size;            // Set to 0 for dynamic gates.
+    uint64        reciprocal;           // '(uint64(1) << 32) / (elem_size * sizeof(GLit))'
+};
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Netlist data:
+
+
+struct Netlist_data {
+    netlist_id      nl_;
+    netlist_id      nl_next_free;
+
+    AlignedAlloc<NETLIST_INPUT_DATA_ALIGNMENT, NETLIST_INPUT_DATA_BLOCK_ALLOC, sizeof(GatesHeader)> mem;
+
+    Vec<GLit*>  gates;
+    Vec<GLit*>  gate_data   [GateType_size];  // For each type, a vector of memory blocks storing gate data.
+    uintg       type_count  [GateType_size];  // How many gates have been created of this type? (deleted gates subtracted)
+    serial_t    serial_count[GateType_size];  // Next serial number to use ('type_count' but without deleted gates subtracted)
+
+    Vec<Pec*>   pobs;           // Persistent, embedded classes (the first 'GateType_size' pecs are gate attributes (followed by pre-placed pecs then named pecs)).
+    uind        n_user_pobs;    // Number of user defined pobs (excluding gate attributes and 'pob_NULL's)
+    NameStore   names;          // Maps gate IDs to strings (and optionally back).
+    Vec<NlLis*> listeners[NlMsg_size];  // One listener list per message type. The same listener may be in multiple lists.
+    NlLis*      send_proxy;     // Object used to send user messages through 'sendMsg()'.
+} ___aligned(256);
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Global variables:
+
+
+#if defined(STATIC_NETLISTS)
+    // Trick to avoid calling constructor for the static netlists:
+    typedef Netlist_data AllGlobalNetlists[STATIC_NETLISTS];
+    extern uint64 global_netlists_blob_[sizeof(AllGlobalNetlists) / 8] ___may_alias;
+    AllGlobalNetlists& global_netlists_ = *reinterpret_cast<AllGlobalNetlists*>(global_netlists_blob_);
+    extern uint n_global_netlists_;
+
+#else
+    extern Netlist_data* global_netlists_;
+    extern uint          global_netlists_sz_;
+#endif
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Wire:
+
+
+class Wire {
+protected:
+    uint64 data;      // -- [63:32]=netlist ID, [32:1]=gate ID, [0]=sign
+
+    Wire(uint64 d) : data(d) {}
+    Netlist_data& nlData() const { return global_netlists_[nl()]; }
+
+public:
+    Wire()                                  { data = (uint64(nid_NULL) << 32) | (uint64(gid_NULL) << 1); }
+    Wire(const Wire& w)                     { data = w.data; }
+    Wire(netlist_id nl, gate_id id)         { data = (uint64(nl) << 32) | (uint64(id) << 1); }
+    Wire(netlist_id nl, gate_id id, bool s) { data = (uint64(nl) << 32) | (uint64(id) << 1) | uint64(s); }
+    Wire(netlist_id nl, GLit p)             { data = (uint64(nl) << 32) | (uint64(p.id) << 1) | uint64(p.sign); }
+
+    netlist_id   nl     () const { assert_debug(legal()); return netlist_id(data >> 32); }
+    gate_id      id     () const { return gate_id(uint32(data) >> 1); }
+    GLit         lit    () const { return GLit(packed_, uint32(data)); } // -- cast to 'GLit' (signed ID); this is also done implicit, but if you want to be explicit...
+    bool         sign   () const { return bool(data & 1); }
+
+    bool         legal  () const { return id() >= gid_FirstLegal; } // -- non-legal gates don't support every operation since they have no header associated with them
+    GLit*        deref_ () const { return (GLit*)(uintp(nlData().gates[id()]) & ~uintp(1)); }
+    GLit*        deref  () const { GLit* ret = deref_(); assert_debug(ret != NULL); return ret; }
+    GatesHeader& header () const { assert_debug(legal()); return *(GatesHeader*)((uintp(deref()) & ~uintp(NETLIST_INPUT_DATA_ALIGNMENT-1)) - sizeof(GatesHeader)); }
+
+    serial_t     sn     () const;
+    uint         size   () const { return dynamic() ? deref()[-1].data() : header().n_inputs; }
+    GateType     type   () const { return header().type; }
+    bool         dynamic() const { return (bool)(header().n_inputs == DYNAMIC_GATE_INPUTS); }
+    bool         deleted() const { return deref_() == NULL; }
+
+    Wire operator[](uint input_pin) const {
+        assert_debug(legal()); assert_debug(input_pin < size());
+        return Wire((data & 0xFFFFFFFF00000000ull) | uint64(deref()[input_pin+1].data())); }
+
+    inline void set(uint input_pin, GLit w_new) const;
+    void disconnect(uint input_pin) const { set(input_pin, GLit()); }
+
+    inline void remove(bool keep_names = false) const;      // -- 'keep_names' is internal; used by 'NetlistRef::change()'.
+
+    // Predicates:
+    bool null() const { return uint32(data) == (gid_NULL << 1); }
+    typedef uint64 Wire::*bool_type;
+    operator bool_type() const { return null() ? 0 : &Wire::data; }
+
+    // Negation:
+    Wire operator~()       const { return Wire(data ^ uint64(1)); }
+    Wire operator+()       const { return Wire(data & ~uint64(1)); }
+    Wire operator^(bool s) const { return Wire(data ^ uint64(s)); }
+        // -- '~w'  negates, '+w' removes the sign if present, 'w ^ s' negates if 's' is true.
+
+    // Comparison:
+    bool operator==(Wire w) const { return lit() == w.lit(); }
+    bool operator< (Wire w) const {
+        assert_debug(!legal() || !w.legal() || nl() == w.nl()); // -- it is illegal to compare (proper) wires from different netlists.
+        return lit() < w.lit(); }
+    bool operator==(GLit p) const { return lit() == p; }
+    bool operator!=(GLit p) const { return lit() != p; }
+    bool operator< (GLit p) const { return lit() <  p; }
+    bool operator<=(GLit p) const { return lit() <= p; }
+    bool operator> (GLit p) const { return lit() >  p; }
+    bool operator>=(GLit p) const { return lit() >= p; }
+    uint64 hash() const { return hash_<GLit>(lit()); }
+        // -- NOTE! You cannot store wires of different netlist in a hash table; operators ignore netlist ID.
+
+    // Implicit conversion to 'GLit':
+    operator GLit() const { return lit(); }
+};
+
+
+inline serial_t Wire::sn() const
+{
+    if (dynamic()){
+        GLit* p = deref();
+        return p[p[-1].data()+1].data(); }
+
+    GatesHeader& h      = header();
+    uint         offset = uintp(deref()) & uintp(NETLIST_INPUT_DATA_ALIGNMENT-1);
+    serial_t     local_serial = serial_t((uint64(offset) * h.reciprocal) >> 32);
+    assert_debug(local_serial == offset / (h.elem_size * sizeof(GLit)));
+    return h.serial0 + local_serial;
+}
+
+
+// Function interface:
+macro bool       legal  (Wire w) { return w.legal(); }        // -- illegal wires are 'Wire_NULL' and 'Wire_ERROR' (possibly signed)
+macro gate_id    id     (Wire w) { return w.id(); }
+macro bool       sign   (Wire w) { return w.sign(); }
+macro netlist_id nl     (Wire w) { return w.nl(); }
+macro netlist_id sn     (Wire w) { return w.sn(); }
+macro uint       size   (Wire w) { return w.size(); }
+macro GateType   type   (Wire w) { return w.type(); }
+macro bool       dynamic(Wire w) { return w.dynamic(); }
+macro bool       deleted(Wire w) { return w.deleted(); }
+macro void       remove (Wire w) { w.remove(); }
+
+// Hashing:
+template<> fts_macro uint64 hash_<Wire>(const Wire& w) { return w.hash(); }
+
+// Special wires:
+#if defined(ZZ_CONSTANTS_AS_MACROS)
+    #define Wire_NULL  (Wire(nid_NULL, gid_NULL))
+    #define Wire_ERROR (Wire(nid_NULL, gid_ERROR))
+    // -- NOTE! For speed reasons, the netlist ID part is ignored in the wire comparison operators
+    // and multiple representations of these two wires are used (differing in the netlist ID part).
+    // For that reason, it is illegal to ask 'nl(w)' if 'w' is "null" or "error".
+    // However, 'id(w)' and 'sign(w)' are allowed for all wires.
+#else
+    static const Wire Wire_NULL  = Wire(nid_NULL, gid_NULL);
+    static const Wire Wire_ERROR = Wire(nid_NULL, gid_ERROR);
+#endif
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Delayed inlines:
+
+
+#define NL_LIS_IMPLEMENTATION
+#include "Netlist_Listener.ihh"              // [INCLUDE POINT]
+
+
+inline void Wire::set(uint input_pin, GLit w_new) const
+{
+    assert_debug(legal()); assert_debug(input_pin < size());
+    const Vec<NlLis*>& lis = nlData().listeners[msg_Update];
+    if (lis.size() > 0){
+        Wire w_old = Wire(nl(), deref()[input_pin+1]);      // <<== DYNAMIC size fix here!
+        uind i = 0;
+        do{
+            lis[i]->update(*this, input_pin, w_old, Wire(nl(), w_new));
+            i++;
+        }while (i < lis.size());
+    }
+    deref()[input_pin+1] = w_new;
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Delayed implementations:
+
+
+#else
+#undef NL_CORE_IMPLEMENTATION
+
+void Wire::remove(bool keep_names) const
+{
+    const Vec<NlLis*>& lis = nlData().listeners[msg_Remove];
+    for (uind i = 0; i < lis.size(); i++)
+        lis[i]->remove(*this);
+
+    // <<== put gate data on free list in header
+    // <<== remove gate attribute, if any (or too slow?) -- basically for "writing" to be complete
+    assert_debug(id() >= gid_FirstUser);
+    assert_debug(!deleted());
+
+    if (!keep_names)
+        nlData().names.clear(this->lit());    // -- remove name(s)
+    GateType type_ = type();
+    Pec* attr_pob = nlData().pobs[type_];
+    if (attr_pob != NULL)
+        attr_pob->clearAttr(*this);
+
+    deref()[0] = glit_NULL;
+    nlData().type_count[type_]--;
+    nlData().type_count[gate_NULL]++;
+    nlData().gates[id()] = NULL;
+}
+
+#endif

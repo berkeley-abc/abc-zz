@@ -1,0 +1,291 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : GateDefs.ihh
+//| Author(s)   : Niklas Een
+//| Module      : Netlist
+//| Description : Defines gate types that can be used in 'Netlist'.
+//| 
+//| (C) Copyright 2010-2012, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//| This is the ONLY file that needs to be modified by other projects. If you need a new gate type,
+//| just add it's name to the 'Apply_To_All_GateTypes' macro and define a struct 'GateAttr_xxx'
+//| for it (see existing gates for examples). The second template parameter is the number of 
+//| inputs. If your gate has attributes (such as 'ushort ftb'), you need to tell how to load/save
+//| that data (binary) and how to read/write it (as text). The text representation must not contain
+//| the character '[' or ']' or a newline, and it must not start or end in a white space character.
+//|________________________________________________________________________________________________
+
+
+#ifdef GET_GATE_TYPES
+#undef GET_GATE_TYPES
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// List of gate types:
+
+
+#define Apply_To_All_GateTypes(Macro) \
+    Macro(Const)  /* must be first */ \
+    /* AIG */                         \
+    Macro(PI)                         \
+    Macro(PO)                         \
+    Macro(Flop)                       \
+    Macro(And)                        \
+    /* Extended AIG */                \
+    Macro(Buf)                        \
+    Macro(Not)                        \
+    Macro(Or)                         \
+    Macro(Xor)                        \
+    Macro(Equiv)                      \
+    /* Ternary gates */               \
+    Macro(And3)                       \
+    Macro(Or3)                        \
+    Macro(Xor3)                       \
+    Macro(Mux)                        \
+    Macro(Maj)                        \
+    Macro(One)                        \
+    Macro(Gamb)                       \
+    /* Multi-input AIG */             \
+    Macro(Conj)                       \
+    Macro(Disj)                       \
+    Macro(Even)                       \
+    Macro(Odd)                        \
+    /* Separated flops */             \
+    Macro(SO)                         \
+    /* Techmapped */                  \
+    Macro(Lut4)                       \
+    Macro(Npn4)                       \
+    Macro(WLut)                       \
+    /* Multi-output */                \
+    Macro(Pin)                        \
+    /* Grouping */                    \
+    Macro(Vec)                        \
+    Macro(Clamp)                      \
+    /* Memory */                      \
+    Macro(MFlop)                      \
+    Macro(MMux)                       \
+    Macro(MRead)                      \
+    Macro(MWrite)                     \
+    /* Uninterpreted functions: */    \
+    Macro(Uif)
+
+
+#endif
+#ifdef GET_GATE_ATTRIBUTES
+#undef GET_GATE_ATTRIBUTES
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// User defined gate attributes:
+
+
+struct GateAttr_Const : GateAttr<gate_Const, 0> {
+    lbool value;
+    GateAttr_Const() : value(l_Undef) {}
+
+    void save (Out& out) const { putc(out, value.value); }
+    void load (In&  in )       { value.value = getc(in); }
+    void write(Out& out) const { out += name(value); }
+    void read (Str  in ) {
+        if (in.size() != 1) throw String("Invalid constant: ") + in;
+        if      (in[0] == name(l_False)) value = l_False;
+        else if (in[0] == name(l_True )) value = l_True;
+        else if (in[0] == name(l_Undef)) value = l_Undef;
+        else if (in[0] == name(l_Error)) value = l_Error;
+        else throw String("Invalid constant: ") + in;
+    }
+    bool operator==(const GateAttr_Const& e) const { return value == e.value; }
+};
+
+
+
+struct GateAttr_PI : GateAttr_Numbered<gate_PI, 0> {
+    GateAttr_PI() {}
+    GateAttr_PI(int n) : GateAttr_Numbered<gate_PI,0>(n) {}
+};
+
+
+struct GateAttr_PO : GateAttr_Numbered<gate_PO, 1> {
+    GateAttr_PO() {}
+    GateAttr_PO(int n) : GateAttr_Numbered<gate_PO,1>(n) {}
+};
+
+
+struct GateAttr_Flop : GateAttr_Numbered<gate_Flop, 1> {
+    GateAttr_Flop() {}
+    GateAttr_Flop(int n) : GateAttr_Numbered<gate_Flop,1>(n) {}
+};
+
+struct GateAttr_And : GateAttr<gate_And, 2> {};
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct GateAttr_Buf  : GateAttr<gate_Buf  , 1> {};
+struct GateAttr_Not  : GateAttr<gate_Not  , 1> {};
+struct GateAttr_Or   : GateAttr<gate_Or   , 2> {};
+struct GateAttr_Xor  : GateAttr<gate_Xor  , 2> {};
+struct GateAttr_Equiv: GateAttr<gate_Equiv, 2> {};
+
+struct GateAttr_And3 : GateAttr<gate_And3, 3> {};
+struct GateAttr_Or3  : GateAttr<gate_Or3 , 3> {};
+struct GateAttr_Xor3 : GateAttr<gate_Xor3, 3> {};
+struct GateAttr_Mux  : GateAttr<gate_Mux , 3> {};       // pin0 ? pin1 : pin2
+struct GateAttr_Maj  : GateAttr<gate_Maj , 3> {};
+struct GateAttr_One  : GateAttr<gate_One , 3> {};
+struct GateAttr_Gamb : GateAttr<gate_Gamb, 3> {};
+
+struct GateAttr_Conj : GateAttr<gate_Conj, DYNAMIC_GATE_INPUTS> {};
+struct GateAttr_Disj : GateAttr<gate_Disj, DYNAMIC_GATE_INPUTS> {};
+struct GateAttr_Even : GateAttr<gate_Even, DYNAMIC_GATE_INPUTS> {};
+struct GateAttr_Odd  : GateAttr<gate_Odd , DYNAMIC_GATE_INPUTS> {};
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct GateAttr_SO : GateAttr_Numbered<gate_SO, 1> {
+    GateAttr_SO() {}
+    GateAttr_SO(int n) : GateAttr_Numbered<gate_SO,1>(n) {}
+};
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct GateAttr_Lut4 : GateAttr<gate_Lut4, 4> {
+    ushort ftb;
+    GateAttr_Lut4(ushort f = 0) : ftb(f) {}
+
+    void save(Out& out) const {
+        putc(out, ftb); putc(out, ftb >> 8); }
+
+    void load(In&  in ) {
+        ftb = getc(in); ftb |= (ushort)getc(in) << 8; }
+
+    void write(Out& out) const {
+        putc(out, toHex(ftb >> 12));
+        putc(out, toHex((ftb >> 8) & 0xF));
+        putc(out, toHex((ftb >> 4) & 0xF));
+        putc(out, toHex(ftb& 0xF)); }
+
+    void read(Str in) {
+        if (in.size() > 4) throw Excp_AttrParseError();
+        ftb = 0;
+        if (in.size() > 0) ftb  = fromHex(in[in.size()-1]);       else return;
+        if (in.size() > 1) ftb |= fromHex(in[in.size()-2]) <<  4; else return;
+        if (in.size() > 2) ftb |= fromHex(in[in.size()-3]) <<  8; else return;
+        if (in.size() > 3) ftb |= fromHex(in[in.size()-4]) << 12;
+    }
+
+    bool operator==(const GateAttr_Lut4& e) const {
+        return ftb == e.ftb; }
+};
+
+
+struct GateAttr_Npn4 : GateAttr<gate_Npn4, 4> {
+    uchar cl;   // -- equivalence class number (0..221)
+    GateAttr_Npn4(uchar cl_ = 255) : cl(cl_) {}
+
+    void save (Out& out) const { putc(out, cl); }
+    void load (In&  in )       { cl = getc(in); }
+    void write(Out& out) const { out += (uint)cl; }
+    void read (Str  in )       { cl = stringToUInt64(in); }
+
+    bool operator==(const GateAttr_Npn4& other) const {
+        return cl == other.cl; }
+};
+
+
+struct GateAttr_WLut : GateAttr<gate_WLut, DYNAMIC_GATE_INPUTS> {
+    uint64* ftb;
+    uint    ftb_sz;
+    GateAttr_WLut() : ftb(NULL), ftb_sz(0) {}
+
+    void load (In&  /*in      */)       { /*<<==*/ }
+    void save (Out& /*out     */) const {}
+    void read (Str  /*text_in */)       {}
+    void write(Out& /*text_out*/) const {}
+    bool operator==(const GateAttr_WLut& /*e*/) const { return true; }
+};
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct GateAttr_Pin : GateAttr_Numbered<gate_Pin, 1> {
+    GateAttr_Pin() {}
+    GateAttr_Pin(int n) : GateAttr_Numbered<gate_Pin,1>(n) {}
+};
+
+
+struct GateAttr_Vec : GateAttr<gate_Vec, DYNAMIC_GATE_INPUTS> {};
+
+
+struct GateAttr_Clamp  : GateAttr<gate_Clamp, 1> {};
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+static const uint mem_id_NULL = UINT_MAX;
+
+
+template<GateType t, uint n>
+struct GateAttr_MemGate : GateAttr<t,n> {
+    uint   mem_id;
+    GateAttr_MemGate() : mem_id(mem_id_NULL) {}
+    GateAttr_MemGate(uint id) : mem_id(id) {}
+
+    void save (Out& out) const { putu(out, mem_id); }
+    void load (In&  in )       { mem_id = getu(in); }
+    void write(Out& out) const { out += mem_id; }
+    void read (Str in)         { mem_id = stringToUInt64(in); }
+
+    bool operator==(const GateAttr_MemGate& other) const {
+        return mem_id == other.mem_id; }
+};
+
+
+struct GateAttr_MFlop : GateAttr_MemGate<gate_MFlop, 1> {   // -- mem
+    GateAttr_MFlop() {}
+    GateAttr_MFlop(uint id) : GateAttr_MemGate<gate_MFlop,1>(id) {}
+};
+
+struct GateAttr_MMux   : GateAttr_MemGate<gate_MMux, 3> {   // -- sel, mem1, mem0
+    GateAttr_MMux() {}
+    GateAttr_MMux(uint id) : GateAttr_MemGate<gate_MMux,3>(id) {}
+};
+
+struct GateAttr_MRead  : GateAttr_MemGate<gate_MRead, 2> {   // -- mem, addr-vec (output is split by 'Pin')
+    GateAttr_MRead() {}
+    GateAttr_MRead(uint id) : GateAttr_MemGate<gate_MRead,2>(id) {}
+};
+
+struct GateAttr_MWrite : GateAttr_MemGate<gate_MWrite, 3> {   // -- mem, addr-vec, data-vec (output is new mem)
+    GateAttr_MWrite() {}
+    GateAttr_MWrite(uint id) : GateAttr_MemGate<gate_MWrite,3>(id) {}
+};
+
+// NOTE! mem signals cannot be negated (neither can vec signals)
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct GateAttr_Uif : GateAttr<gate_Uif, DYNAMIC_GATE_INPUTS> {
+    uint        sym;
+
+    GateAttr_Uif(uint s = UINT_MAX) : sym(s) {}
+
+    void save(Out& out) const { putu(out, sym); }
+    void load(In&  in ) { sym = getu(in); }
+    void write(Out& out) const { out += sym; }
+    void read(Str in) { sym = stringToUInt64(in); }
+
+    bool operator==(const GateAttr_Uif& e) const {
+        return sym == e.sym; }
+};
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+#endif

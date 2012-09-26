@@ -1,0 +1,29 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : Tuples.ihh
+//| Author(s)   : Niklas Een
+//| Module      : Prelude
+//| Description : 
+//| 
+//| (C) Copyright 2010, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//| The content of this file was automatically generated from 'ZZ/Prelude/Aux/GenTuples.C' by:
+//| 
+//|     g++ GenTuples.C -o gen_tuples && gen_tuples && rm gen_tuples
+//|     
+//| Pairs, triplets and quadruplets are supported. Fields are named: fst, snd, trd, fth.
+//| Factory functions allow creating tuples without explicitly stating types:
+//| 
+//|     tuple(12, "niklas");      vs.    Pair<int,const char*>(12, "niklas")
+//| 
+//| Variables can be temporary wrapped as a tuple l-value to receiving return values:
+//|
+//|     l_tuple(x, y) = myFunc(...);
+//|________________________________________________________________________________________________
+
+namespace ZZ {
+using namespace std;
+
+

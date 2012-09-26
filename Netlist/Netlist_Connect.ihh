@@ -1,0 +1,86 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : Netlist_Connect.ihh
+//| Author(s)   : Niklas Een
+//| Module      : Netlist
+//| Description : A 'Connect' is a wire + a pin#.
+//| 
+//| (C) Copyright 2010-2012, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//|________________________________________________________________________________________________
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Connect:
+
+
+// A 'Connect' is a 'Wire' plus a pin number. It is used to store fanout information ("which gate
+// is pointing to me through what pin?"). Although not enforced by the data structure, when used
+// for fanouts the sign of the connect will always match that of the 'pin'th input of the gate
+// (i.e. 'sign(c[c.pin]) == sign(c)' for a connect 'c').
+
+struct Connect : Wire {
+    uint    pin;
+    Connect() : Wire(nid_NULL, gid_NULL), pin(UINT_MAX) {}
+    Connect(Wire w, uint p) : Wire(w), pin(p) {}
+
+  //________________________________________
+  //  Operations on the child pointed to:
+
+    Wire get() const {               // -- get the child pointed to by 'parent[pin]'
+        return (*this)[pin]; }
+
+    void set(Wire w_new) const {     // -- set the child to 'w_new'
+        Wire w = *this;
+        w.set(pin, w_new); }
+
+    void replace(Wire w_new) const { // -- set the child sign-aware (must not pass 'Wire_NULL')
+        assert(w_new);
+        Wire w = *this;
+        w.set(pin, w_new ^ w.sign()); }
+
+    void disconnect() const {        // -- disconnect the child (set it to 'Wire_NULL')
+        Wire w = *this;
+        w.disconnect(pin); }
+
+  //________________________________________
+  //  Comparison:
+
+    bool operator==(const Connect& other) const {
+        Wire w = *this;
+        Wire v = other;
+        return (w == v) && pin == other.pin; }
+
+    bool operator<(const Connect& other) const {
+        Wire w = *this;
+        Wire v = other;
+        return (w < v) || (w == v && pin < other.pin); }
+
+    bool operator==(const Wire& other) const {
+        Wire w = *this;
+        Wire v = other;
+        return (w == v); }
+
+    bool operator<(const Wire& other) const {
+        Wire w = *this;
+        Wire v = other;
+        return (w < v); }
+};
+
+
+// Hashing:
+template<> fts_macro uint64 hash_<Connect>(const Connect& c) {
+    Wire w = c;
+    return w.hash() ^ (uint64(c.pin) << 32); }
+
+
+// Special connects:
+#if defined(ZZ_CONSTANTS_AS_MACROS)
+    #define Connect_NULL  (Connect())
+    #define Connect_ERROR (Connect(Wire_ERROR, UINT_MAX))
+#else
+    static const Connect Connect_NULL  = Connect();
+    static const Connect Connect_ERROR = Connect(Wire_ERROR, UINT_MAX);
+#endif

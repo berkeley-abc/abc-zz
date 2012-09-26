@@ -1,0 +1,7 @@
+*.ftp
+*.pdf
+*.log 
+*.wcnf
+
+.idea/
+build/
