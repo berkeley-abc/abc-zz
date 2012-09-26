@@ -35,7 +35,7 @@ $MAKEFILE_DEFINES
 extern "C" void Abc_CommandUpdate9(Abc_Frame_t* pAbc, Gia_Man_t* pNew);
 
 // Get rid of warnings:
-static void    Vec_IntUniqify( Vec_Int_t * p ) ___unused;
+static int     Vec_IntUniqify( Vec_Int_t * p ) ___unused;
 static void    Vec_WrdUniqify( Vec_Wrd_t * p ) ___unused;
 static int     sat_solver_var_value( sat_solver* s, int v )  ___unused;
 static int     sat_solver_var_literal( sat_solver* s, int v ) ___unused;
