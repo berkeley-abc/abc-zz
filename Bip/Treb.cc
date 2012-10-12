@@ -282,7 +282,7 @@ TCube Treb::generalize(TCube s0)
                     if (P.gen_with_cex && cexs[i] && !subsumes(s.cube, cexs[i]))
                         goto Continue;   // -- previous CEX still works
 
-                    TCube s2 = Z->solveRelative(new_s, sr_ExtractModel | (P.gen_with_cex ? sr_NoSim : 0));
+                    TCube s2 = Z->solveRelative(new_s, (P.gen_with_cex ? sr_ExtractModel : 0) | (P.gen_with_cex ? sr_NoSim : 0));
                     if (condAssign(s, s2)){
                         if (P.gen_with_cex)
                             s.frame = new_s.frame;  // -- CEX only hold for a specific time-frame, so undo time-generalization that 'solveRelative()' might have done
