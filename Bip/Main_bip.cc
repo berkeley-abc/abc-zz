@@ -58,7 +58,7 @@ void SIGINT_handler(int signum)
         // -- this is highly unsafe, but it is temporary...
     fflush(stdout);
     dumpProfileData();
-  #if !defined(ZZ_PROFILE_MODE)
+  #if !defined(ZZ_PROFILE)
     _exit(-1);
   #else
     zzFinalize();
@@ -578,6 +578,8 @@ void outputVerificationResult(
             WriteLn "----";
             if (N.typeCount(gate_MFlop) > 0)
                 WriteLn "Netlist has memories. Counterexample could not be verified (yet).";
+            else if (!cex)
+                WriteLn "Counterexample not provided.";
             else{
                 Vec<uint> fails_at;
                 if (verifyCex(N, props, *cex, &fails_at)){
@@ -714,6 +716,28 @@ void printAbcHelp(CLI& cli_, String& orig_msg)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Increase stack size:
+
+
+void increaseStackSize()
+{
+    const rlim_t stack_size = 64 * rlim_t(1024*1024);
+    struct rlimit r;
+    int st;
+
+    st = getrlimit(RLIMIT_STACK, &r);
+    if (st == 0)    {
+        if (r.rlim_cur < stack_size){
+            r.rlim_cur = stack_size;
+            st = setrlimit(RLIMIT_STACK, &r);
+            if (st != 0)
+                ShoutLn "WARNING! Stack size could not be changed.";
+        }
+    }
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Main:
 
 
@@ -779,6 +803,8 @@ int main(int argc, char** argv)
 
     //**/WriteLn "Running TEST..."; void test(); test(); exit(0);
 
+    increaseStackSize();
+
     // Command line -- common:
     if (abc_plugin_call){
         cli_hidden.add("input" , "string", "", "");
@@ -821,7 +847,7 @@ int main(int argc, char** argv)
 
     // Command line -- new property driven reachability (The Trebuchet):
     CLI cli_pdr2;
-    //addCli_Pdr2(cli_pdr2);
+    addCli_Pdr2(cli_pdr2);
     cli.addCommand("pdr2", "Two-frame version of PDR.", &cli_pdr2);
 
     // Command line -- Sifting for k-inductive invariant:
@@ -1363,13 +1389,12 @@ int main(int argc, char** argv)
 
     }else if (cli.cmd == "pdr2"){
         Params_Pdr2 P;
-        //setParams(cli, P);
+        setParams(cli, P);
         Cex     cex;
         Netlist N_inv;
-        int     bug_free_depth;
-        lbool   result = pdr2(N, props, P, &cex, N_inv, &bug_free_depth);
+        bool    result = pdr2(N, props, P, &cex, N_inv);
 
-        outputVerificationResult(N, props, result, &cex, orig_num_pis, N_inv, bug_free_depth, cli.get("check").bool_val, output, quiet, T0, Tr0);
+        outputVerificationResult(N, props, lbool_lift(result), &cex, orig_num_pis, N_inv, 0, cli.get("check").bool_val, output, quiet, T0, Tr0);
 
     }else if (cli.cmd == "sift"){
         lbool result ___unused = sift(N, props);
@@ -1433,20 +1458,23 @@ int main(int argc, char** argv)
                 if (fanout_count[w] > 1)
                     keep.add(w);
 
-            SatStd    S;
+            MiniSat2s S;
             WMap<Lit> m2s;
-            Clausify<SatStd> CM(S, M, m2s, keep);
+            Clausify<MetaSat> CM(S, M, m2s, keep);
             CM.quant_claus    = cli_static_bmc.get("qc").bool_val;
             CM.simple_tseitin = cli_static_bmc.get("st").bool_val;
             S.addClause(CM.clausify(m_out));
 
             if (output == ""){
-                S.verbosity = 1;
+                S.setVerbosity(1);
                 bool result = (S.solve() == l_True);
                 WriteLn "Result: \a*%_\a*", result ? "SAT" : "UNSAT";
+                NewLine;
+                writeResourceUsage(T0, Tr0);
             }else{
-                S.exportCnf(output);
-                WriteLn "Wrote DIMACS: \a*%_\a*", output;
+                /**/WriteLn "TEMPORARY: Cannot export CNF; need to fix. Sorry.";
+                //S.exportCnf(output);
+                //WriteLn "Wrote DIMACS: \a*%_\a*", output;
             }
 
         }else{

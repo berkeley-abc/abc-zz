@@ -17,12 +17,13 @@ int main(int argc, char** argv)
 
     cli.add("input" , "string", arg_REQUIRED, "Input Liberty library file.", 0);
     cli.add("output", "string", arg_REQUIRED, "Output file ('.scl' or '.genlib').", 1);
+    cli.add("ttm" , "{keep,merge,first}", "merge", "Timing tables mode.");
     cli.parseCmdLine(argc, argv);
 
     SC_Lib L;
     try{
         WriteLn "Reading: %_", cli.get("input").string_val;
-        readLiberty(cli.get("input").string_val, L);
+        readLiberty(cli.get("input").string_val, L, (TimingTablesMode)cli.get("ttm").enum_val);
     }catch (Excp_Msg& msg){
         ShoutLn "PARSE ERROR! %_", msg;
         exit(1);

@@ -68,6 +68,8 @@ void Cube::sort()
 {
     Array<GLit> proxy(ptr->data, ptr->sz);
     ::ZZ::sort(proxy);
+    for (uint i = 1; i < this->size(); i++)
+        assert(ptr->data[i-1] != ptr->data[i]);     // -- cubes must created with unique elements
 }
 
 

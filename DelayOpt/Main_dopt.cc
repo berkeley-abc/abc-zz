@@ -119,7 +119,7 @@ int main(int argc, char** argv)
 
     // Run delay optimization:
     if (cli.get("old").bool_val)
-        optimizeDelay(N, L, wire_cap, false/*pre_buffer*/, true/*forget_sizes*/);
+        optimizeDelay(N, L, wire_cap, cli.get("prebuf").int_val, cli.get("forget").bool_val);
     else
         optimizeDelay2(N, L, wire_cap, P);
 

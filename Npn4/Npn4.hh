@@ -70,6 +70,8 @@ extern ftb4_t apply_perm4    [24][65536];
 extern ftb4_t apply_inv_perm4[24][65536];
 extern ftb4_t apply_negs4    [32][65536];
 
+extern uint npn4_just[222][16];     // -- list of minimal justifications for each function
+
 
 // Compile time 'pseq4_to_perm4':
 #define PERM4_0123 0

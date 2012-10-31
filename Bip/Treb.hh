@@ -36,6 +36,7 @@ struct Params_Treb {
     bool    multi_sat;          // Use multiple SAT solvers?
     bool    use_activity;       // Use activity heuristic.
     Weaken  weaken;             // Method to weaken proof-obligations with.
+    bool    pre_weak;           // Is simulation is used for weakening, first apply justification as a pre-step?
     uint    rec_nonind;         // Recurse into non-inductive region (#tries).
     uint    targ_enl;           // Target enlargement. Currently don't produce correct CEXs.
     uint    semant_coi;         // Semantic cone-of-influence (bit0=before, bit1=after forward-propagation).
@@ -52,6 +53,7 @@ struct Params_Treb {
     bool    gen_with_cex;       // Store counterexamples in 'generalize()' to speedup multiple orbits.
     bool    hq;                 // High quality generalization (slower)
     uint    dump_invar;         // Dump invariant (0=no, 1=clauses, 2=PLA).
+    SolverType sat_solver;      // SAT-solver to use
     bool    quiet;              // Suppress output.
 
     Params_Treb() :
@@ -60,6 +62,7 @@ struct Params_Treb {
         multi_sat(false),
         use_activity(true),
         weaken(SIM),
+        pre_weak(true),
         rec_nonind(0),
         targ_enl(0),
         semant_coi(0),
@@ -76,6 +79,7 @@ struct Params_Treb {
         gen_with_cex(false),
         hq(false),
         dump_invar(0),
+        sat_solver(sat_Msc),
         quiet(false)
     {}
 };

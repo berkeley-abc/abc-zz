@@ -266,8 +266,8 @@ TCube Treb::generalize(TCube s0)
     bool  changed;
 
     Vec<GLit> ss(copy_, s0.cube);
-    if (P.use_activity){
-        sobSort(sob(ss, proj_lt(compose(brack<float,Wire>(activity), brack<Wire,GLit>(N))))); }
+    if (P.use_activity)
+        sobSort(ordStabilize(sob(ss, proj_lt(compose(brack<float,Wire>(activity), brack<Wire,GLit>(N))))));
 
     do{
         // Keep going until we have a full orbit of failures to remove a literal OR we have done two orbits.
@@ -282,7 +282,7 @@ TCube Treb::generalize(TCube s0)
                     if (P.gen_with_cex && cexs[i] && !subsumes(s.cube, cexs[i]))
                         goto Continue;   // -- previous CEX still works
 
-                    TCube s2 = Z->solveRelative(new_s, (P.gen_with_cex ? sr_ExtractModel : 0) | (P.gen_with_cex ? sr_NoSim : 0));
+                    TCube s2 = Z->solveRelative(new_s, (P.gen_with_cex ? (sr_ExtractModel | sr_NoSim) : 0));
                     if (condAssign(s, s2)){
                         if (P.gen_with_cex)
                             s.frame = new_s.frame;  // -- CEX only hold for a specific time-frame, so undo time-generalization that 'solveRelative()' might have done
@@ -1612,12 +1612,15 @@ void addCli_Treb(CLI& cli)
     Params_Treb P;  // -- get default values.
     cchar* weak_type    = "{none,sim,just}";
     cchar* weak_default = (P.weaken == Params_Treb::NONE) ? "none" : (P.weaken == Params_Treb::SIM) ? "sim" : "just";
+    String sat_types   = "{zz, msc, abc}";
+    String sat_default = (P.sat_solver == sat_Zz) ? "zz" : (P.sat_solver == sat_Msc) ? "msc" : "abc";
 
     cli.add("seed"      , "uint"     , (FMT "%_", P.seed)           , "Seed to randomize SAT solver with. 0 means no randomization.");
     cli.add("bwd"       , "bool"     , P.bwd ? "yes" : "no"         , "Perform backward induction/reachability.");
     cli.add("multi"     , "bool"     , P.multi_sat ? "yes" : "no"   , "Use multiple SAT solvers?");
     cli.add("act"       , "bool"     , P.use_activity ? "yes" : "no", "Use activity in weakening and generalization.");
     cli.add("weak"      , weak_type  , weak_default                 , "Weakening method for proof-obligations.");
+    cli.add("pre-weak"  , "bool"     , P.pre_weak ? "yes" : "no"    , "Apply justification before ternary simulation? (only for -weak=sim).");
     cli.add("rec-ni"    , "uint"     , (FMT "%_", P.rec_nonind)     , "Recurse into non-inductive region on this many literals during cube generalization.");
     cli.add("te"        , "uint"     , (FMT "%_", P.targ_enl)       , "EXPERIMENTAL. Target enlargement (invar/CEX generation not supported)");
     cli.add("coi"       , "int[0:3]" , (FMT "%_", P.semant_coi)     , "EXPERIMENTAL. Semantic cone of influence (1=before propagation, 2=after, 3=both).");
@@ -1634,6 +1637,7 @@ void addCli_Treb(CLI& cli)
     cli.add("gen-cex"   , "bool"     , P.gen_with_cex?"yes":"no"    , "Sets '-orbits' to infinity and stores CEXs during generalization to speedup fixedpoint.");
     cli.add("hq"        , "bool"     , P.hq?"yes":"no"              , "Use slow, high-quality generalization procedure.");
     cli.add("dump-invar", "int[0:2]" , (FMT "%_", P.dump_invar)     , "Dump invariant: 0=no, 1=clause form, 2=PLA form.");
+    cli.add("sat"       , sat_types  , sat_default                  , "SAT-solver to use.");
 }
 
 
@@ -1646,6 +1650,7 @@ void setParams(const CLI& cli, Params_Treb& P)
     P.multi_sat     = cli.get("multi")     .bool_val;
     P.use_activity  = cli.get("act")       .bool_val;
     P.weaken      =(W)cli.get("weak")      .enum_val;
+    P.pre_weak      = cli.get("pre-weak")  .bool_val;
     P.rec_nonind    = cli.get("rec-ni")    .int_val;
     P.targ_enl      = cli.get("te")        .int_val;
     P.semant_coi    = cli.get("coi")       .int_val;
@@ -1662,6 +1667,10 @@ void setParams(const CLI& cli, Params_Treb& P)
     P.gen_with_cex  = cli.get("gen-cex")   .bool_val;
     P.hq            = cli.get("hq")        .bool_val;
     P.dump_invar    = cli.get("dump-invar").int_val;
+
+    P.sat_solver = (cli.get("sat").enum_val == 0) ? sat_Zz :
+                   (cli.get("sat").enum_val == 1) ? sat_Msc :
+                   (cli.get("sat").enum_val == 2) ? sat_Abc : (assert(false), sat_NULL);
 
     P.quiet         = cli.get("quiet")     .bool_val;
 

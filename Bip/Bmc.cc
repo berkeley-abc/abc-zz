@@ -32,7 +32,7 @@ class BmcTrace {
 //**/public:
     NetlistRef          N;          // Design
     Netlist             F;          // Unrolled design
-    SatStd              S;          // SAT environment
+    MultiSat            S;          // SAT environment
   #if !defined(USE_COMPACT_MAPS)
     Vec<WMap<Wire> >    n2f;        // Map '(frame, wire)' to wire in 'F'.
   #else
@@ -40,7 +40,7 @@ class BmcTrace {
   #endif
     WMap<Lit>           f2s;        // Map gate in 'F' to SAT literal.
     WZet                keep_f;     // Gates in 'F' that we hypothesize are best kept as SAT variables
-    Clausify<SatStd>    C;
+    Clausify<MetaSat>   C;
     Vec<MemUnroll>      memu;
 
 public:
@@ -58,8 +58,8 @@ public:
     void  getModel(Vec<Vec<lbool> >& pi, Vec<Vec<lbool> >& ff) const;
 
     uint  nClauses  () const { return (uint)S.nClauses(); }
-    uint  nConflicts() const { return (uint)S.statistics().conflicts; }
-    uint  nVars     () const { return (uint)S.varCount(); }
+    uint  nConflicts() const { return (uint)S.nConflicts(); }
+    uint  nVars     () const { return (uint)S.nVars(); }
     uint  nGates    () const { return F.gateCount(); }
 
     // Export unrolling:
@@ -69,6 +69,9 @@ public:
     // Clausification control:
     void  setSimpleTseitin(bool val) { C.simple_tseitin = val; }
     void  setQuantClaus   (bool val) { C.quant_claus    = val; }
+
+    // SAT solver:
+    void  setSatSolver(SolverType t) { S.selectSolver(t); }
 };
 
 
@@ -78,9 +81,12 @@ BmcTrace::BmcTrace(NetlistRef N_, EffortCB* cb) :
 {
     Add_Pob0(F, strash);
     if (cb){
+        WriteLn "WARNING! Virtual timeout no longer supported.";
+      #if 0
         S.timeout         = VIRT_TIME_QUANTA;
         S.timeout_cb      = satEffortCB;
         S.timeout_cb_data = (void*)cb;
+      #endif
     }
     initMemu(N, memu);
 }
@@ -165,8 +171,12 @@ lbool BmcTrace::solve(const Vec<Wire>& assumps, uint64 timeout)
         Vec<Lit> lits;
         for (uind i = 0; i < assumps.size(); i++)
             lits.push(C.clausify(assumps[i]));
-        if (timeout != UINT64_MAX)
+        if (timeout != UINT64_MAX){
+            WriteLn "WARNING! Virtual timeout no longer supported.";
+          #if 0
             S.timeout = timeout;
+          #endif
+        }
         return S.solve(lits);
     }catch (Excp_Clausify_Abort){
         return l_Undef;
@@ -357,6 +367,7 @@ lbool bmc_(NetlistRef N0, const Vec<Wire>& props, const Params_Bmc& P, Cex* cex,
     Get_Pob(N, init_bad);
     T.setSimpleTseitin(P.simple_tseitin);
     T.setQuantClaus   (P.quant_claus);
+    T.setSatSolver    (P.sat_solver);
 
     Info_Bmc info;
     if (cb) cb->info = &info;

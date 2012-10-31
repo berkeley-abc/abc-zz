@@ -102,6 +102,10 @@ public:
     const Vec<Key_>& list() const { return elems; }
     void compact();
         // -- The list will contain excluded elements unless 'compact()' is called first.
+
+    // Vector interface:
+    bool push(const Key_& key) { return add(key); }
+    Key  operator[](uint i) const { assert_debug(elems.size() == sz); return elems[i]; }
 };
 
 

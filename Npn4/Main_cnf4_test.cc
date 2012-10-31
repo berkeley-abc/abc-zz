@@ -1,5 +1,7 @@
 #include "Prelude.hh"
+#include "Npn4.hh"
 #include "Cnf4.hh"
+#include "ZZ/Generics/Sort.hh"
 
 using namespace ZZ;
 
@@ -7,6 +9,75 @@ using namespace ZZ;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+/*
+all minimal justification for each NPN class (and each input combination)
+worst case: 
+
+uint npn4_just[222][16];    // each group of four bits gives one minimal justification
+
+1110 -> 0
+*/
+
+
+bool minSup(ftb4_t ftb, uint a, uchar sup, Vec<uchar>& all_sup)
+{
+    // Support too small?
+    bool val_a = ftb & (1u << a);
+    for (uint i = 0; i < 16; i++){
+        if ((a & sup) == (i & sup)){
+            bool val_i = ftb & (1u << i);
+            if (val_a != val_i)
+                return false;
+        }
+    }
+
+    // Support minimal?
+    bool minimal = true;
+    for (uint b = 0; b < 4; b++){
+        if (sup & (1u << b)){
+            uchar new_sup = sup & ((1u << b) ^ 15);
+            if (minSup(ftb, a, new_sup, all_sup))
+                minimal = false;
+        }
+    }
+
+    if (minimal)
+        all_sup.push(sup);
+    return true;
+}
+
+
+void minSup(ftb4_t ftb, uint a, Vec<uchar>& all_sup)
+{
+    minSup(ftb, a, 15, all_sup);
+    sortUnique(all_sup);
+}
+
+
+int main(int argc, char** argv)
+{
+    ZZ_Init;
+
+    uint max_sz = 0;
+    for (uint cl = 0; cl < 222; cl++){
+        WriteLn "class=%_", cl;
+        for (uint a = 0; a < 16; a++){
+            Write "f%_[%.4b] = %_   support:", cl, a, (uint)bool(npn4_repr[cl] & (1u << a));
+
+            Vec<uchar> all;
+            minSup(npn4_repr[cl], a, all);
+            WriteLn " %.4b", all;
+
+            newMax(max_sz, (uint)all.size());
+        }
+    }
+    WriteLn "Max #supports: %_", max_sz;
+
+    return 0;
+}
+
+
+#if 0
 int main(int argc, char** argv)
 {
     ZZ_Init;
@@ -33,3 +104,4 @@ int main(int argc, char** argv)
 
     return 0;
 }
+#endif

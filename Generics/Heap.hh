@@ -45,7 +45,7 @@ public:
 
     void reserve(uind cap)           { heap.reserve(cap); }
     void clear(bool dispose = false) { heap.clear(dispose); }
-    uind size()                      { return heap.size(); }
+    uind size() const                { return heap.size(); }
 
     Key  peek()        { assert(size() != 0); return heap[0]; }
     Key  pop()         { assert(size() != 0); Key ret = heap[0], tmp = heap.last(); heap.pop(); if (size() > 0) siftDown(0, tmp); return ret; }
@@ -82,7 +82,7 @@ public:
 
     void reserve(uind cap)           { heap.reserve(cap); }
     void clear(bool dispose = false) { heap.clear(dispose); }
-    uind size()                      { return heap.size(); }
+    uind size() const                { return heap.size(); }
 
     Pair<Key_,Value_> peek()                      { return heap.peek(); }
     Key               peekKey()                   { return heap.peek().fst; }

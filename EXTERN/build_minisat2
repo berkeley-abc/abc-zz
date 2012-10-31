@@ -127,10 +127,12 @@ def create_header():
 
     out = open(out_filename, "wt")
     for filename in order:
+        remove_protected = (filename == "minisat/core/Solver.h")
         with open(filename) as f:
             for line in f:
                 if not line.startswith("#include \"minisat"):
-                    out.write(line)
+                    if not remove_protected or line != "protected:\n":    # (remove "protected:" from 'Solver.h')
+                        out.write(line)
     out.close()
     print "`` Created header: minisat2.hh"
 

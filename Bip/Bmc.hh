@@ -25,6 +25,7 @@ using namespace std;
 
 
 struct Params_Bmc {
+    SolverType sat_solver;      // -- SAT-solver to use.
     bool    simple_tseitin;
     bool    quant_claus;
     uint    la_steps;           // -- look-ahead frames
@@ -32,6 +33,7 @@ struct Params_Bmc {
     bool    quiet;
 
     Params_Bmc() :
+        sat_solver    (sat_Msc),
         simple_tseitin(false),
         quant_claus   (false),
         la_steps      (1),

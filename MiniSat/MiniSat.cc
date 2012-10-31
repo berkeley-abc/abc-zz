@@ -736,6 +736,8 @@ Var MiniSat<pfl>::newVar()
     assign_     .push(l_Undef);
 #endif
 //    activity    .push(1.0/0x10000000 * x);
+//    activity    .push(1 - 1.0/0x10000000 * x);
+//    activity    .push(var_inc * (1 - 1.0/0x10000000 * x));
     activity    .push(0);
     polarity    .push(1);
     if (pfl) unit_id.push(clause_id_NULL);

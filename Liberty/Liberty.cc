@@ -618,22 +618,22 @@ class LibertyParser {
     void throwIllegalChar(cchar* p) const;
     void preprocess(String filename);
     void parse(LibertyListener& lis);
-    void postProcess(SC_Lib& lib, bool static_timing);
+    void postProcess(SC_Lib& lib, TimingTablesMode timing_mode);
 
 public:
     LibertyParser() {}
 
-    void read(String filename, SC_Lib& lib, bool static_timing);
+    void read(String filename, SC_Lib& lib, TimingTablesMode timing_mode);
 };
 
 
-void LibertyParser::read(String filename, SC_Lib& lib, bool static_timing)
+void LibertyParser::read(String filename, SC_Lib& lib, TimingTablesMode timing_mode)
 {
     preprocess(filename);
 
     LibertyListener lis(lib);
     parse(lis);
-    postProcess(lib, static_timing);
+    postProcess(lib, timing_mode);
     lib.text = text;    // -- 'lib' takes ownership of this string; will be freed by its destructor
 }
 
@@ -747,12 +747,12 @@ void mergeTiming(SC_Timing& a, const SC_Timing& b)
 }
 
 
-// If 'static_timing' is set, all tables for the same input/output pair (with different "when"
-// conditions) are merged into a worst-case table. In this case, the list of tables
+// If 'timing_mode' is set to "merge", all tables for the same input/output pair (with different 
+// "when" conditions) are merged into a worst-case table. In this case, the list of tables
 // 'cell.pins[output_pin].rtiming[input_pin]' is always of size 0 or 1. NOTE! No tables mean
 // the output pin doesn't depend on the input pin (e.g. in a multi-output cell or a constant cell).
 static
-void normalizeTables(SC_Lib& L, bool static_timing)
+void normalizeTables(SC_Lib& L, TimingTablesMode timing_mode)
 {
     // Make sure 'index0' and 'index1' is set for each timing table, plus organize the timing
     // tables in groups (each group containg all the tables for one output):
@@ -805,7 +805,7 @@ void normalizeTables(SC_Lib& L, bool static_timing)
     }
 
     // Sort the entries in each group on "related_pin" plus add missing entries (can happen
-    // if an output does not depend on an input). In 'static_timing' mode, also merge tables.
+    // if an output does not depend on an input). In  static timing mode, also merge tables.
     for (uint i = 0; i < L.cells.size(); i++){
         SC_Cell& cell = L.cells[i];
         if (cell.unsupp) continue;
@@ -828,12 +828,14 @@ void normalizeTables(SC_Lib& L, bool static_timing)
             }
             pin.rtiming.rehash();
 
-            if (static_timing){
+            if (timing_mode != ttm_Keep){
                 // Merge tables (unateness and timing values):
                 for (uint k = 0; k < pin.rtiming.size(); k++){
                     SC_Timings& tables = pin.rtiming[k];
-                    for (uint n = 1; n < tables.size(); n++)
-                        mergeTiming(tables[0], tables[n]);
+                    if (timing_mode == ttm_Merge){
+                        for (uint n = 1; n < tables.size(); n++)
+                            mergeTiming(tables[0], tables[n]);
+                    }
                     tables.shrinkTo(1);
                     if (tables.size() == 1)
                         tables[0].when_text = Str_NULL;
@@ -870,12 +872,12 @@ void extractFunctions(SC_Lib& L)
 }
 
 
-void LibertyParser::postProcess(SC_Lib& L, bool static_timing)
+void LibertyParser::postProcess(SC_Lib& L, TimingTablesMode timing_mode)
 {
     sortPins(L);
-    normalizeTables(L, static_timing);
+    normalizeTables(L, timing_mode);
     extractFunctions(L);
-    if (static_timing)
+    if (timing_mode != ttm_Keep)
         approxCellTables(L);
 }
 
@@ -1096,11 +1098,11 @@ double SC_Lib::ps(double time) const
 // Wrapper function:
 
 
-void readLiberty(String filename, SC_Lib& out_lib, bool static_timing)
+void readLiberty(String filename, SC_Lib& out_lib, TimingTablesMode timing_mode)
 {
     LibertyParser p;
 
-    p.read(filename, out_lib, static_timing);
+    p.read(filename, out_lib, timing_mode);
 }
 
 

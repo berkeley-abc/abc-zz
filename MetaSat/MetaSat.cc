@@ -14,11 +14,164 @@
 #include "Prelude.hh"
 #include "MetaSat.hh"
 #include "minisat2.hh"
+#include "abcSat.hh"
+#include "ZZ_MiniSat.hh"
+#include "ZZ/Generics/Sort.hh"
 
 namespace MS = ::Minisat;
+namespace AS = ::abc_sat;
 
 namespace ZZ {
 using namespace std;
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// ZZ MiniSat wrapper:
+
+
+ZzSat::ZzSat()
+{
+    S = new MiniSat<false>();
+}
+
+
+ZzSat::~ZzSat()
+{
+    if (S) delete S;
+}
+
+
+void ZzSat::clear(bool dealloc)
+{
+    S->clear(dealloc);
+}
+
+
+Lit ZzSat::True() const
+{
+    return S->True();
+}
+
+
+Lit ZzSat::addLit()
+{
+    return S->addLit();
+}
+
+
+void ZzSat::addClause_(const Vec<Lit>& ps)
+{
+    S->addClause(ps);
+}
+
+
+void ZzSat::recycleLit(Lit p)
+{
+    S->addClause(p);    // -- not supported, just set 'p' to TRUE.
+}
+
+
+void ZzSat::setConflictLim(uint64 n_confl)
+{
+    assert(false);      // <<== later; need to use callback function for this
+}
+
+
+lbool ZzSat::solve_(const Vec<Lit>& assumps)
+{
+    return S->solve(assumps);
+}
+
+
+void ZzSat::randomizeVarOrder(uint64 seed)
+{
+    S->randomizeVarOrder(seed);
+}
+
+
+bool ZzSat::okay() const
+{
+    return S->okay();
+}
+
+
+lbool ZzSat::value_(uint x) const
+{
+    return S->value(x);
+}
+
+
+void ZzSat::getModel(Vec<lbool>& m) const
+{
+    return S->getModel(m);
+}
+
+
+void ZzSat::getConflict(Vec<Lit>& confl)
+{
+    return S->getConflict(confl);
+}
+
+
+double ZzSat::getActivity(uint x) const
+{
+    return S->getActivity(x);
+}
+
+
+uint ZzSat::nClauses() const
+{
+    return S->nClauses();
+}
+
+
+uint ZzSat::nLearnts() const
+{
+    return S->nLearnts();
+}
+
+
+uint ZzSat::nConflicts() const
+{
+    return S->statistics().conflicts;
+}
+
+
+uint ZzSat::nVars() const
+{
+    return S->nVars();
+
+}
+
+
+void ZzSat::freeze(uint x)
+{
+    /*nothing*/
+}
+
+
+void ZzSat::thaw(uint x)
+{
+    /*nothing*/
+}
+
+
+void ZzSat::preprocess(bool /*final_call*/)
+{
+    S->simplifyDB();
+}
+
+
+void ZzSat::getCnf(Vec<Lit>& out_cnf)
+{
+    assert(false);  // <<== later
+}
+
+
+void ZzSat::setVerbosity(int verb_level)
+{
+    S->verbosity = verb_level;
+}
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -41,7 +194,7 @@ MiniSat2::MiniSat2()
     S = new MS::Solver;
 
     Lit null_lit = addLit(); assert(null_lit.id == 0);
-    Lit true_lit = addLit();
+    true_lit = addLit();
     MetaSat::addClause(true_lit);
 }
 
@@ -77,12 +230,18 @@ Lit MiniSat2::addLit()
 
 void MiniSat2::addClause_(const Vec<Lit>& ps)
 {
-    MS_litvec& tmp  = *(MS_litvec*)(void*)&tmp_lits;
+    MS_litvec& tmp = *(MS_litvec*)(void*)&tmp_lits;
     tmp.clear();
     for (uint i = 0; i < ps.size(); i++)
         tmp.push(toMs(ps[i]));
 
     S->addClause(tmp);
+}
+
+
+void MiniSat2::recycleLit(Lit p)
+{
+    S->releaseVar(toMs(p));
 }
 
 
@@ -94,7 +253,7 @@ void MiniSat2::setConflictLim(uint64 n_confl)
 
 lbool MiniSat2::solve_(const Vec<Lit>& assumps)
 {
-    MS_litvec& tmp  = *(MS_litvec*)(void*)&tmp_lits;
+    MS_litvec& tmp = *(MS_litvec*)(void*)&tmp_lits;
     tmp.clear();
     for (uint i = 0; i < assumps.size(); i++)
         tmp.push(toMs(assumps[i]));
@@ -139,6 +298,12 @@ void MiniSat2::getConflict(Vec<Lit>& confl)
 }
 
 
+double MiniSat2::getActivity(uint x) const
+{
+    return S->activity[x] / S->var_inc;
+}
+
+
 uint MiniSat2::nClauses() const
 {
     return S->nClauses();
@@ -148,6 +313,12 @@ uint MiniSat2::nClauses() const
 uint MiniSat2::nLearnts() const
 {
     return S->nLearnts();
+}
+
+
+uint MiniSat2::nConflicts() const
+{
+    return S->conflicts;
 }
 
 
@@ -185,6 +356,388 @@ void MiniSat2::getCnf(Vec<Lit>& out_cnf)
 void MiniSat2::setVerbosity(int verb_level)
 {
     S->verbosity = verb_level;
+}
+
+
+//=================================================================================================
+// -- simplifying version:
+
+
+MiniSat2s::MiniSat2s()
+{
+    MS_litvec& tmp  = *(MS_litvec*)(void*)&tmp_lits;
+    new (&tmp) MS_litvec;
+
+    S = new MS::SimpSolver;
+
+    Lit null_lit = addLit(); assert(null_lit.id == 0);
+    true_lit = addLit();
+    MetaSat::addClause(true_lit);
+}
+
+
+MiniSat2s::~MiniSat2s()
+{
+    if (S) delete S;
+}
+
+
+void MiniSat2s::clear(bool dealloc)
+{
+    S->~Solver();
+    new (S) MS::Solver;
+
+    Lit null_lit = addLit(); assert(null_lit.id == 0);
+    Lit true_lit = addLit();
+    MetaSat::addClause(true_lit);
+}
+
+
+Lit MiniSat2s::True() const
+{
+    return true_lit;
+}
+
+
+Lit MiniSat2s::addLit()
+{
+    return fromMs(MS::mkLit(S->newVar()));
+}
+
+
+void MiniSat2s::addClause_(const Vec<Lit>& ps)
+{
+    MS_litvec& tmp  = *(MS_litvec*)(void*)&tmp_lits;
+    tmp.clear();
+    for (uint i = 0; i < ps.size(); i++)
+        tmp.push(toMs(ps[i]));
+
+    S->addClause(tmp);
+}
+
+
+void MiniSat2s::recycleLit(Lit p)
+{
+    S->releaseVar(toMs(p));
+}
+
+
+void MiniSat2s::setConflictLim(uint64 n_confl)
+{
+    S->setConfBudget(n_confl);
+}
+
+
+lbool MiniSat2s::solve_(const Vec<Lit>& assumps)
+{
+    MS_litvec& tmp  = *(MS_litvec*)(void*)&tmp_lits;
+    tmp.clear();
+    for (uint i = 0; i < assumps.size(); i++)
+        tmp.push(toMs(assumps[i]));
+
+    lbool ret = fromMs(S->solveLimited(tmp));
+    S->budgetOff();
+    return ret;
+}
+
+
+void MiniSat2s::randomizeVarOrder(uint64 seed)
+{
+    /*nothing yet*/
+}
+
+
+bool MiniSat2s::okay() const
+{
+    return S->okay();
+}
+
+
+lbool MiniSat2s::value_(uint x) const
+{
+    return fromMs(S->modelValue(x));
+}
+
+
+void MiniSat2s::getModel(Vec<lbool>& m) const
+{
+    m.setSize(nVars());
+    for (uint i = 0; i < nVars(); i++)
+        m[i] = fromMs(S->modelValue(i));
+}
+
+
+void MiniSat2s::getConflict(Vec<Lit>& confl)
+{
+    confl.clear();
+    for (int i = 0; i < S->conflict.size(); i++)
+        confl.push(~fromMs(S->conflict[i]));
+}
+
+
+double MiniSat2s::getActivity(uint x) const
+{
+    return S->activity[x] / S->var_inc;
+}
+
+
+uint MiniSat2s::nClauses() const
+{
+    return S->nClauses();
+}
+
+
+uint MiniSat2s::nLearnts() const
+{
+    return S->nLearnts();
+}
+
+
+uint MiniSat2s::nConflicts() const
+{
+    return S->conflicts;
+}
+
+
+uint MiniSat2s::nVars() const
+{
+    return S->nVars();
+
+}
+
+
+void MiniSat2s::freeze(uint x)
+{
+    S->setFrozen(x, true);
+}
+
+
+void MiniSat2s::thaw(uint x)
+{
+    S->setFrozen(x, false);
+}
+
+
+void MiniSat2s::preprocess(bool final_call)
+{
+    S->eliminate(final_call);
+}
+
+
+void MiniSat2s::getCnf(Vec<Lit>& out_cnf)
+{
+    assert(false);  // <<== later
+}
+
+
+void MiniSat2s::setVerbosity(int verb_level)
+{
+    S->verbosity = verb_level;
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// ABC SAT wrapper:
+
+
+}
+#include "ZZ/EXTERN/abcSat/satVec.h"
+namespace ZZ {
+
+
+typedef Vec<abc_sat::lit> AS_litvec;
+
+macro Lit fromAs(AS::lit p) { Lit ret; ret.id = AS::lit_var(p); ret.sign = AS::lit_sign(p); return ret; }
+macro AS::lit toAs(Lit p) { return AS::toLitCond(p.id, p.sign); }
+
+macro lbool fromAsLbool(AS::lbool v) { return (v == AS::l_True) ? l_True : (v == AS::l_False) ? l_False : l_Undef; }
+
+
+AbcSat::AbcSat()
+{
+    S = NULL;
+    clear(true);
+}
+
+
+AbcSat::~AbcSat()
+{
+    if (S){ AS::sat_solver_delete(S); S = NULL; }
+}
+
+
+void AbcSat::clear(bool dealloc)
+{
+    if (dealloc){
+        if (S){ AS::sat_solver_delete(S); S = NULL; }
+        S = AS::sat_solver_new();
+    }else
+        AS::sat_solver_rollback(S);
+
+    ok = true;
+    Lit null_lit = addLit(); assert(null_lit.id == 0);
+    true_lit = addLit();
+    MetaSat::addClause(true_lit);
+    confl_lim = UINT64_MAX;
+}
+
+
+Lit AbcSat::True() const
+{
+    return true_lit;
+}
+
+
+Lit AbcSat::addLit()
+{
+    int n_vars = AS::sat_solver_nvars(S);
+    AS::sat_solver_setnvars(S, n_vars+1);
+    return Lit(n_vars);
+}
+
+
+void AbcSat::addClause_(const Vec<Lit>& ps)
+{
+    if (!ok) return;
+
+    tmp.clear();
+    for (uint i = 0; i < ps.size(); i++)
+        tmp.push(toAs(ps[i]));
+
+    ok &= AS::sat_solver_addclause(S, &tmp[0], &tmp.end());
+}
+
+
+void AbcSat::recycleLit(Lit p)
+{
+    if (!ok) return;
+
+    MetaSat::addClause(p);      // -- ABC SAT doesn't support recycling, just set 'p' to TRUE.
+}
+
+
+void AbcSat::setConflictLim(uint64 n_confl)
+{
+    confl_lim = n_confl;
+}
+
+
+lbool AbcSat::solve_(const Vec<Lit>& assumps_)
+{
+    ok &= AS::sat_solver_simplify(S);
+    if (!ok) return l_False;
+
+    Vec<Lit> assumps(copy_, assumps_);
+    sortUnique(assumps);
+
+    tmp.clear();
+    for (uint i = 0; i < assumps.size(); i++)
+        tmp.push(toAs(assumps[i]));
+
+    lbool result = fromAsLbool(sat_solver_solve(S, &tmp[0], &tmp.end(), (confl_lim == UINT64_MAX) ? 0 : confl_lim, 0, 0, 0));
+
+    AS::lit* lits;
+    if (result == l_False && AS::sat_solver_final(S, &lits) == 0)
+        ok = false;
+
+    return result;
+}
+
+
+void AbcSat::randomizeVarOrder(uint64 seed)
+{
+    /*nothing yet*/
+}
+
+
+bool AbcSat::okay() const
+{
+    return ok;
+}
+
+
+lbool AbcSat::value_(uint x) const
+{
+    return lbool_lift(sat_solver_var_value(S, x));
+}
+
+
+void AbcSat::getModel(Vec<lbool>& m) const
+{
+    m.setSize(nVars());
+    for (uint i = 0; i < nVars(); i++)
+        m[i] = lbool_lift(sat_solver_var_value(S, i));
+}
+
+
+void AbcSat::getConflict(Vec<Lit>& confl)
+{
+    AS::lit* lits;
+    uint sz = AS::sat_solver_final(S, &lits);
+
+    confl.clear();
+    for (uint i = 0; i < sz; i++)
+        confl.push(~fromAs(lits[i]));
+}
+
+
+double AbcSat::getActivity(uint x) const
+{
+    return AS::sat_solver_get_activity(S, x);
+}
+
+
+uint AbcSat::nClauses() const
+{
+    return AS::sat_solver_nclauses(S);
+}
+
+
+uint AbcSat::nLearnts() const
+{
+    return AS::sat_solver_nlearnts(S);
+}
+
+
+uint AbcSat::nConflicts() const
+{
+    return AS::sat_solver_nconflicts(S);
+}
+
+
+uint AbcSat::nVars() const
+{
+    return AS::sat_solver_nvars(S);
+}
+
+
+void AbcSat::freeze(uint x)
+{
+    /*nothing*/
+}
+
+
+void AbcSat::thaw(uint x)
+{
+    /*nothing*/
+}
+
+
+void AbcSat::preprocess(bool /*final_call*/)
+{
+    ok &= AS::sat_solver_simplify(S);
+}
+
+
+void AbcSat::getCnf(Vec<Lit>& out_cnf)
+{
+    assert(false);  // <<== later
+}
+
+
+void AbcSat::setVerbosity(int verb_level)
+{
+    AS::sat_solver_set_verbosity(S, verb_level);
 }
 
 

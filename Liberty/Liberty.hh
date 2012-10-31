@@ -27,8 +27,10 @@ using namespace std;
 
 struct SC_Lib;
 
-void readLiberty(String filename, SC_Lib& result, bool static_timing = true);
-    // -- 'static_timing' will tell parser to merge tables with "when" conditions.
+enum TimingTablesMode { ttm_Keep, ttm_Merge, ttm_First };
+
+void readLiberty(String filename, SC_Lib& result, TimingTablesMode timing_mode = ttm_Merge);
+    // -- 'timing_mode' may tell parser to merge tables with "when" conditions.
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -109,7 +111,7 @@ struct SC_Surface : NonCopyable {
         // content pointed to by 'templ_name' (if necessary).
 
     // Post-processed:
-    SC_ApxSurf       approx;    // -- fast way of computing approximate table value. NOTE! only initialized in 'static_timing' mode.
+    SC_ApxSurf       approx;    // -- fast way of computing approximate table value. NOTE! only initialized in static timing mode.
 
     void moveTo(SC_Surface& other) {
         mov(templ_name, other.templ_name);

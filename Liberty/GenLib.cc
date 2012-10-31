@@ -89,7 +89,6 @@ bool writeGenlibFile(String filename, const SC_Lib& L, bool quiet = false)
 
     uint ignored_unsupp = 0;
     uint ignored_seq    = 0;
-    uint ignored_multi  = 0;
 
     // Sort cells on size (beneficial for ABCs mapper):
     Vec<Pair<float,uint> > sz_idx;
@@ -97,37 +96,40 @@ bool writeGenlibFile(String filename, const SC_Lib& L, bool quiet = false)
         const SC_Cell& cell = L.cells[i];
         if (cell.unsupp)        { ignored_unsupp++; continue; }
         if (cell.seq)           { ignored_seq++;    continue; }
-        if (cell.n_outputs > 1) { ignored_multi++;  continue; }
         sz_idx.push(tuple(cell.area, i));
     }
     sort(sz_idx);
 
     for (uint i = 0; i < sz_idx.size(); i++){
         const SC_Cell& cell = L.cells[sz_idx[i].snd];
-        const SC_Pin&  pin  = cell.pins[cell.n_inputs];
 
-        FWriteLn(out) "GATE %_ %_ %_=%_;", cell.name, cell.area, pin.name, funcText(pin, cell);
+        for (uint o = 0; o < cell.n_outputs; o++){
+            const SC_Pin&  pin  = cell.pins[cell.n_inputs + o];
 
-        for (uint j = 0; j < cell.n_inputs; j++){
-            assert(pin.rtiming[j].size() == 1);     // <<== fails if function does not depend on all inputs
-            const SC_Timing& t = pin.rtiming[j][0];
-            const SC_Pin&    p = cell.pins[j];
+            FWriteLn(out) "GATE %_ %_ %_=%_;", cell.name, cell.area, pin.name, funcText(pin, cell);
 
-            cchar* phase = (t.tsense == sc_ts_Pos) ? "INV"    :
-                           (t.tsense == sc_ts_Neg) ? "NONINV" :
-                                                     "UNKNOWN";
+            for (uint j = 0; j < cell.n_inputs; j++){
+                if (pin.rtiming[j].size() == 0) continue;
 
-            FWriteLn(out) "PIN %_ %_ %_ %_ %_ 0 %_ 0",
-                p.name, phase,
-                max_(p.rise_cap, p.fall_cap), p.max_out_cap,
-                L.ps(mid(t.cell_rise)), L.ps(mid(t.cell_fall));
+                assert(pin.rtiming[j].size() == 1);
+                const SC_Timing& t = pin.rtiming[j][0];
+                const SC_Pin&    p = cell.pins[j];
+
+                cchar* phase = (t.tsense == sc_ts_Pos) ? "INV"    :
+                               (t.tsense == sc_ts_Neg) ? "NONINV" :
+                                                         "UNKNOWN";
+
+                FWriteLn(out) "PIN %_ %_ %_ %_ %_ 0 %_ 0",
+                    p.name, phase,
+                    max_(p.rise_cap, p.fall_cap), p.max_out_cap,
+                    L.ps(mid(t.cell_rise)), L.ps(mid(t.cell_fall));
+            }
         }
     }
 
     if (!quiet){
         if (ignored_unsupp > 0) WriteLn "WARNING! Ignored %_ unsupported (non-logic) cells.", ignored_unsupp;
         if (ignored_seq    > 0) WriteLn "WARNING! Ignored %_ sequential cells.", ignored_seq;
-        if (ignored_multi  > 0) WriteLn "WARNING! Ignored %_ multi-output cells.", ignored_multi;
 
         WriteLn "Successfully processed %_ cells.", sz_idx.size();
     }

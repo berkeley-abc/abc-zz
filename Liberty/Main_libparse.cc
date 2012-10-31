@@ -14,15 +14,15 @@ int main(int argc, char** argv)
     ZZ_Init;
 
     // Command line options:
-    cli.add("lib" , "string", arg_REQUIRED, "Input Liberty library file.", 0);
-    cli.add("orig", "bool"  , "no"        , "Keep original tables rather than merge them for static timing.");
-    cli.add("dump", "bool"  , "no"        , "Dump parsed data to standard output.");
-    cli.add("uifs", "string", ""          , "Write UIF map to this file.");
+    cli.add("lib" , "string"            , arg_REQUIRED, "Input Liberty library file.", 0);
+    cli.add("ttm" , "{keep,merge,first}", "merge"     , "Timing tables mode.");
+    cli.add("dump", "bool"              , "no"        , "Dump parsed data to standard output.");
+    cli.add("uifs", "string"            , ""          , "Write UIF map to this file.");
     cli.parseCmdLine(argc, argv);
 
     String lib_file = cli.get("lib").string_val;
     bool   dump = cli.get("dump").bool_val;
-    bool   stime = !cli.get("orig").bool_val;
+    uint   ttm = cli.get("ttm").enum_val;
     String uifs_file = cli.get("uifs").string_val;
 
     // Read input:
@@ -30,7 +30,7 @@ int main(int argc, char** argv)
     try{
         cpuClock();
         if (hasExtension(lib_file, "lib")){
-            readLiberty(lib_file, L, stime);
+            readLiberty(lib_file, L, (TimingTablesMode)ttm);
             WriteLn "Reading liberty file: \a*%t\a*", cpuClock();
         }else{
             readSclFile(lib_file, L);

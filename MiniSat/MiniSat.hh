@@ -273,6 +273,8 @@ public:
     void  getConflict(Vec<Lit>& assump_confl) { conflict.copyTo(assump_confl); }
         // -- Harmonize interface with 'MetaSat'.
 
+    double getActivity(uint x) { return activity[x] / var_inc; }
+
     lbool topValue(Var x) const { return (level(x) == 0) ? assign(x) : l_Undef; }
     lbool topValue(Lit p) const { return (level(p) == 0) ? assign(p) : l_Undef; }
         // If 'x' has been proven (at the top-level) to be constant, return that value.

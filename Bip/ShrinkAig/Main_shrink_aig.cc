@@ -36,8 +36,14 @@ uint n_tries     = 0;
 template<bool strashed>
 void shrinkAig(NetlistRef N, NetlistRef M, uint64& seed)
 {
-    GLit pick = GLit(irand(seed, N.size() - gid_FirstUser) + gid_FirstUser);
-    assert(!deleted(N[pick]));
+    Vec<GLit> all_gates;
+    For_Gates(N, w)
+        all_gates.push(w);
+    if (all_gates.size() == 0){
+        WriteLn "Empty netlist! Aborting...";
+        exit(0);
+    }
+    GLit pick = all_gates[irand(seed, all_gates.size())];
 
     M.clear();
     if (strashed)
@@ -56,7 +62,8 @@ void shrinkAig(NetlistRef N, NetlistRef M, uint64& seed)
         if (w != pick){
             // Copy gate:
             if (type(w) == gate_And){
-                //**/if (!n2m[w[1]]) Dump(w[1], n2m[w[1]], pick);
+                /**/if (!+n2m[w[0]]) Dump(w[0], n2m[w[0]], pick);
+                /**/if (!+n2m[w[1]]) Dump(w[1], n2m[w[1]], pick);
                 if (strashed)
                     m = s_And(n2m[w[0]] ^ sign(w[0]), n2m[w[1]] ^ sign(w[1]));
                 else
@@ -88,19 +95,16 @@ void shrinkAig(NetlistRef N, NetlistRef M, uint64& seed)
                 default: assert(false); }
 
             }else if (type(w) == gate_Flop){
-                switch (irand(seed, 3)){
+                switch (irand(seed, 2)){
                 case 0: m =  M.True(); break;
                 case 1: m = ~M.True(); break;
-                case 2:
-                    if (+w[0] != w) m = n2m[w[0]] ^ sign(w[0]);
-                    else            m = M.True();
-                    break;
                 default: assert(false); }
 
             }else
                 m = M.True();
         }
 
+        /**/if (!+m) Dump(w, m);
         n2m(w) = m;
     }
 

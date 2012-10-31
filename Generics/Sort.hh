@@ -4,14 +4,14 @@
 //| Author(s)   : Niklas Een
 //| Module      : Generics
 //| Description : Combinator library for sorting.
-//|
+//| 
 //| (C) Copyright 2010-2012, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//|
+//| 
 //| Generic sort functions and combinators. Work on any class ("sorting object") with the following
 //| methods:
-//|
+//| 
 //|     struct Sob {
 //|         // Mandatory:
 //|         //
@@ -36,9 +36,10 @@
 //|     
 //| Objects can then be combined using combinators:
 //| 
-//|     ordReverse(s)
-//|     ordByFirst(s0, s1)
-//|     ordLexico (s0, s1)
+//|     ordReverse  (s)
+//|     ordByFirst  (s0, s1)
+//|     ordLexico   (s0, s1)
+//|     ordStabilize(s)
 //|     
 //| Finally, two sorting functions are defined:
 //| 
@@ -62,7 +63,6 @@
 //|     sortUnique_reverse(v)
 //|     sortUnique_byFirst(v, w)
 //|     sortUnique_lexico (v, w)
-//| 
 //|________________________________________________________________________________________________
 
 #ifndef ZZ__Generics__Sort_h
@@ -158,6 +158,42 @@ template<class Sob0, class Sob1> struct Sob_lexico {
 
 template<class S0, class S1>
 macro Sob_lexico<S0,S1> ordLexico(S0 s0, S1 s1) { return Sob_lexico<S0,S1>(s0, s1); }
+
+
+template<class Sob>
+struct Sob_stabilize {
+    Sob     s;
+    uint*   order;
+
+    Sob_stabilize(Sob s_) : s(s_) {
+        assert(s.size() < UINT_MAX);   // -- only support stable sort for up to 4 billion elements
+        order = xmalloc<uint>(s.size() + 1);
+        order[0] = 1;
+        order++;
+        for (uint i = 0; i < s.size(); i++) order[i] = i;
+    }
+
+   ~Sob_stabilize() {
+        order--;
+        order[0]--;
+        if (order[0] == 0) xfree(order); }
+
+    Sob_stabilize(const Sob_stabilize& other) : s(other.s) {
+        order = other.order;
+        order[-1]++; }
+
+    bool    lessThan(uind i, uind j) const { return s.lessThan(i, j) || (!s.lessThan(j, i) && order[i] < order[j]); }
+    void    swap    (uind i, uind j)       { s.swap(i, j); swp(order[i], order[j]); }
+    uind    size()                   const { return s.size(); }
+    void    shrinkTo(uind sz)              { s.shrinkTo(sz); }
+    void    dispose (uind i)               { s.dispose(i); }
+
+private:
+    Sob_stabilize& operator=(const Sob_stabilize& other);   // -- should not be needed
+};
+
+template<class S>
+macro Sob_stabilize<S> ordStabilize(S s) { return Sob_stabilize<S>(s); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

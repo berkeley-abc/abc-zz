@@ -19,9 +19,20 @@
 
 
 // Forward declarations:
-namespace Minisat{
+namespace ZZ {
+    template<bool pfl> class MiniSat;
+};
+
+namespace Minisat {
     struct Solver;
+    struct SimpSolver;
 }
+
+namespace abc_sat {
+    struct sat_solver_t;
+    typedef struct sat_solver_t sat_solver;
+    typedef int lit;
+};
 
 
 namespace ZZ {
@@ -29,7 +40,7 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// 'MetaSat' base class:
+// 'MetaSat' -- interface class:
 
 
 struct MetaSat {
@@ -45,6 +56,7 @@ struct MetaSat {
     virtual Lit   True() const = 0;
     virtual Lit   addLit() = 0;
     virtual void  addClause_(const Vec<Lit>& ps) = 0;
+    virtual void  recycleLit(Lit p) = 0;                    // -- For non-supporting solvers, just adds a unit clause.
 
   //________________________________________
   //  Solving:
@@ -61,11 +73,14 @@ struct MetaSat {
     virtual void  getModel(Vec<lbool>& m) const = 0;
     virtual void  getConflict(Vec<Lit>& assump_confl) = 0;  // -- Returns a cube (not a clause) which is a subset of 'assumps' passed to 'solve()'.
 
+    virtual double getActivity(uint x) const = 0;
+
   //________________________________________
   //  Statistics:
 
     virtual uint  nClauses() const = 0;
     virtual uint  nLearnts() const = 0;
+    virtual uint  nConflicts() const = 0;
     virtual uint  nVars () const = 0;
 
   //________________________________________
@@ -104,10 +119,11 @@ protected:
 
 
 #define MetaSat_OVERRIDES                                               \
-    virtual void  clear(bool dealloc);                                  \
+    virtual void  clear(bool dealloc = false);                          \
     virtual Lit   True() const;                                         \
     virtual Lit   addLit();                                             \
     virtual void  addClause_(const Vec<Lit>& ps);                       \
+    virtual void  recycleLit(Lit p);                                    \
     virtual void  setConflictLim(uint64 n_confl);                       \
     virtual lbool solve_(const Vec<Lit>& assumps);                      \
     virtual void  randomizeVarOrder(uint64 seed);                       \
@@ -115,8 +131,10 @@ protected:
     virtual lbool value_(uint x) const;                                 \
     virtual void  getModel(Vec<lbool>& m) const;                        \
     virtual void  getConflict(Vec<Lit>& assump_confl);                  \
+    virtual double getActivity(uint x) const;                           \
     virtual uint  nClauses() const;                                     \
     virtual uint  nLearnts() const;                                     \
+    virtual uint  nConflicts() const;                                   \
     virtual uint  nVars () const;                                       \
     virtual void  freeze(uint x);                                       \
     virtual void  thaw(uint x);                                         \
@@ -136,6 +154,23 @@ struct minisat2_vec_data {
 };
 
 
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct ZzSat : MetaSat {
+    ZzSat();
+    virtual ~ZzSat();
+
+    MetaSat_OVERRIDES
+
+private:
+    MiniSat<false>* S;
+};
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
 struct MiniSat2 : MetaSat {
     MiniSat2();
     virtual ~MiniSat2();
@@ -147,6 +182,101 @@ private:
     Lit true_lit;
     minisat2_vec_data tmp_lits;
 };
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct MiniSat2s : MetaSat {
+    MiniSat2s();
+    virtual ~MiniSat2s();
+
+    MetaSat_OVERRIDES
+
+private:
+    ::Minisat::SimpSolver* S;
+    Lit true_lit;
+    minisat2_vec_data tmp_lits;
+};
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct AbcSat : MetaSat {
+    AbcSat();
+    virtual ~AbcSat();
+
+    MetaSat_OVERRIDES
+
+private:
+    ::abc_sat::sat_solver* S;
+    Lit                    true_lit;
+    Vec<abc_sat::lit>      tmp;
+    uint64                 confl_lim;
+    bool                   ok;
+};
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// 'MultiSat' -- Dynamically become anyone of the wrapped solvers:
+
+
+enum SolverType {
+    sat_NULL,
+    sat_Zz,         // The ZZ framework's version of MiniSat (based on v1.14 + improvements)
+    sat_Msc,        // MiniSat 2.2, core version
+    sat_Mss,        // MiniSat 2.2, simplifying version
+    sat_Abc,        // ABC's MiniSat
+};
+
+
+struct MultiSat : MetaSat {
+    MetaSat*   S;
+    SolverType type;
+
+    MultiSat(SolverType t = sat_NULL) : S(NULL), type(sat_NULL) { selectSolver(t); }
+   ~MultiSat() { selectSolver(sat_NULL); }
+
+    void selectSolver(SolverType type); // -- pass 'sat_NULL' to dispose the current solver.
+
+    virtual void   clear(bool dealloc = false)         { S->clear(dealloc); }
+    virtual Lit    True() const                        { return S->True(); }
+    virtual Lit    addLit()                            { return S->addLit(); }
+    virtual void   addClause_(const Vec<Lit>& ps)      { S->addClause_(ps); }
+    virtual void   recycleLit(Lit p)                   { S->recycleLit(p); }
+    virtual void   setConflictLim(uint64 n_confl)      { S->setConflictLim(n_confl); }
+    virtual lbool  solve_(const Vec<Lit>& assumps)     { return S->solve_(assumps); }
+    virtual void   randomizeVarOrder(uint64 seed)      { S->randomizeVarOrder(seed); }
+    virtual bool   okay() const                        { return S->okay(); }
+    virtual lbool  value_(uint x) const                { return S->value_(x); }
+    virtual void   getModel(Vec<lbool>& m) const       { S->getModel(m); }
+    virtual void   getConflict(Vec<Lit>& assump_confl) { S->getConflict(assump_confl); }
+    virtual double getActivity(uint x) const           { return S->getActivity(x); }
+    virtual uint   nClauses() const                    { return S->nClauses(); }
+    virtual uint   nLearnts() const                    { return S->nLearnts(); }
+    virtual uint   nConflicts() const                  { return S->nConflicts(); }
+    virtual uint   nVars () const                      { return S->nVars(); }
+    virtual void   freeze(uint x)                      { S->freeze(x); }
+    virtual void   thaw(uint x)                        { S->thaw(x); }
+    virtual void   preprocess(bool final_call)         { S->preprocess(final_call); }
+    virtual void   getCnf(Vec<Lit>& out_cnf)           { S->getCnf(out_cnf); }
+    virtual void   setVerbosity(int verb_level)        { S->setVerbosity(verb_level); }
+};
+
+
+inline void MultiSat::selectSolver(SolverType type)
+{
+    if (S) delete S;
+
+    switch (type){
+    case sat_NULL: S = NULL           ; break;
+    case sat_Zz:   S = new ZzSat()    ; break;
+    case sat_Msc:  S = new MiniSat2() ; break;
+    case sat_Mss:  S = new MiniSat2s(); break;
+    case sat_Abc:  S = new AbcSat()   ; break;
+    default: assert(false); }
+}
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

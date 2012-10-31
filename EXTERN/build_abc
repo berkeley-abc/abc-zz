@@ -77,7 +77,7 @@ def build(suffix, clean):       # -- assumes we are in directory 'ZZ/EXTERN/abc'
     out.flush()
 
     # Remove readline...
-    os.system("if grep readline src/base/main/mainUtils.c; then  patch src/base/main/mainUtils.c < ../abc_mainUtils.c.patch; fi")
+    os.system("if ! grep '//#define ABC_USE_READLINE' src/base/main/mainUtils.c >/dev/null; then patch src/base/main/mainUtils.c < ../abc_mainUtils.c.patch; fi")
 
     # Call makefile:
     target = lib_name if (not clean) else "clean"

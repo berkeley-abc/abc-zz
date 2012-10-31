@@ -17,6 +17,7 @@
 #include "Clausify.hh"
 #include "ZZ_Netlist.hh"
 #include "ZZ_MiniSat.hh"
+#include "ZZ_Npn4.hh"
 
 namespace ZZ {
 using namespace std;
@@ -1559,6 +1560,110 @@ Wire insertUnrolled(Wire w, uint k, NetlistRef F, Vec<CompactBmcMap>& n2f, const
     return insertUnrolled_(w, k, F, n2f, P); }
 
 
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Clausification for CNF-mapped netlists:
+
+
+// Convert a CNF-mapped netlist (with 'Npn4' LUTs) to clauses. No strashing is done.
+// NOTE! 'roots' will be empty after this call.
+void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized,
+    /*outputs:*/ MetaSat& S, Vec<LLMap<GLit,Lit> >& m2s)
+{
+    Pec_FlopInit* ff_init = NULL;
+    if (initialized){
+        Get_Pob(M, flop_init);
+        ff_init = &flop_init;
+    }
+
+    Vec<Pair<uint,GLit> >& Q = roots;
+    Vec<Lit> tmp;
+
+    for (uint i = 0; i < roots.size(); i++)
+        m2s.growTo(roots[i].fst + 1);
+
+    while (Q.size() > 0){
+        uint d = Q.last().fst;
+        Wire w = +Q.last().snd + M;
+
+        if (m2s[d][w]){
+            Q.pop();
+            continue; }
+
+        switch (type(w)){
+        case gate_Const:
+            Q.pop();
+            if (w == glit_True)
+                m2s[d](w) = S.True();
+            else assert(w == glit_False),
+                m2s[d](w) = ~S.True();
+            break;
+
+        case gate_PI:
+            Q.pop();
+            m2s[d](w) = S.addLit();
+            break;
+
+        case gate_PO:
+        case gate_SO:
+            if (m2s[d][+w[0]]){
+                Q.pop();
+                m2s[d](w) = m2s[d][w[0]];
+            }else
+                Q.push(tuple(d, +w[0]));
+            break;
+
+        case gate_Flop:
+            if (d == 0){
+                Q.pop();
+                if (ff_init){
+                    if      ((*ff_init)[w] == l_True ) m2s[d](w) =  S.True();
+                    else if ((*ff_init)[w] == l_False) m2s[d](w) = ~S.True();
+                    else                               m2s[d](w) =  S.addLit();
+                }else
+                    m2s[d](w) = S.addLit();       // -- for uninitialized traces
+
+            }else{
+                if (m2s[d-1][+w[0]]){
+                    Q.pop();
+                    m2s[d](w) = m2s[d-1][w[0]];
+                }else
+                    Q.push(tuple(d-1, +w[0]));
+            }
+            break;
+
+        case gate_Npn4:{
+            bool ready = true;
+            For_Inputs(w, v){
+                if (!m2s[d][+v]){
+                    Q.push(tuple(d, +v));
+                    ready = false;
+                }
+            }
+            if (ready){
+                Q.pop();
+
+                // Instantiate LUT as CNF:
+                Lit inputs[4] = { Lit_NULL, Lit_NULL, Lit_NULL, Lit_NULL };
+                For_Inputs(w, v)
+                    inputs[Iter_Var(v)] = m2s[d][v];
+                Lit output = S.addLit();
+
+                uint cl = attr_Npn4(w).cl;
+                for (uint i = 0; i < cnfIsop_size(cl); i++){
+                    cnfIsop_clause(cl, i, inputs, output, tmp);
+                    //**/Dump(tmp);
+                    S.addClause(tmp);
+                }
+                m2s[d](w) = output;
+            }
+            break;}
+
+        default:
+            ShoutLn "INTERNAL ERROR! Unexpected type in clausification: %_", GateType_name[type(w)];
+            assert(false);
+        }
+    }
+}
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

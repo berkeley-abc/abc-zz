@@ -16,6 +16,7 @@
 
 #include "Prelude.hh"
 #include "Npn4.hh"
+#include "ZZ/Generics/Sort.hh"
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -88,6 +89,8 @@ perm4_t inv_perm4     [24];
 ftb4_t apply_perm4    [24][65536];
 ftb4_t apply_inv_perm4[24][65536];
 ftb4_t apply_negs4    [32][65536];
+
+uint npn4_just[222][16];     // -- list of minimal justifications for each function
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -269,11 +272,67 @@ void genNpnNorm()
 }
 
 
+static
+bool minSup(ftb4_t ftb, uint a, uchar sup, Vec<uchar>& all_sup)
+{
+    // Support too small?
+    bool val_a = ftb & (1u << a);
+    for (uint i = 0; i < 16; i++){
+        if ((a & sup) == (i & sup)){
+            bool val_i = ftb & (1u << i);
+            if (val_a != val_i)
+                return false;
+        }
+    }
+
+    // Support minimal?
+    bool minimal = true;
+    for (uint b = 0; b < 4; b++){
+        if (sup & (1u << b)){
+            uchar new_sup = sup & ((1u << b) ^ 15);
+            if (minSup(ftb, a, new_sup, all_sup))
+                minimal = false;
+        }
+    }
+
+    if (minimal)
+        all_sup.push(sup);
+
+    return true;
+}
+
+
+static
+void minSup(ftb4_t ftb, uint a, Vec<uchar>& all_sup) {
+    minSup(ftb, a, 15, all_sup);
+    sortUnique(all_sup); }
+
+
+static
+void genNpnJust()   // -- takes about 1.2 ms
+{
+    Vec<uchar> all;
+    for (uint cl = 0; cl < 222; cl++){
+        for (uint a = 0; a < 16; a++){
+            all.clear();
+            minSup(npn4_repr[cl], a, all);
+
+            uint mask = 0;
+            for (uint i = 0; i < all.size(); i++)
+                mask |= uint(all[i]) << (i * 4);
+
+            npn4_just[cl][a] = mask;
+        }
+    }
+}
+
+
 ZZ_Initializer(npn4, -9500) {
     genPseqMaps();
     genApplyPerm();
     genApplyNegs();
     genNpnNorm();
+    genNpnJust();
 }
 
 

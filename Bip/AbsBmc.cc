@@ -282,7 +282,7 @@ void uabsRefine(NetlistRef M, const Vec<Wire>& props, /*in+out*/FlopSet& abstr, 
 
     // Find a counterexample that violates the invariant (or property):
     S.addClause(target);
-    lbool result = S.solve();
+    lbool result ___unused = S.solve();
 
     // Scan:
     Vec<uint> cands;

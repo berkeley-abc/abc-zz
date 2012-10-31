@@ -154,6 +154,7 @@ Array<char> readFile(String filename, bool add_null/*=false*/)
 
     FILE* in = fopen(filename.c_str(), "rb");
     size_t n = fread(text.base(), 1, sz, in);
+    fclose(in);
     if (n != sz){
         dispose(text);
         return Array<char>();

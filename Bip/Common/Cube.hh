@@ -107,9 +107,7 @@ protected:
         for (uind i = 0; i < ps.size(); i++){
             ptr->abstr |= uint64(1) << (ps[i].data() & 63);
             ptr->data[i] = ps[i]; }
-#if 1
         sort();
-#endif
         ZZ_PTimer_End(Cube_Constr);
     }
 

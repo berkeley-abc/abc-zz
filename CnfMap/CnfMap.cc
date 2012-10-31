@@ -345,9 +345,11 @@ void CnfMap::run()
         updateFanoutEst(instantiate);
         double T2 = cpuTime();
 
-        if (round == 0)
-            WriteLn "cuts_enumerated=%,d", cuts_enumerated;
-        WriteLn "round=%d   mapped_area=%,d   mapped_luts=%,d   [enum: %t, blend: %t]", round, mapped_area, mapped_luts, T1-T0, T2-T1;
+        if (!P.quiet){
+            if (round == 0)
+                WriteLn "cuts_enumerated=%,d", cuts_enumerated;
+            WriteLn "round=%d   mapped_area=%,d   mapped_luts=%,d   [enum: %t, blend: %t]", round, mapped_area, mapped_luts, T1-T0, T2-T1;
+        }
     }
 }
 

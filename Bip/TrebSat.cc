@@ -18,8 +18,9 @@
 #include "ZZ/Generics/Sort.hh"
 
 //#define WEAKEN_BY_SAT
-#define USE_MINISAT2
 //#define SAT_SNAPSHOT
+
+//#define LAZY_CUBES
 
 namespace ZZ {
 using namespace std;
@@ -36,6 +37,8 @@ ZZ_PTimer_Add(treb_newsim);
 ZZ_PTimer_Add(treb_multi_choose);
 ZZ_PTimer_Add(treb_weaken_sat);
 ZZ_PTimer_Add(treb_randvar);
+ZZ_PTimer_Add(treb_lazy_validate);
+ZZ_PTimer_Add(treb_lazy_refine);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -54,7 +57,7 @@ struct TrebSat_Common : TrebSat {
 
     //  Major helpers for derived classes:
     Cube weakenByJust(Cube s, Cube bad);
-    Cube weakenBySim (Cube s, Cube bad);
+    Cube weakenBySim (Cube s, Cube bad, bool pre_weak_by_just);
     Cube weaken      (Cube s, Cube bad);
 
     // Constructor:
@@ -199,18 +202,41 @@ Cube TrebSat_Common::weakenByJust(Cube c, Cube bad)
 
 // NOTE! Cube 'c' contains both FFs and PIs, but the returned cube only has FFs. 'bad' can either
 // be 'Cube_NULL' or a cube of FFs (which will be automatically translated to flop inputs).
-Cube TrebSat_Common::weakenBySim(Cube c, Cube bad)
+Cube TrebSat_Common::weakenBySim(Cube c0, Cube bad, bool pre_weak_by_just)
 {
     ZZ_PTimer_Scope(treb_sim);
 
-    // Setup counterexample:
-    cex.flops [0].clear();
-    cex.inputs[0].clear();
-    for (uint i = 0; i < c.size(); i++){
-        Wire  w   = N[c[i]];
-        lbool val = sign(w) ? l_False : l_True;
-        if (type(w) == gate_Flop)        cex.flops [0](w) = val;
-        else assert(type(w) == gate_PI), cex.inputs[0](w) = val;
+    if (pre_weak_by_just){
+        Cube c = weakenByJust(c0, bad);
+
+        // Setup counterexample:
+        cex.flops [0].clear();
+        cex.inputs[0].clear();
+        for (uint i = 0; i < c.size(); i++){
+            Wire  w   = N[c[i]]; assert(type(w) == gate_Flop);
+            lbool val = sign(w) ? l_False : l_True;
+            cex.flops [0](w) = val;
+        }
+        for (uint i = 0; i < c0.size(); i++){
+            Wire  w = N[c0[i]];
+            if (type(w) == gate_PI){
+                lbool val = sign(w) ? l_False : l_True;
+                cex.inputs[0](w) = val;
+            }
+        }
+
+    }else{
+        Cube& c = c0;
+
+        // Setup counterexample:
+        cex.flops [0].clear();
+        cex.inputs[0].clear();
+        for (uint i = 0; i < c.size(); i++){
+            Wire  w   = N[c[i]];
+            lbool val = sign(w) ? l_False : l_True;
+            if (type(w) == gate_Flop)        cex.flops [0](w) = val;
+            else assert(type(w) == gate_PI), cex.inputs[0](w) = val;
+        }
     }
 
     xsim.simulate(cex);
@@ -222,8 +248,8 @@ Cube TrebSat_Common::weakenBySim(Cube c, Cube bad)
     Vec<GLit> ffs;
     For_Gatetype(N, gate_Flop, w)
         ffs.push(w);
-    if (P.use_activity){
-        sobSort(sob(ffs, proj_lt(compose(brack<float,Wire>(activity), brack<Wire,GLit>(N))))); }
+    if (P.use_activity)
+        sobSort(ordStabilize(ordReverse(sob(ffs, proj_lt(compose(brack<float,Wire>(activity), brack<Wire,GLit>(N)))))));
 
     for (uint j = 0; j < ffs.size(); j++){
         Wire w = N[ffs[j]];
@@ -320,7 +346,7 @@ Cube TrebSat_Common::weakenBySim(Cube c, Cube bad)
 Cube TrebSat_Common::weaken(Cube c, Cube bad)
 {
     return (P.weaken == Params_Treb::NONE) ? c :
-           (P.weaken == Params_Treb::SIM ) ? weakenBySim (c, bad) :
+           (P.weaken == Params_Treb::SIM ) ? weakenBySim (c, bad, P.pre_weak) :
            /*otherwise*/                     weakenByJust(c, bad) ;
 }
 
@@ -334,18 +360,16 @@ struct TrebSat_MonoSat : TrebSat_Common {
   //  State:
 
     WZet              keep;
-#if !defined(USE_MINISAT2)
-    SatStd            S;
-    Clausify<SatStd>  C;
-  #if defined(SAT_SNAPSHOT)
-    SatStd S_copy;
-  #endif
-#else
-    MiniSat2          S;
+    MultiSat          S;
     Clausify<MetaSat> C;
-#endif
     WMap<Lit>         n2s;
     Vec<Lit>          act_;
+
+#if defined(LAZY_CUBES)
+    Set<Cube_Data*>   has_cube;     // -- has cube been added to 'S' yet? [EXPERIMENTAL]
+    WMap<lbool>       model;
+    uint              n_cubes_added;
+#endif
 
     Cube              last_cube;
     Lit               tmp_act;
@@ -360,6 +384,7 @@ struct TrebSat_MonoSat : TrebSat_Common {
     Lit  act(uint k);
     void recycle();
     Cube weakenBySat(Cube s, Cube bad);
+    lbool S_solve(const Vec<Lit>& assumps, uint frame);
 
   //________________________________________
   //  Virtual interface:
@@ -377,11 +402,75 @@ struct TrebSat_MonoSat : TrebSat_Common {
 
 
 //=================================================================================================
+// -- Lazy cubes:
+
+
+lbool TrebSat_MonoSat::S_solve(const Vec<Lit>& assumps, uint frame)
+{
+#if !defined(LAZY_CUBES)
+    return S.solve(assumps);
+
+#else
+    for(;;){
+        ZZ_PTimer_Mark(last_solve);
+        lbool result = S.solve(assumps);
+        if (result == l_False){
+            return l_False; }
+
+        {
+            ZZ_PTimer_Scope(treb_lazy_validate);
+
+            For_Gatetype(N, gate_Flop, w){
+                Lit p = n2s[w];
+                model(w) = p ? (p.id < S.nVars() ? S.value(p) : l_Undef) : l_Undef;
+            }
+
+            /**/bool retry = false;
+            for (uind d = F.size(); d > frame;){ d--;
+                for (uint i = 0; i < F[d].size(); i++){
+                    const Cube& c = F[d][i];
+                    for (uint j = 0; j < c.size(); j++){
+                        if ((model[c[j] + N] ^ sign(c[j])) == l_False)
+                            goto Satisfied;
+                    }
+                    // Found unsatisfied clause/cube; add it:
+                    {
+                        Vec<Lit> ps;
+                        if (d != F.size() - 1){
+                            ps.push(~act(d));
+                            assert(has(assumps, act(d)));
+                        }
+
+                        for (uint i = 0; i < c.size(); i++)
+                            ps.push(C.clausify(~c[i] + N));
+                        S.addClause(ps);
+                        n_cubes_added++;
+
+                        ZZ_PTimer_AddTo(treb_lazy_refine, last_solve);
+                        //goto Retry;
+                        /**/retry = true;
+                    }
+                  Satisfied:;
+                }
+            }
+            /**/if (retry) goto Retry;
+
+            return result;
+        }
+
+      Retry:;
+    }
+#endif
+}
+
+
+//=================================================================================================
 // -- Local methods:
 
 
 TrebSat_MonoSat::TrebSat_MonoSat(NetlistRef N_, const Vec<Vec<Cube> >& F_, const WMapS<float>& activity_, const Params_Treb& P_) :
     TrebSat_Common(N_, F_, activity_, P_),
+    S(P.sat_solver),
     C(S, N, n2s, keep),
     last_cube(Cube_NULL),
     tmp_act(lit_Undef),
@@ -401,6 +490,10 @@ TrebSat_MonoSat::TrebSat_MonoSat(NetlistRef N_, const Vec<Vec<Cube> >& F_, const
   #else
     C.quant_claus = false;
   #endif
+
+#if defined(LAZY_CUBES)
+    n_cubes_added = 0;
+#endif
 
     recycle();  // -- put in clauses from 'F' if not empty.
 }
@@ -429,9 +522,18 @@ void TrebSat_MonoSat::recycle()
     //**/WriteLn "[Recycled SAT]";
     C.clear();
     act_.clear();
+#if !defined(LAZY_CUBES)
     for (uint d = 0; d < F.size(); d++)
         for (uint i = 0; i < F[d].size(); i++)
             blockCubeInSolver(TCube(F[d][i], (d == depth()+1) ? frame_INF : d));
+
+#else
+    uint total_cubes = 0;
+    for (uint d = 0; d < F.size(); d++)
+        total_cubes += F[d].size();
+    //**/WriteLn "[Recycled SAT]  %_/%_ cubes were added", n_cubes_added, total_cubes;
+    n_cubes_added = 0;
+#endif
 
     wasted_lits = 0;
     last_cube = Cube_NULL;
@@ -546,6 +648,7 @@ void solveMutual(const Vec<Cube>& bads, uint frame, /*out*/Vec<Cube>& blocked, /
 #if !defined(SAT_SNAPSHOT)
 TCube TrebSat_MonoSat::solveRelative(TCube s, uint params, Vec<Cube>* avoid)
 {
+    //*D*/Write "*\f";
     if (wasted_lits * 2 > S.nVars()){
         //**/WriteLn "[recycled SAT-solver]";
         recycle(); }
@@ -615,7 +718,7 @@ TCube TrebSat_MonoSat::solveRelative(TCube s, uint params, Vec<Cube>* avoid)
 
     // Solve:
     ZZ_PTimer_Mark(solve);
-    lbool result = S.solve(assumps);
+    lbool result = S_solve(assumps, k-1);
     if (result == l_Undef) throw Excp_TrebSat_Abort();
 
     if (result == l_True) ZZ_PTimer_AddTo(treb_sat  , solve);
@@ -725,7 +828,7 @@ TCube TrebSat_MonoSat::solveRelative(TCube s, uint params, Vec<Cube>* avoid)
 
     // Solve:
     ZZ_PTimer_Mark(solve);
-    lbool result = S.solve(assumps);
+    lbool result = S_solve(assumps, k-1);
     if (result == l_Undef) throw Excp_TrebSat_Abort();
 
     if (result == l_True) ZZ_PTimer_AddTo(treb_sat  , solve);
@@ -823,7 +926,7 @@ Cube TrebSat_MonoSat::solveBad(uint k, bool restart)      // <<== 'k' redundant,
 
     // Solve:
     ZZ_PTimer_Mark(solve);
-    lbool result = S.solve(assumps);
+    lbool result = S_solve(assumps, k);
     if (result == l_Undef) throw Excp_TrebSat_Abort();
 
     if (result == l_True) ZZ_PTimer_AddTo(treb_sat  , solve);
@@ -855,7 +958,8 @@ Cube TrebSat_MonoSat::solveBad(uint k, bool restart)
 
     // Solve:
     ZZ_PTimer_Mark(solve);
-    lbool result = S.solve();
+    Vec<Lit> empty;
+    lbool result = S_solve(empty, k);
     if (result == l_Undef) throw Excp_TrebSat_Abort();
 
     if (result == l_True) ZZ_PTimer_AddTo(treb_sat  , solve);
@@ -899,7 +1003,7 @@ bool TrebSat_MonoSat::isBlocked(TCube s)
 
     // Solve:
     ZZ_PTimer_Mark(solve);
-    lbool result = S.solve(assumps);
+    lbool result = S_solve(assumps, k);
     if (result == l_Undef) throw Excp_TrebSat_Abort();
 
     if (result == l_True) ZZ_PTimer_AddTo(treb_sat  , solve);
@@ -930,7 +1034,8 @@ bool TrebSat_MonoSat::isBlocked(TCube s)
 
     // Solve:
     ZZ_PTimer_Mark(solve);
-    lbool result = S.solve();
+    Vec<Lit> empty;
+    lbool result = S_solve(empty, k);
     if (result == l_Undef) throw Excp_TrebSat_Abort();
 
     if (result == l_True) ZZ_PTimer_AddTo(treb_sat  , solve);

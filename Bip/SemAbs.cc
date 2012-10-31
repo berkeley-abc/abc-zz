@@ -97,8 +97,8 @@ SemAbs::SemAbs(NetlistRef N0, const Vec<Wire>& props) :
 
     // Add empty transition relation to interpolant netlist:
     NetlistRef M = P.netlist();
-    Wire m_bad      = M.add(Flop_(bad_flop));
-    Wire m_bad_next = M.add(PI_  (bad_flop + next_state_offset));
+    Wire m_bad      ___unused = M.add(Flop_(bad_flop));
+    Wire m_bad_next ___unused = M.add(PI_  (bad_flop + next_state_offset));
     M.add(PO_(0), M.True());
 }
 

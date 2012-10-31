@@ -183,6 +183,10 @@ macro void vecCopy(const V& src, W& dst) {
 
 
 template<class V>
+macro bool isNull(const V& v) {
+    return v.null(); }
+
+template<class V>
 macro bool isEmpty(const V& v) {
     return v.size() == 0; }
 
