@@ -580,6 +580,8 @@ public:
     uint size() const { return order.size(); }
     Wire operator[](uint i) const { return netlist(Pec::nl)[order[i]]; }
 
+    void recompute() { order.clear(); upOrder(netlist(Pec::nl), order); }
+
   //________________________________________
   //  Pec interface:
 

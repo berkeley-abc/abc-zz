@@ -432,6 +432,9 @@ void streamOut_Netlist(Vec<uchar>& data, NetlistRef N)
         }
     }else
         putu(data, 0);  // -- no properties
+
+    // Save fairness properties and constraints: 
+    // <<== to be done
 }
 
 
@@ -499,6 +502,35 @@ void streamIn_Netlist(const uchar* in, const uchar* end, NetlistRef N)
     for (uind i = 0; i < n_props; i++){
         uint64 d = getu(in, end);
         properties.push(N.add(PO_(i), xlat[d>>1] ^ bool(d & 1)));
+    }
+
+    // Read fairness properties and constraints:
+    if (in != end){
+        uint version = getu(in, end);
+        assert(version == 1);
+
+        uint n_fairs = getu(in, end);
+        if (n_fairs > 0){
+            Add_Pob(N, fair_properties);
+            fair_properties.push();
+            for (uint i = 0; i < n_fairs; i++){
+                uint64 d = getu(in, end);
+                if (d == 0)
+                    fair_properties.push();
+                else
+                    fair_properties.last().push(N.add(PO_(N.typeCount(gate_PO)), xlat[d>>1] ^ bool(d & 1)));
+            }
+            fair_properties.pop();
+        }
+
+        uint n_constr = getu(in, end);
+        if (n_constr > 0){
+            Add_Pob(N, constraints);
+            for (uint i = 0; i < n_constr; i++){
+                uint64 d = getu(in, end);
+                constraints.push(N.add(PO_(N.typeCount(gate_PO)), xlat[d>>1] ^ bool(d & 1)));
+            }
+        }
     }
 }
 

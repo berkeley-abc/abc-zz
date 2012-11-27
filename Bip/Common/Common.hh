@@ -37,8 +37,8 @@ static const double SEC_TO_VIRT_TIME = 10000000;
 // Prepare netlist for verification:
 
 
-void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init);
-void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, WMap<Wire>& xlat);
+void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, Wire* fairness_monitor = NULL, bool toggle_bad = false);
+void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, WMap<Wire>& xlat, Wire* fairness_monitor = NULL, bool toggle_bad = false);
 void instantiateAbstr(NetlistRef N, const IntSet<uint>& abstr, /*outputs:*/ NetlistRef M, WMap<Wire>& n2m, IntMap<uint,uint>& pi2ff);
 void addReset(NetlistRef N, int flop_num = num_NULL, int pi_num = num_ERROR);
 
@@ -153,7 +153,7 @@ void translateCex(const CCex& ccex, NetlistRef N_cex, /*out*/Cex& cex);
 void translateCex(const Cex& cex, CCex& ccex, NetlistRef N);
 void makeCexInitial(NetlistRef N, Cex& cex);
 
-bool verifyCex(NetlistRef N, const Vec<Wire>& props, const Cex& cex, /*out*/Vec<uint>* fails_at = NULL);
+bool verifyCex(NetlistRef N, const Vec<Wire>& props, Cex& cex, /*out*/Vec<uint>* fails_at = NULL);
 void dumpCex(NetlistRef N, const Cex& cex, Out& out = std_out);
 
 bool verifyInvariant(NetlistRef N, const Vec<Wire>& props, NetlistRef invariant, /*out*/uint* failed_prop = NULL);
@@ -240,6 +240,13 @@ Wire insertUnrolled(Wire w, uint k, NetlistRef F, Vec<CompactBmcMap>& n2f, const
 
 void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized, /*outputs:*/ MetaSat& S, Vec<LLMap<GLit,Lit> >& m2s);
     // -- 'roots' is a list of pairs '(frame#, gate)'.
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Constraint handling:
+
+
+void foldConstraints(NetlistRef N);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

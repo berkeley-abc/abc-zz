@@ -206,6 +206,8 @@ void BmcTrace::getModel(Vec<Vec<lbool> >& pi, Vec<Vec<lbool> >& ff) const
             For_Gatetype(N, gate_Flop, w){
                 Wire x = n2f[d][w];
                 int  num = attr_Flop(w).number;
+                if (num == num_NULL) continue;
+
                 if (!x) ff[d](num) = l_Undef;       // -- can't tie flops to anything...
                 else{
                     Lit p = f2s[x] ^ sign(x);
@@ -220,6 +222,7 @@ void BmcTrace::getModel(Vec<Vec<lbool> >& pi, Vec<Vec<lbool> >& ff) const
     Get_Pob(N, flop_init);
     For_Gatetype(N, gate_Flop, w){
         int num = attr_Flop(w).number;
+        if (num == num_NULL) continue;
         if (ff[0][num] == l_Undef)
             ff[0][num] = flop_init[w];
     }

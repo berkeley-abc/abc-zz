@@ -207,17 +207,6 @@ void readAiger_(In& in, NetlistRef N, bool store_comment)
         w_po.set(0, w_in);
     }
 
-/*
-      Tot  PIs  Flops  POs  Ands  Bad  Constr Live (Fair)
-aig   22   0    3      1    19    0    0      1
-20
-36
-45
-11
-1
-11
-*/
-
     // Read bad/constr/live/fair:
     if (n_bad > 0){
         Add_Pob(N, properties);
@@ -245,7 +234,7 @@ aig   22   0    3      1    19    0    0      1
 
     if (n_live > 0){
         Add_Pob(N, fair_properties);
-        for (uind i = 0; i < n_live; i++){
+        for (uind n = 0; n < n_live; n++){
             readLine(in, buf);
             splitArray(buf.slice(), " ", fs);
             if (fs.size() != 1) throw Excp_AigerParseError("Expected a single number on each line in the 'liveness' section");
@@ -422,9 +411,9 @@ void removeFlopInit(NetlistRef N)
 
                     if (muxes[v] == Wire_NULL){
                         Wire w_pseudo = N.add(PI_(piC++));
-                        muxes(v) = addMux(N, cycle0, w_pseudo, v, ignore);
+                        muxes(v) = addMux(N, cycle0, w_pseudo, +v, ignore);
                     }
-                    w.set(Input_Pin_Num(v), muxes[v]);
+                    w.set(Input_Pin_Num(v), muxes[v] ^ sign(v));
                 }
             }
         }

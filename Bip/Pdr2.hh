@@ -42,6 +42,8 @@ struct Params_Pdr2 {
     uint        gen_orbits;
     bool        tweak_cut;
     SolverType  sat_solver;
+    bool        prop_init;
+    bool        check_klive;
 
     Params_Pdr2() :
         recycling    (SOLVER),
@@ -55,7 +57,9 @@ struct Params_Pdr2 {
         restarts     (false),
         gen_orbits   (2),
         tweak_cut    (false),
-        sat_solver   (sat_Abc)
+        sat_solver   (sat_Abc),
+        prop_init    (false),
+        check_klive  (false)
     {}
 };
 

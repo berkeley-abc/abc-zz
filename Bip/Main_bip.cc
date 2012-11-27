@@ -35,6 +35,8 @@
 #include "BestBwd.hh"
 #include "Saber.hh"
 #include "AbsBmc.hh"
+#include "Live.hh"
+
 #if !defined(NO_BERKELEY_ABC)
 #include "Bdd.hh"
 #endif
@@ -275,7 +277,7 @@ static
 void setupProperties(NetlistRef N, Vec<int>& prop_nums, bool inv_prop, /*out*/Vec<Wire>& props, bool quiet)
 {
     // Define properties:
-    if (!Has_Pob(N, properties)){
+    if (!Has_Pob(N, properties) && !Has_Pob(N, fair_properties)){
         if (N.typeCount(gate_PO) == 0){
             ShoutLn "No properties and no POs in design!";
             exit(1); }
@@ -283,7 +285,7 @@ void setupProperties(NetlistRef N, Vec<int>& prop_nums, bool inv_prop, /*out*/Ve
         if (!quiet) WriteLn "No properties defined. Treating all POs as properties.";
     }
 
-    Get_Pob(N, properties);
+    Assure_Pob(N, properties);
     bool props_numbered = true;
     for (uind i = 0; i < properties.size(); i++){
         Wire w = properties[i];
@@ -527,8 +529,10 @@ void writeCex(Out& out, NetlistRef N, const Cex& cex, uint orig_num_pis)
             for (uind j = 0; j < skip; j++) out += '!';
             out += name(cex.inputs[d][N[pis[i].snd]]);
         }
-        for (uint i = pis.last().fst + 1; i < orig_num_pis; i++)
-            out += '!';
+        if (pis.size() > 0){
+            for (uint i = pis.last().fst + 1; i < orig_num_pis; i++)
+                out += '!';
+        }
     }
     out += NL;
 }
@@ -564,10 +568,31 @@ void writeAbstr(Out& out, NetlistRef N, const IntSet<uint>& abstr)
 
 void outputVerificationResult(
     NetlistRef N, const Vec<Wire>& props,
-    lbool result, const Cex* cex, uint orig_num_pis, NetlistRef invar, int bug_free_depth, bool check_invar,
+    lbool result, Cex* cex, uint orig_num_pis, NetlistRef invar, int bug_free_depth, bool check_invar,
     String out_filename, bool quiet,
     double T0, double Tr0)
 {
+    //
+    // TO FILE:
+    //
+    if (out_filename != ""){
+        OutFile out(out_filename);
+
+        // Write result:
+        FWriteLn(out) "result: %_", resultToString(result);
+
+        // Write counterexample:
+        if (cex != NULL && cex->size() > 0)
+            writeCex(out, N, *cex, orig_num_pis);
+
+        // Write invariant:
+        if (!invar.null() && !invar.empty())
+            writeInvar(out, invar);
+
+        // Write bug-free depth:
+        FWriteLn(out) "bug-free-depth: %_", bug_free_depth;
+    }
+
     //
     // TO STANDARD OUTPUT:
     //
@@ -621,27 +646,6 @@ void outputVerificationResult(
         NewLine;
         writeResourceUsage(T0, Tr0);
     }
-
-    //
-    // TO FILE:
-    //
-    if (out_filename != ""){
-        OutFile out(out_filename);
-
-        // Write result:
-        FWriteLn(out) "result: %_", resultToString(result);
-
-        // Write counterexample:
-        if (cex != NULL && cex->size() > 0)
-            writeCex(out, N, *cex, orig_num_pis);
-
-        // Write invariant:
-        if (!invar.null() && !invar.empty())
-            writeInvar(out, invar);
-
-        // Write bug-free depth:
-        FWriteLn(out) "bug-free-depth: %_", bug_free_depth;
-    }
 }
 
 
@@ -662,7 +666,7 @@ void parseSif(String input, NetlistRef N)
         exit(1);
     }
 
-    For_Gatetype(N, gate_PO, w) w.set(0, ~w[0]);    // -- invert properties
+//    For_Gatetype(N, gate_PO, w) w.set(0, ~w[0]);    // -- invert properties
 }
 
 
@@ -830,6 +834,16 @@ int main(int argc, char** argv)
 
     cli_hidden.add("profile", "bool", "no", "Activate profiling.");
 
+    // Command line -- new property driven reachability (The Trebuchet):
+    CLI cli_treb;
+    addCli_Treb(cli_treb);
+    cli.addCommand("treb", "Trebuchet version of PDR.", &cli_treb);
+
+    // Command line -- new property driven reachability:
+    CLI cli_pdr2;
+    addCli_Pdr2(cli_pdr2);
+    cli.addCommand("pdr2", "Two-frame version of PDR.", &cli_pdr2);
+
     // Command line -- property driven reachability:
     CLI cli_pdr;
     cli_pdr.add("seed", "uint", "0", "Seed to randomize SAT solver with. 0 means no randomization.");
@@ -839,16 +853,6 @@ int main(int argc, char** argv)
     cli_pdr.add("stats", "{clauses, time, vars}", "clauses", "Control progress output.");
     cli_pdr.add("dump-invar", "bool", "no", "Dump invariant in clause form.");
     cli.addCommand("pdr", "Property driven reachability analysis.", &cli_pdr);
-
-    // Command line -- new property driven reachability (The Trebuchet):
-    CLI cli_treb;
-    addCli_Treb(cli_treb);
-    cli.addCommand("treb", "Trebuchet version of PDR.", &cli_treb);
-
-    // Command line -- new property driven reachability (The Trebuchet):
-    CLI cli_pdr2;
-    addCli_Pdr2(cli_pdr2);
-    cli.addCommand("pdr2", "Two-frame version of PDR.", &cli_pdr2);
 
     // Command line -- Sifting for k-inductive invariant:
     CLI cli_sift;
@@ -952,6 +956,14 @@ int main(int argc, char** argv)
     // Command line -- abstract BMC:
     CLI cli_absbmc;
     cli.addCommand("absbmc", "Under-approximate BMC.", &cli_absbmc);
+
+    // Command line -- liveness:
+    CLI cli_live;
+    cli_live.add("k", "uint | {inc, l2s}", "l2s", "Bound for k-liveness ('inc' = incremental) or 'l2s' for liveness-to-safety algorithm.");
+    cli_live.add("aig", "string", "", "Output AIGER file after conversion.");
+    cli_live.add("gig", "string", "", "Output GIG file after conversion.");
+    cli_live.add("eng", "{none, bmc, treb, treb-abs, pdr2, imc}", "none", "Proof-engine to apply to conversion.");
+    cli.addCommand("live", "Liveness checking.", &cli_live);
 
     // Command line -- show:
     CLI cli_show;
@@ -1109,7 +1121,8 @@ int main(int argc, char** argv)
     // Run non-verification commands:
     if (cli.cmd == "info"){
         WriteLn "\a*%_\a* -- %_", input, info(N);
-        if (!is_aiger) WriteLn "  %_", verifInfo(N);
+        if (!is_aiger || Has_Pob(N, constraints) || Has_Pob(N, fair_properties) || Has_Pob(N, fair_constraints))
+            WriteLn "  %_", verifInfo(N);
         return 0;
 
     }else if (cli.cmd == "show"){
@@ -1126,6 +1139,7 @@ int main(int argc, char** argv)
 
         if (cli.get("human").bool_val){
             introduceXorsAndMuxes(N);
+            removeAllUnreach(N);
             normalizeXors(N);
             introduceBigAnds(N);
             introduceOrs(N);
@@ -1213,7 +1227,9 @@ int main(int argc, char** argv)
         // Setup properties:
         getInitialAbstr(N, cli.get("abstr").string_val, abstr, quiet);
 
-        setupProperties(N, prop_nums, inv_prop, props, quiet || is_aiger);
+        // <<== rather check for liveness properties here, and switch default command
+        if (cli.cmd != "live")
+            setupProperties(N, prop_nums, inv_prop, props, quiet || is_aiger);
         setupInitialState(N, quiet || is_aiger);
 
         // Conjoin properties:
@@ -1258,7 +1274,11 @@ int main(int argc, char** argv)
 
         removeFlopInit(N);
         padInputs(N, orig_num_pis);
-        //*aiger*/For_Gatetype(N, gate_PO, w) w.set(0, ~w[0]);    // -- invert properties
+        if (!is_aiger && Has_Pob(N, properties)){
+            Get_Pob(N, properties);
+            for (uint i = 0; i < properties.size(); i++)
+                properties[i].set(0, ~properties[i][0]);
+        }
         writeAigerFile(output, N);
         WriteLn "Wrote: \a*%_\a*", output;
 
@@ -1609,8 +1629,35 @@ int main(int argc, char** argv)
 
     }else if (cli.cmd == "absbmc"){
         absBmc(N, props);
-    }
 
+    }else if (cli.cmd == "live"){
+        Get_Pob(N, fair_properties);
+        if (prop_nums.size() == 0 && fair_properties.size() == 1)
+            prop_nums.push(0);
+
+        if (prop_nums.size() != 1){
+            ShoutLn "ERROR! Liveness algorithm can only check one property at a time.";
+            exit(1); }
+
+        uint prop_no = (uint)prop_nums[0];
+        if (prop_no >= fair_properties.size()){
+            ShoutLn "ERROR! Invalid property number.";
+            ShoutLn "Use '-prop={%_..%_}", 0, fair_properties.size() - 1;
+            exit(1); }
+
+        Params_Liveness P;
+        P.k = (cli.get("k").choice == 0) ? cli.get("k").int_val :
+                                           cli.get("k").enum_val == 0 ? Params_Liveness::INC : Params_Liveness::L2S;
+        P.aig_output = cli.get("aig").string_val;
+        P.gig_output = cli.get("gig").string_val;
+        P.eng = (Params_Liveness::Engine)cli.get("eng").enum_val;
+
+        lbool result = liveness(N, prop_no, P);
+
+        if (result != l_Undef)
+            ;// <<==  outputVerificationResult(N, props, result, &cex, orig_num_pis, NetlistRef(), bug_free_depth, false, output, quiet, T0, Tr0);
+        if (!quiet) writeResourceUsage(T0, Tr0);
+    }
 
     return 0;
 }

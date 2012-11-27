@@ -603,6 +603,7 @@ void splitFlops(NetlistRef N, bool cut_up)
 // Returns FALSE if an infinite loop was detected among the buffers.
 bool removeBuffers(NetlistRef N)
 {
+    if (Has_Pob(N, strash)) Remove_Pob(N, strash);
     Assure_Pob(N, fanout_count);
 
     // Remove buffers:
@@ -784,8 +785,7 @@ bool collectConjunction(Wire w, WZetS& seen, Vec<Wire>& out_conj)
 
 void introduceXorsAndMuxes(NetlistRef N)
 {
-    if (Has_Pob(N, strash))
-        Remove_Pob(N, strash);
+    if (Has_Pob(N, strash)) Remove_Pob(N, strash);
     Assure_Pob(N, fanout_count);
 
     Vec<gate_id> order;
@@ -859,7 +859,7 @@ void introduceBigAnds(NetlistRef N)
 
         conj.clear();
         if (!collectConjunction(w, seen, conj)){
-            N.change(w, Buf_(), N.True());
+            N.change(w, Buf_(), ~N.True());
         }else if (conj.size() == 1){
             N.change(w, Buf_(), conj[0]);
         }else if (conj.size() > 2){

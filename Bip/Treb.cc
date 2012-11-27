@@ -249,7 +249,7 @@ void Treb::showProgress(String prefix)
 // -- Cube Generalization:
 
 
-// <<== to try: any literal that could not be removed after the first literal was removed 
+// <<== to try: any literal that could not be removed after the first literal was removed
 // can be tried afterwards at the toplevel (=with the original cube). If it can be removed there,
 // then derive a second cube as well
 
@@ -266,6 +266,8 @@ TCube Treb::generalize(TCube s0)
     bool  changed;
 
     Vec<GLit> ss(copy_, s0.cube);
+    if (seed != 0)
+        shuffle(seed, ss);
     if (P.use_activity)
         sobSort(ordStabilize(sob(ss, proj_lt(compose(brack<float,Wire>(activity), brack<Wire,GLit>(N))))));
 
@@ -351,11 +353,11 @@ TCube Treb::generalize(TCube s0)
         if (P.rec_nonind > 0 && did_elim){
             ZZ_PTimer_Scope(treb_block_genNonInd);
             Vec<GLit> t(copy_, s.cube);
-          #if 0
-            shuffle(seed, t);
-          #else
+
+            if (seed != 0)
+                shuffle(seed, t);
             sobSort(sob(t, proj_lt(compose(brack<float,Wire>(activity), brack<Wire,GLit>(N)))));
-          #endif
+
             uint n_tries = 0;
             for (uint i = 0; i < t.size(); i++){
                 if (!has(s.cube, t[i])) continue;
@@ -991,74 +993,6 @@ void Treb::semanticCoi(uint k0)
 
 
 //=================================================================================================
-// -- Target enlargement (hackish):
-
-
-// Add new logic to 'N' corresponding to enlarging the target by 'targ_enl' frames.
-// New logic added to 'N' from 'N0' will be inserted into the 'n0_to_n' map.
-//
-// Returns the displacement of extra PIs ('pi_sz') which needs to be passed to 'fixCex()' to
-// recover a conterexample.
-static
-uint targetEnlargment(NetlistRef N, WMap<Wire>& n0_to_n, uint targ_enl, const Vec<Wire>& props)
-{
-    uint pi_sz = nextNum_PI(N);
-
-    Get_Pob(N, init_bad);
-    uint bad_size0 = sizeOfCone(init_bad[1][0]);
-
-    Vec<WMap<Wire> > n2f;
-    n2f.push();
-    n0_to_n.moveTo(n2f[0]);
-
-    Wire conj = N.True();
-    for (uind i = 0; i < props.size(); i++){
-        assert(type(props[i]) == gate_PO);
-        Params_Unroll P;
-        P.number_pis = pi_sz;
-        Wire w = insertUnrolled(props[i][0], targ_enl, N, n2f, P);
-        conj = s_And(conj, w ^ sign(props[i])); }
-
-    init_bad[1].set(0, ~conj);
-    n2f[0].moveTo(n0_to_n);
-    removeUnreach(N, NULL, false);
-
-    uint bad_size1 = sizeOfCone(init_bad[1][0]);
-    if (targ_enl > 0)
-        WriteLn "Target enlargment: %_ -> %_ gates in property.", bad_size0, bad_size1;
-
-    return pi_sz;
-}
-
-
-// Fix up counterexample in the presence of target enlargement (migrating values of extra PI in
-// the last frame to additional frame added to the tail).
-static
-void fixCex(Cex& cex, NetlistRef N, uint pi_sz, uint targ_enl)
-{
-    if (cex.size() > 0){
-        Vec<Wire> pi;
-        For_Gatetype(N, gate_PI, w)
-            pi(attr_PI(w).number) = w;
-
-        cex.flops.shrinkTo(1);
-        uint cex_sz = cex.inputs.size();
-        cex.inputs.growTo(cex_sz + targ_enl);
-        For_Gatetype(N, gate_PI, w){
-            int num = attr_PI(w).number;
-            if ((uint)num > pi_sz){
-                uint frame = (uint)num / pi_sz;
-                num -= frame * pi_sz;
-                lbool val = cex.inputs[cex_sz-1][w];
-
-                cex.inputs[cex_sz-1 + frame](pi[num]) = val;
-            }
-        }
-    }
-}
-
-
-//=================================================================================================
 // -- Initial activity:
 
 
@@ -1358,9 +1292,6 @@ bool Treb::run(Cex* cex_out, NetlistRef N_invar)
     }else
         reset = Wire_NULL;
 
-    // Target enlargement:
-    uint pi_sz = targetEnlargment(N, n0_to_n, P.targ_enl, props);
-
 #if 0
     /*EXPERIMENTAL*/
     {
@@ -1469,7 +1400,6 @@ bool Treb::run(Cex* cex_out, NetlistRef N_invar)
                     uint orig_abstr_size = abstr.size();
                     if (!refineAbstr(cex)){
                         WriteLn "Counterexample found.";
-                        fixCex(cex, N, pi_sz, P.targ_enl);
                         if (cex_out) translateCex(cex, N0, *cex_out, n0_to_n);
                         return false;
                     }else{
@@ -1577,8 +1507,8 @@ lbool treb( NetlistRef          N0,
     try{
         result = lbool_lift(treb.run(cex, invariant));
 
-        if (result == l_False && bug_free_depth)
-            *bug_free_depth = treb.bugFreeDepth();
+        if (bug_free_depth)
+            *bug_free_depth = (result == l_False) ? treb.bugFreeDepth() : INT_MAX;
 
         if (par){
             Vec<uint> props_; assert(props.size() == 1);      // -- for now, can only handle singel properties in PAR mode
@@ -1622,7 +1552,6 @@ void addCli_Treb(CLI& cli)
     cli.add("weak"      , weak_type  , weak_default                 , "Weakening method for proof-obligations.");
     cli.add("pre-weak"  , "bool"     , P.pre_weak ? "yes" : "no"    , "Apply justification before ternary simulation? (only for -weak=sim).");
     cli.add("rec-ni"    , "uint"     , (FMT "%_", P.rec_nonind)     , "Recurse into non-inductive region on this many literals during cube generalization.");
-    cli.add("te"        , "uint"     , (FMT "%_", P.targ_enl)       , "EXPERIMENTAL. Target enlargement (invar/CEX generation not supported)");
     cli.add("coi"       , "int[0:3]" , (FMT "%_", P.semant_coi)     , "EXPERIMENTAL. Semantic cone of influence (1=before propagation, 2=after, 3=both).");
     cli.add("skip-prop" , "bool"     , P.skip_prop ? "yes" : "no"   , "EXPERIMENTAL. Don't propagate cubes forward bewteen major rounds.");
     cli.add("rlim"      , "float[0:]", (FMT "%_", P.restart_lim)    , "EXPERIMENTAL. Initial restart limit (number of derived cubes).");
@@ -1652,7 +1581,6 @@ void setParams(const CLI& cli, Params_Treb& P)
     P.weaken      =(W)cli.get("weak")      .enum_val;
     P.pre_weak      = cli.get("pre-weak")  .bool_val;
     P.rec_nonind    = cli.get("rec-ni")    .int_val;
-    P.targ_enl      = cli.get("te")        .int_val;
     P.semant_coi    = cli.get("coi")       .int_val;
     P.skip_prop     = cli.get("skip-prop") .bool_val;
     P.restart_lim   = cli.get("rlim")      .float_val;

@@ -134,7 +134,7 @@ void migrateNames(Wire from, Wire into, Str prefix = Str());
 // Collect Conjunctions:
 
 
-bool       isMux(Wire w, Wire& sel, Wire& d1, Wire& d0);
+bool isMux(Wire w, Wire& sel, Wire& d1, Wire& d0);
 macro bool isMux(Wire w) { Wire sel, d1, d0; return isMux(w, sel, d1, d0); }
 
 void countFanouts(Wire w, WMap<uint>& n_fanouts);

@@ -310,7 +310,9 @@ void Pdr2::recycleSolver(uint d)
     //**/WriteLn "[RECYCLE]";
     ZZ_PTimer_Scope(pdr2_recycleSolver);
     S[d].clear();
-    n2s[d].clear();
+    assert(n2s[d].size() == 2);
+    n2s[d][0].clear();
+    n2s[d][1].clear();
     wasted_lits[d] = 0;
 
     Vec<Lit> tmp;
@@ -1027,7 +1029,7 @@ bool Pdr2::propagate()
     //*T*/WriteLn "\a*\a/==== PROPAGATE\a0";
     addFrame();
 
-    for (uint k = 1; k < F.size()-1; k++){
+    for (uint k = P.prop_init ? 0 : 1; k < F.size()-1; k++){
         Vec<Cube> cubes(copy_, F[k]);
         for (uint i = 0; i < cubes.size(); i++){
             if (has(F[k], cubes[i])){       // <<== need to speed this up!
@@ -1253,8 +1255,10 @@ bool Pdr2::blockCube(TCube s0)
         if (!isBlocked(s)){
             if (s.frame == 0){
                 // Found counterexample:
-                extractCex(po);
-                return false; }
+                if (!P.check_klive)
+                    extractCex(po);
+                return false;
+            }
 
             assert(!isInitial(s.cube));
             TCube z;
@@ -1344,14 +1348,51 @@ bool Pdr2::run()
     //*T*/Dump(w_prop);
 
     // Keep proving property deeper and deeper until invariant or CEX is found:
+    uint klive_depth = 0;
     for(;;){
         if (F.size() > 1)
             WriteLn "-------------------- Depth %_ --------------------", F.size()-2;
 
         if (!blockCube(TCube(Cube(~w_prop), F.size()-1))){
-            showProgress("final");
-            WriteLn "Counterexample of depth %_ found.", cex.depth();
-            return false;
+            if (P.check_klive){
+                Get_Pob(N, flop_init);
+                Wire b_in = N.add(SO_());
+                Wire b = N.add(Flop_(), b_in);
+                flop_init(b) = l_False;
+                b_in     .set(0, N.add(Npn4_(npn4_cl_OR2), Wire_NULL, Wire_NULL,  b, ~w_prop_in[0]));
+                w_prop_in.set(0, N.add(Npn4_(npn4_cl_OR2), Wire_NULL, Wire_NULL, ~b,  w_prop_in[0]));
+
+                addCube(TCube(Cube(b), 0));
+
+                Get_Pob(N, fanouts);
+                fanouts.recompute();
+
+                Get_Pob(N, up_order);
+                up_order.recompute();
+
+#if 1
+                for (uint d = 0; d < F.size(); d++)
+                    recycleSolver(d);
+#else
+                for (uint d = 0; d < F.size(); d++){
+                    n2s[d][0](w_prop_in) = lit_Undef;
+                    n2s[d][1](w_prop) = lit_Undef;
+                    clausify(d, w_prop, 1);
+                }
+#endif
+
+                WriteLn "           \a*\a/==>> increasing\a/ k \a/to\a/ %_ \a/<<==\a/\a*", ++klive_depth;
+
+                    //        Wire b = N.add(Flop_());
+                    //        flop_init(b) = l_False;
+                    //        b.set(0, s_Or(b, ts[i-1]));
+                    //
+                    //        ts(i) = s_And(ts[i-1], b);
+            }else{
+                showProgress("final");
+                WriteLn "Counterexample of depth %_ found.", cex.depth();
+                return false;
+            }
 
         }else{
             showProgress("block");
@@ -1539,6 +1580,8 @@ void Pdr2::storeInvariant(NetlistRef N_invar)
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+// <<== report 'bug_free_depth' back to main() for ABC consumption...
+
 // Returns TRUE if properties hold, FALSE if CEX is found.
 bool pdr2( NetlistRef          N,
            const Vec<Wire>&    props,
@@ -1575,10 +1618,17 @@ bool pdr2( NetlistRef          N,
 
         // Copy properties: (should be singleton)
         {
+#if 0
             Get_Pob(N, properties);
             Add_Pob2(L, properties, new_properties);
             for (uint i = 0; i < properties.size(); i++)
                 new_properties.push(n2l[properties[i]] + L);
+#else
+            Get_Pob(M, properties);
+            Add_Pob2(L, properties, new_properties);
+            for (uint i = 0; i < properties.size(); i++)
+                new_properties.push(m2l[properties[i]] + L);
+#endif
         }
 
         // Split flops:
@@ -1626,18 +1676,19 @@ void addCli_Pdr2(CLI& cli)
     String sat_types   = "{zz, msc, abc}";
     String sat_default = select(sat_types, (P.sat_solver == sat_Zz) ? 0 : (P.sat_solver == sat_Msc) ? 1 : 2);
 
-    cli.add("recycle" , recycling_types , recycling_default , "SAT solver recycling strategy.");
-    cli.add("cone"    , pob_cone_types  , pob_cone_default  , "First POB phase: justification cone to consider.");
-    cli.add("intern"  , "bool"          , B(P.pob_internals), "Second POB phase: do min-cut to select internal points (otherwise state-vars).");
-    cli.add("weaken"  , "bool"          , B(P.pob_weaken)   , "Third POB phase: weaken cut by ternary simulation.");
-    cli.add("rotate"  , "bool"          , B(P.pob_rotate)   , "Shift between POB generation strategies.");
-    cli.add("just"    , just_strat_types, just_strat_default, "Justification strategy (if '-cone=just' is selected).");
-    cli.add("act"     , "bool"          , B(P.use_activity) , "Use activity based heuristic in POB phase and generalization.");
-    cli.add("rand"    , "bool"          , B(P.randomize)    , "Instead of activity, just shuffle the literals before POB/generalization.");
-    cli.add("restarts", "bool"          , B(P.restarts)     , "Clear queue of POBs periodically.");
-    cli.add("orbits"  , "int[1:2]"      , S(P.gen_orbits)   , "Orbits of literal removal in generalization.");
-    cli.add("tweak"   , "bool"          , B(P.tweak_cut)    , "Do a (weak) post-processing of min-cut to select more active variables.");
-    cli.add("sat"     , sat_types       , sat_default       , "SAT-solver to use.");
+    cli.add("recycle"  , recycling_types , recycling_default , "SAT solver recycling strategy.");
+    cli.add("cone"     , pob_cone_types  , pob_cone_default  , "First POB phase: justification cone to consider.");
+    cli.add("intern"   , "bool"          , B(P.pob_internals), "Second POB phase: do min-cut to select internal points (otherwise state-vars).");
+    cli.add("weaken"   , "bool"          , B(P.pob_weaken)   , "Third POB phase: weaken cut by ternary simulation.");
+    cli.add("rotate"   , "bool"          , B(P.pob_rotate)   , "Shift between POB generation strategies.");
+    cli.add("just"     , just_strat_types, just_strat_default, "Justification strategy (if '-cone=just' is selected).");
+    cli.add("act"      , "bool"          , B(P.use_activity) , "Use activity based heuristic in POB phase and generalization.");
+    cli.add("rand"     , "bool"          , B(P.randomize)    , "Instead of activity, just shuffle the literals before POB/generalization.");
+    cli.add("restarts" , "bool"          , B(P.restarts)     , "Clear queue of POBs periodically.");
+    cli.add("orbits"   , "int[1:2]"      , S(P.gen_orbits)   , "Orbits of literal removal in generalization.");
+    cli.add("tweak"    , "bool"          , B(P.tweak_cut)    , "Do a (weak) post-processing of min-cut to select more active variables.");
+    cli.add("sat"      , sat_types       , sat_default       , "SAT-solver to use.");
+    cli.add("prop-init", "bool"          , B(P.prop_init)    , "Propagate initial state unit cubes from F[0].");
 }
 
 
@@ -1658,6 +1709,7 @@ void setParams(const CLI& cli, Params_Pdr2& P)
     P.restarts       = cli.get("restarts").bool_val;
     P.gen_orbits     = cli.get("orbits").int_val;
     P.tweak_cut      = cli.get("tweak").bool_val;
+    P.prop_init      = cli.get("prop-init").bool_val;
 
     P.sat_solver = (cli.get("sat").enum_val == 0) ? sat_Zz :
                    (cli.get("sat").enum_val == 1) ? sat_Msc :

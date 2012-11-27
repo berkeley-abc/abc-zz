@@ -38,7 +38,6 @@ struct Params_Treb {
     Weaken  weaken;             // Method to weaken proof-obligations with.
     bool    pre_weak;           // Is simulation is used for weakening, first apply justification as a pre-step?
     uint    rec_nonind;         // Recurse into non-inductive region (#tries).
-    uint    targ_enl;           // Target enlargement. Currently don't produce correct CEXs.
     uint    semant_coi;         // Semantic cone-of-influence (bit0=before, bit1=after forward-propagation).
     bool    skip_prop;          // Don't run forward-propagate 
     double  restart_lim;        // Initial restart limit. 0=no restarts
@@ -64,7 +63,6 @@ struct Params_Treb {
         weaken(SIM),
         pre_weak(true),
         rec_nonind(0),
-        targ_enl(0),
         semant_coi(0),
         skip_prop(false),
         restart_lim(0),

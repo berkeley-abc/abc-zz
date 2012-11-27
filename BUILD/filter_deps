@@ -4,6 +4,9 @@ import sys
 import re
 
 
+# <<== change to search for .zb_root
+
+
 ## Define filters for unwanted system header files here.
 ##
 def systemHeader(filename):

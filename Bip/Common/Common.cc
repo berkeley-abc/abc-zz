@@ -27,20 +27,31 @@ using namespace std;
 // Prepare netlist for verification:
 
 
-void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, WMap<Wire>& xlat)
+// NOTE! If 'liveness' is set, 'props' is supposed to be fairness constraints. 
+// NOTE! Extra flops, numbered beyond the last flop of 'N0', may be introduced.
+// 
+// If 'liveness_monitor' is non-NULL, a 'Buf' gate will be written as a place holder there.
+// The signal should be true for the fairness monitor to be active.
+//
+void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, WMap<Wire>& xlat, Wire* fairness_monitor, bool toggle_bad)
 {
     Assure_Pob0(N, strash);
     Assure_Pob (N, init_bad);
     Assure_Pob0(N, fanout_count);
 
+    Auto_Pob(N0, constraints);
+    /**/if (getenv("ZZ_IGNORE_CONSTRAINTS")) constraints.clear();
+
     // COI:
     WZet seen;
     for (uind i = 0; i < props.size(); i++)
         seen.add(+props[i]);
+    for (uind i = 0; i < constraints.size(); i++)
+        seen.add(+constraints[i]);
     for (uind i = 0; i < seen.size(); i++){
         Wire w = seen.list()[i];
-        For_Inputs(w, v)
-            seen.add(+v);
+        For_Inputs(w, v){
+            seen.add(+v); }
     }
 
     if (Has_Pob(N0, reset)){    // -- this flop must be present, even if it is not in the COI of a property.
@@ -119,13 +130,75 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
             flop_init_new(xlat[w]) = flop_init[w];
 
     // Fold constraints:
-    if (Has_Pob(N0, constraints)){
-        ShoutLn "INTERNAL ERROR! Constraint folding not implemented yet.";
-        assert(false); }
+    int flopC = nextNum_Flop(N);
+    Wire w_cfail = ~N.True();       // -- outputs TRUE if constraints have failed
+    if (Has_Pob(N0, constraints) && constraints.size() > 0){
+        Wire w_constr = N.True();                           // -- 'w_constr' is conjunction of all constraints
+        for (uint i = 0; i < constraints.size(); i++){
+            Wire w = constraints[i][0] ^ sign(constraints[i]);
+            w_constr = s_And(w_constr, xlat[w] ^ sign(w)); }
+
+        Wire w_cflop = N.add(Flop_(flopC++));       // -- remembers if constraints have failed in the past
+        flop_init_new(w_cflop) = l_False;
+
+        w_cfail = s_Or(~w_constr, w_cflop);
+        w_cflop.set(0, w_cfail);
+    }
+
+    // -- init_bad[1]:
+    if (fairness_monitor == NULL){     // -- if NULL, then we are checking safety property
+        Wire conj = N.True();
+        for (uind i = 0; i < props.size(); i++){
+            assert(type(props[i]) == gate_PO);
+            conj = s_And(conj, xlat[props[i][0]] ^ sign(props[i][0]) ^ sign(props[i])); }
+        init_bad(1) = N.add(PO_(), s_And(~conj, ~w_cfail));
+
+        // Add singleton 'properties' for compatibility:
+        Assure_Pob(N, properties);
+        properties.clear();
+        properties.push(~init_bad[1]);
+        //**/Dump(init_bad[1]);
+        //**/init_bad[0] = N.Unbound();
+        //**/N.write("N.gig"); WriteLn "Wrote: N.gig"; exit(0);
+
+    }else{
+        // Insert monitor for fairness constraints (will toggle once when all of them has been seen, then reset):
+        //
+        // "toggle" will go high for one cycle when all fairness constraints have been seen. Example with two FCs:
+        //
+        //     s0' = (f0 | s0) & ~toggle
+        //     s1' = (f1 | s1) & ~toggle
+        //     toggle = (f0 | s0) & (f1 | s1)      <= this is the PO created for 'init_bad[1]'
+
+        *fairness_monitor = N.add(Buf_());
+
+        Vec<Wire> seen_prop;
+        Vec<Wire> ffs;
+        Wire toggle = N.True();
+        for (uint i = 0; i < props.size(); i++){
+            assert(type(props[i]) == gate_PO);
+            Wire wp = xlat[props[i][0]] ^ sign(props[i][0]) ^ sign(props[i]);
+
+            ffs.push(N.add(Flop_(flopC++)));
+            seen_prop.push(s_And(s_Or(wp, ffs.last()), *fairness_monitor));
+            flop_init_new(ffs.last()) = l_False;
+            toggle = s_And(toggle, seen_prop.last());
+        }
+
+        for (uint i = 0; i < props.size(); i++){
+            if (toggle_bad)
+                ffs[i].set(0, s_And(seen_prop[i], ~toggle));
+            else
+                ffs[i].set(0, seen_prop[i]);
+        }
+
+        init_bad(1) = N.add(PO_(), s_And(toggle, ~w_cfail));
+//        init_bad(1) = N.add(PO_(), toggle);
+    }
 
     // -- init_bad[0]:
     if (keep_flop_init){
-        init_bad.push(N.Unbound());
+        init_bad(0) = N.Unbound();
     }else{
         // Convert 'flop_init' to single-output constraint:
         Vec<Wire> conj;
@@ -134,25 +207,13 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
                 conj.push(xlat[w] ^ (flop_init[w] == l_False)); assert(!sign(w));
         }
         if (conj.size() == 0)
-            init_bad.push(N.add(PO_(), N.True()));
+            init_bad(0) = N.add(PO_(), N.True());
         else{
             for (uint i = 0; i < conj.size()-1; i += 2)
                 conj.push(s_And(conj[i], conj[i+1]));
-            init_bad.push(N.add(PO_(), conj.last()));
+            init_bad(0) = N.add(PO_(), conj.last());
         }
     }
-
-    // -- init_bad[1]:
-    Wire conj = N.True();
-    for (uind i = 0; i < props.size(); i++){
-        assert(type(props[i]) == gate_PO);
-        conj = s_And(conj, xlat[props[i][0]] ^ sign(props[i][0]) ^ sign(props[i])); }
-    init_bad.push(N.add(PO_(), ~conj));
-
-    // Add singleton 'properties' for compatibility:
-    Assure_Pob(N, properties);
-    properties.clear();
-    properties.push(~init_bad[1]);
 
     // Copy mem info:
     if (Has_Pob(N0, mem_info)){
@@ -163,14 +224,14 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
                 mem_info_new(xlat[w]) = mem_info[w];
     }
 
-    // <<== Simplify, techmap, cone of influence etc. here...
+    // <<== netlist simplification here?
 }
 
 
-void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init)
+void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, Wire* fairness_monitor, bool toggle_bad)
 {
     WMap<Wire> xlat;
-    initBmcNetlist(N0, props, N, keep_flop_init, xlat);
+    initBmcNetlist(N0, props, N, keep_flop_init, xlat, fairness_monitor, toggle_bad);
 }
 
 
@@ -392,11 +453,13 @@ void translateCex(const Vec<Vec<lbool> >& pi, const Vec<Vec<lbool> >& ff, Netlis
     Vec<Wire> num2ff;
 
     For_Gatetype(N_cex, gate_PI, w){
-        int num = attr_PI(w).number; assert(num != num_NULL);
+        int num = attr_PI(w).number;
+        if (num == num_NULL) continue;
         num2pi(num) = w; }
 
     For_Gatetype(N_cex, gate_Flop, w){
-        int num = attr_Flop(w).number; assert(num != num_NULL);
+        int num = attr_Flop(w).number;
+        if (num == num_NULL) continue;
         num2ff(num) = w; }
 
     cex.clear();
@@ -411,7 +474,7 @@ void translateCex(const Vec<Vec<lbool> >& pi, const Vec<Vec<lbool> >& ff, Netlis
 
     for (uint d = 0; d < ff.size(); d++){
         for (uint num = 0; num < ff[d].size(); num++)
-            if (ff[d][num] != l_Undef)
+            if (ff[d][num] != l_Undef && num2ff(num) != Wire_NULL)
                 cex.flops[d](num2ff[num]) = ff[d][num];
     }
 
@@ -637,10 +700,22 @@ void XSimulate::propagateUndo()
 // fail. The depth at which each property fails is returned through 'fails_at' (with UINT_MAX denoting
 // no failure for that property). If 'fails_at' is left empty but FALSE is returned, it indicates
 // that initial states were violated.
-bool verifyCex(NetlistRef N, const Vec<Wire>& props, const Cex& cex, /*out*/Vec<uint>* fails_at)
+//
+// NOTE! If 'N' has constraints, they will be folded by this function (so 'N' will change) and
+// the counterexample will be extended to include the new monitor flop.
+//
+bool verifyCex(NetlistRef N, const Vec<Wire>& props, Cex& cex, /*out*/Vec<uint>* fails_at)
 {
-    // Verify initial state:
     Get_Pob(N, flop_init);
+
+    // Fold constraints:
+    int mark = nextNum_Flop(N);
+    foldConstraints(N);
+    For_Gatetype(N, gate_Flop, w)
+        if (attr_Flop(w).number >= mark)
+            cex.flops[0](w) = flop_init[w];
+
+    // Verify initial state:
     For_Gatetype(N, gate_Flop, w){
         lbool iv = flop_init[w];
         if (iv != l_Undef && iv != cex.flops[0][w])
@@ -657,7 +732,7 @@ bool verifyCex(NetlistRef N, const Vec<Wire>& props, const Cex& cex, /*out*/Vec<
             lbool val = cex.flops[d][w];
             if (val != l_Undef && xsim[d][w] != val){
                 ShoutLn "INTERNAL ERROR! flop[%_] @ %_.  CEX=%_  SIM=%_", attr_Flop(w).number, d, val, xsim[d][w];
-//                assert(false);  // -- if this line fails, CEX contains a non-X flop value that was simulated to another value
+                assert(false);  // -- if this line fails, CEX contains a non-X flop value that was simulated to another value
             }
         }
     }
@@ -756,10 +831,14 @@ Lit insert(SatStd& S, Wire w, WMap<Lit>& memo)
 // In all three cases, FALSE is returned. NOTE!  Invariant 'H' is assumed to be expressed in
 // input-free, numbered flops, with no PIs present.
 //
+// NOTE! If 'N' has constraints, the will be folded by this function (so 'N' will change).
+//
 bool verifyInvariant(NetlistRef N, const Vec<Wire>& props, NetlistRef H, /*out*/uint* failed_prop)
 {
     // This code is meant to be used for debugging/asserting correctness. For that reason
     // we use a simple Tseitin transformation and a simple, recursive traversal procedure.
+
+    foldConstraints(N);
 
     assert(H.typeCount(gate_PO) == 1);
     for (uind i = 1; i < props.size(); i++)
@@ -1663,6 +1742,44 @@ void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized,
             assert(false);
         }
     }
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Constraint handling:
+
+
+void foldConstraints(NetlistRef N)
+{
+    if (!Has_Pob(N, constraints)) return;
+    Get_Pob(N, constraints);
+    if (constraints.size() == 0) return;
+
+    bool was_strashed = Has_Pob(N, strash);
+    if (was_strashed)
+        Remove_Pob(N, strash);
+
+    Wire w_constr = N.True();                           // -- 'w_constr' is conjunction of all constraints
+    for (uint i = 0; i < constraints.size(); i++){
+        w_constr = N.add(And_(), w_constr, constraints[i][0]);
+        remove(constraints[i]); }
+    Remove_Pob(N, constraints);
+
+    Get_Pob(N, flop_init);
+    Wire w_cflop = N.add(Flop_(nextNum_Flop(N)));       // -- remembers if constraints have failed in the past
+    flop_init(w_cflop) = l_False;
+
+    Wire w_cfail = ~N.add(And_(), w_constr, ~w_cflop);  // -- OR(~w_constr, w_cflop)
+    w_cflop.set(0, w_cfail);
+
+    if (Has_Pob(N, properties)){
+        Get_Pob(N, properties);
+        for (uint i = 0; i < properties.size(); i++)
+            properties[i].set(0, ~N.add(And_(), ~properties[i][0], ~w_cfail));   // -- a property is true if it holds or constraints have failed
+    }
+
+    if (was_strashed)
+        Add_Pob(N, strash);
 }
 
 

@@ -71,6 +71,8 @@ private:
     //  Internal temporaries:
     XSimulate   xsim;
     Cex         cex;
+
+    uint64      seed;
 };
 
 
@@ -83,6 +85,8 @@ TrebSat_Common::TrebSat_Common(NetlistRef N_, const Vec<Vec<Cube> >& F_, const W
     xsim.init(N);
     cex.flops .push();
     cex.inputs.push();
+
+    seed = P.seed;
 }
 
 
@@ -159,7 +163,7 @@ Cube TrebSat_Common::weakenByJust(Cube c, Cube bad)
     Vec<GLit> Q;
     if (bad){
         for (uint i = 0; i < bad.size(); i++)
-            Q.push(+N[bad[i]][0]), Tag_Last;
+            if (!sim[N[bad[i]][0]].just) Q.push(+N[bad[i]][0]), Tag_Last;
     }else
         Q.push(+init_bad[1][0]), Tag_Last;
 
@@ -248,6 +252,8 @@ Cube TrebSat_Common::weakenBySim(Cube c0, Cube bad, bool pre_weak_by_just)
     Vec<GLit> ffs;
     For_Gatetype(N, gate_Flop, w)
         ffs.push(w);
+    if (P.seed != 0)
+        shuffle(seed, ffs);
     if (P.use_activity)
         sobSort(ordStabilize(ordReverse(sob(ffs, proj_lt(compose(brack<float,Wire>(activity), brack<Wire,GLit>(N)))))));
 
@@ -710,6 +716,8 @@ TCube TrebSat_MonoSat::solveRelative(TCube s, uint params, Vec<Cube>* avoid)
 
     // Assume 's' at state outputs:
     Vec<GLit> cc(copy_, c);
+    if (seed != 0)
+        shuffle(seed, cc);
     if (P.use_activity)
         sobSort(ordReverse(sob(cc, proj_lt(compose(brack<float,Wire>(activity), brack<Wire,GLit>(N))))));
     for (uint i = 0; i < cc.size(); i++){
@@ -789,7 +797,7 @@ TCube TrebSat_MonoSat::solveRelative(TCube s, uint params, Vec<Cube>* avoid)
 //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #else
 
-// Experimental version using SAT-solver snapshot mechanism 
+// Experimental version using SAT-solver snapshot mechanism
 TCube TrebSat_MonoSat::solveRelative(TCube s, uint params, Vec<Cube>* avoid)
 {
     assert(avoid == NULL);
@@ -820,6 +828,8 @@ TCube TrebSat_MonoSat::solveRelative(TCube s, uint params, Vec<Cube>* avoid)
 
     // Assume 's' at state outputs:
     Vec<GLit> cc(copy_, c);
+    if (seed != 0)
+        shuffle(seed, cc);
     if (P.use_activity)
         sobSort(ordReverse(sob(cc, proj_lt(compose(brack<float,Wire>(activity), brack<Wire,GLit>(N))))));
     for (uint i = 0; i < cc.size(); i++){
