@@ -4,16 +4,18 @@
 //| Author(s)   : Niklas Een
 //| Module      : Bip
 //| Description : Experimental invariant generation through learned clauses of SAT-solver.
-//| 
+//|
 //| (C) Copyright 2010-2012, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
 #include "ZZ_Bip.Common.hh"
 #include "ZZ_MiniSat.hh"
+
+#define DELAYED_INITIALIZATION
 
 namespace ZZ {
 using namespace std;
@@ -30,6 +32,8 @@ struct TLit {
     GLit glit;
     uint frame;
     TLit(GLit glit_ = Wire_NULL, uint frame_ = UINT_MAX) : glit(glit_), frame(frame_) {}
+
+    Null_Method(TLit) { return glit == Wire_NULL && frame == UINT_MAX; }
 };
 
 
@@ -71,6 +75,10 @@ class Sift {
     Vec<Vec<Array<TLit> > >
                         invars;     // Inductive invariants proven for each 'k'.
 
+#if defined(DELAYED_INITIALIZATION)
+    Vec<lbool>          var_init;
+#endif
+
   //________________________________________
   //  Internal Helpers:
 
@@ -109,9 +117,34 @@ bool Sift::genCands(uint k, /*out*/Vec<Vec<TLit> >& cands)
 
     // <<== insert proved k-invariants everywhere
 
+#if !defined(DELAYED_INITIALIZATION)
     lbool result = Z.solve(z_bad);
     if (result == l_True)
         return true;
+
+#else
+    for(;;){
+        lbool result = Z.solve(z_bad);
+        if (result == l_True){
+            Vec<lbool> model;
+            Z.getModel(model);
+
+            uint refined = 0;
+            for (uint i = 0; i < min_(model.size(), var_init.size()); i++){
+                if (var_init[i] != l_Undef && var_init[i] != model[i]){
+                    Z.addClause(Lit(i) ^ (var_init[i] == l_False));
+                    refined++; }
+            }
+
+            if (refined == 0)
+                return true;
+
+            /**/WriteLn " == refined %_ initial vars", refined;
+
+        }else
+            break;
+    }
+#endif
 
     // Compute inverse map of CNF generation:
     Vec<Wire> z2f;
@@ -127,7 +160,6 @@ bool Sift::genCands(uint k, /*out*/Vec<Vec<TLit> >& cands)
     }
 
     // Extract candidates:
-    assert(result == l_False);
     Z.proofClearVisited();
     Z.proofTraverse();      // <<== fix this bottleneck...
 
@@ -147,6 +179,34 @@ bool Sift::genCands(uint k, /*out*/Vec<Vec<TLit> >& cands)
             //**/WriteLn "    %_", cands.last();
         }
     }
+
+#if 1
+    WriteLn " -- generalizing candidates:";
+    uint lits_removed = 0;
+    for (uint i = 0; i < cands.size(); i++){
+        Vec<TLit>& c = cands[i];
+        for (uint j = 0; j < c.size(); j++){
+            TLit tmp = c[j];
+            c[j] = TLit();
+
+            // Assume negation of (what is left of) 'c':
+            Vec<Lit> assumps;
+            for (uint k = 0; k < c.size(); k++){
+                if (c[k] == TLit()) continue;
+                Wire f = n2f[c[k].frame][c[k].glit + N] ^ c[k].glit.sign;
+                assumps.push(~f2z[f] ^ sign(f));
+            }
+
+            lbool result = Z.solve(assumps);
+            if (result == l_True)
+                c[j] = tmp;
+            else
+                lits_removed++;
+        }
+        filterOut(c, isNull<TLit>);
+    }
+    WriteLn "    (removed %_ literals)", lits_removed;
+#endif
 
     return false;
 }
@@ -298,11 +358,16 @@ bool Sift::run()
 
         Wire f = insertUnrolled(w, 0, F, n2f, &keep);
         Lit  z = CZ.clausify(f);
+#if !defined(DELAYED_INITIALIZATION)
         if (init[w] == l_True)
-            Z.addClause(z);
+            Z.addClause(z);     // <<== lägg till activation literal och "banna" den i SAT-lösaren (väljs sist)
         else if (init[w] == l_False)
             Z.addClause(~z);
+#else
+        var_init(var(z), l_Undef) = init[w] ^ sign(z);
+#endif
     }
+    // <<== lägg till reset? (så att klausuler alltid gäller för <=k snarare än =k)
 
     // Run:
     Vec<Vec<TLit> > cands;

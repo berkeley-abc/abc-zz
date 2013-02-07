@@ -25,3 +25,4 @@
 #include "Init.icc"
 #include "Format.icc"
 #include "Profile.icc"
+#include "Signals.icc"

@@ -629,6 +629,20 @@ void TrebSat_MonoSat::blockCubeInSolver(TCube s)
     for (uint i = 0; i < s.cube.size(); i++)
         ps.push(C.clausify(~N[s.cube[i]]));
     S.addClause(ps);
+
+    if (P.redund_cubes){
+        if (s.frame != frame_INF && s.frame > 1){
+            ps.clear();
+            ps.push(~act(s.frame - 1));
+
+            for (uint i = 0; i < s.cube.size(); i++){
+                Wire w = ~N[s.cube[i]];
+                w = w[0] ^ sign(w);
+                ps.push(C.clausify(w));
+            }
+            S.addClause(ps);
+        }
+    }
 }
 
 

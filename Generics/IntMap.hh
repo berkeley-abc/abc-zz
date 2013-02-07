@@ -101,7 +101,7 @@ public:
     IntTmpMap(Value_ nil_, Key2Index index_ = Key2Index()) : IntMap<Key_,Value_,Key2Index>(nil_, index_) {}
 
     Value_& operator()(Key_ k) {
-        if (null(k)) elems.push(k);
+        if (this->null(k)) elems.push(k);
         return P::operator()(k); }
 
     void clear(bool dispose = false) {

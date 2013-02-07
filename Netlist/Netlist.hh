@@ -278,11 +278,12 @@ static const NetlistRef Netlist_NULL;
 // NetlistRef related functions:
 
 
-#include "Netlist_PecComb.ihh"      // [INCLUDE POINT]
-
-
 macro NetlistRef netlist(netlist_id nl) { return NetlistRef(nl); }
 macro NetlistRef netlist(Wire w)        { return NetlistRef(nl(w)); }
+
+
+#include "Netlist_PecComb.ihh"      // [INCLUDE POINT]
+
 
 macro netlist_id nl(NetlistRef N) { return N.nl(); }
 

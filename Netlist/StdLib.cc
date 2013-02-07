@@ -662,6 +662,28 @@ void migrateNames(Wire from, Wire into, Str prefix)
 }
 
 
+void transitiveFanin(Wire w_sink, WZet& seen)
+{
+    if (seen.has(w_sink)) return;
+
+    seen.add(w_sink);
+    if (isGlobalSource(w_sink)) return;
+
+    NetlistRef N = netlist(w_sink);
+    Vec<GLit> Q(1, w_sink);
+    while (Q.size() > 0){
+        Wire w = N[Q.popC()]; assert(!isGlobalSource(w));
+        For_Inputs(w, v){
+            if (!seen.has(v)){
+                seen.add(v);
+                if (!isGlobalSource(v))
+                    Q.push(v);
+            }
+        }
+    }
+}
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Collect Conjunctions:
 
@@ -1005,7 +1027,7 @@ void expandGeneralizedGates(NetlistRef N)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// "Type" controll:
+// "Type" control:
 
 
 void assertAig(NetlistRef N, const String& where_text)

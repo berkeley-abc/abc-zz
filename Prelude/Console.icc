@@ -24,6 +24,9 @@ static void flushChars(bool use_stdout);
 // State:
 
 
+ZZ_Global_Lock(console);
+
+
 // Stream state:
 //
 struct StrState {

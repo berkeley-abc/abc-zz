@@ -684,6 +684,7 @@ bool Clausify<SAT>::keep_has(Wire f) {
 template struct Clausify<SatStd>;
 template struct Clausify<SatPfl>;
 template struct Clausify<MetaSat>;
+template struct Clausify<MiniSat2>;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

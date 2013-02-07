@@ -239,6 +239,8 @@ Wire insertUnrolled(Wire w, uint k, NetlistRef F, Vec<CompactBmcMap>& n2f, const
 
 
 void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized, /*outputs:*/ MetaSat& S, Vec<LLMap<GLit,Lit> >& m2s);
+void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized, /*outputs:*/ SatPfl&  S, Vec<LLMap<GLit,Lit> >& m2s);
+void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized, /*outputs:*/ SatStd&  S, Vec<LLMap<GLit,Lit> >& m2s);
     // -- 'roots' is a list of pairs '(frame#, gate)'.
 
 

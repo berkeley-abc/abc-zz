@@ -546,7 +546,8 @@ void MiniSat<pfl>::newClause(const Vec<Lit>& ps_, clause_id id)
         undo(0);
         ok = false;
         conflict.clear();
-        conflict_id = clause_id_NULL;
+//        conflict_id = clause_id_NULL;
+        conflict_id = id;
         return;
     }else if (ps.size() == 1){
         undo(0);
@@ -741,7 +742,7 @@ Var MiniSat<pfl>::newVar()
     activity    .push(0);
     polarity    .push(1);
     if (pfl) unit_id.push(clause_id_NULL);
-    //*HEUR*/order.add(x);
+    /*HEUR*/order.add(x);
 #if defined(BUMP_EXPERIMENT)
     var_count   .push(0);
 #endif

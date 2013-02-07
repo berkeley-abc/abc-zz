@@ -42,13 +42,11 @@ int main(int argc, char** argv)
     // Read input file:
     double  T0 = cpuTime();
     Netlist N;
-    bool    is_aiger = false;
     if (hasExtension(input, "aig")){
         try{
             readAigerFile(input, N);
             For_Gatetype(N, gate_PO, w)     // -- invert properties
                 w.set(0, ~w[0]);
-            is_aiger = true;
         }catch (Excp_AigerParseError err){
             ShoutLn "PARSE ERROR! %_", err.msg;
             exit(1);

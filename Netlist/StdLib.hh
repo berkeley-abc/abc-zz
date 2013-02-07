@@ -129,6 +129,9 @@ void migrateNames(Wire from, Wire into, Str prefix = Str());
     // -- Copy all names for wire 'from' to wire 'into' (possibly from a different netlist). If
     // 'prefix' is given, all names are prefixed by this string.
 
+void transitiveFanin(Wire w_sink, WZet& seen);
+    // -- Mark the (combinational) transitive fanin by adding gates to 'seen'. 
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Collect Conjunctions:

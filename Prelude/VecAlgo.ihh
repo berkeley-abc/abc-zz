@@ -190,6 +190,10 @@ template<class V>
 macro bool isEmpty(const V& v) {
     return v.size() == 0; }
 
+template<class V>
+macro bool isUnit(const V& v) {
+    return v.size() == 1; }
+
 template<class T, T t_const>
 macro bool isEqualTo(T val) {
     return val == t_const; }

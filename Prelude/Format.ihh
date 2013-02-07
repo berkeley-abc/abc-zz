@@ -4,25 +4,25 @@
 //| Author(s)   : Niklas Een
 //| Module      : Prelude
 //| Description : Formating functions for the 'Out' class.
-//| 
+//|
 //| (C) Copyright 2010-2012, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //| This module defines an extensible system for formatted output to streams (with some extra
 //| convenience macros for 'stdout' and 'stderr'). The minimum requirement for a user-defined type
 //| to participate is to define a 'write_' function:
-//| 
+//|
 //|    template<> fts_macro void write_(Out& out, const <type>& t) { <code that writes 't'> }
 //|    template<> fts_macro void write_(Out& out, const <type>& t, Str flags) { <code> }
-//| 
+//|
 //| For more advanced outputs, you can also define a 'format_' function that can accept flags to
 //| modify the output.
-//| 
+//|
 //| WriteLn <format>, <args,...>
 //| (FMT <format>, <args,...>)
 //| Throw(<exception>) <format>, <args,...>
-//| 
+//|
 //| out %= ...      -- just formatting
 //| out /= ...      -- auto-newline
 //| out &= ...      -- auto-flush
@@ -89,7 +89,7 @@ template<class T> fts_macro void write_(Out& out, const Array<T>& v) {
     out += '}';
 }
 
-// If the first character of 'flags' is '\n', then each entry is written on its own line without the 
+// If the first character of 'flags' is '\n', then each entry is written on its own line without the
 // wrapping '{' and '}' braces. If it is '\r' the last newline is omitted. A space ' ' just writes
 // the elements without separators altogether.
 template<class T> fts_macro void write_(Out& out, const Array<T>& v, Str flags)
@@ -242,24 +242,32 @@ macro void writeUntilFormatChar(cchar*& fmt, Out& out)
 }
 
 
-template<bool newline, bool flush>
+template<bool newline, bool flush, bool lock>
 struct Formater {
     Out*           out;
     mutable cchar* fmt;     // -- hack to get around passing temporaries through reference (must be const)
 
     Formater(Out& out_, cchar* fmt_) : out(&out_), fmt(fmt_) {
-        writeUntilFormatChar(fmt, *out); }
+        if (lock){ ZZ_Acquire_Lock(console); }
+        writeUntilFormatChar(fmt, *out);
+    }
 
    ~Formater() {
         assert(*fmt == 0);  // -- Fails if too FEW arguments are provided for given format
         if (newline) (*out) += '\n';
-        if (flush) out->flush(); }
+        if (flush) out->flush();
+        if (lock){ ZZ_Release_Lock(console); }
+    }
 };
 
-macro Formater<0,0> operator%=(Out& out, cchar* fmt) { return Formater<0,0>(out, fmt); }    // -- just formatting
-macro Formater<1,0> operator/=(Out& out, cchar* fmt) { return Formater<1,0>(out, fmt); }    // -- "a line" for auto-newline
-macro Formater<0,1> operator&=(Out& out, cchar* fmt) { return Formater<0,1>(out, fmt); }    // -- bit-op for a bit of convenience = auto-flush (furthermore: % and & are related; x%16 vs x&15)
-macro Formater<1,1> operator|=(Out& out, cchar* fmt) { return Formater<1,1>(out, fmt); }    // -- bit-op and "a line" -- both auto-newline and auto-flush
+macro Formater<0,0,0> operator%=(Out& out, cchar* fmt) { return Formater<0,0,0>(out, fmt); }    // -- just formatting
+macro Formater<1,0,0> operator/=(Out& out, cchar* fmt) { return Formater<1,0,0>(out, fmt); }    // -- "a line" for auto-newline
+
+macro Formater<0,1,0> operator&=(Out& out, cchar* fmt) { return Formater<0,1,0>(out, fmt); }    // -- console formatting = auto-flush + locking
+macro Formater<1,1,0> operator|=(Out& out, cchar* fmt) { return Formater<1,1,0>(out, fmt); }    // -- console formatting, with auto-newline
+
+macro Formater<0,1,1> operator*=(Out& out, cchar* fmt) { return Formater<0,1,1>(out, fmt); }    // -- console formatting = auto-flush + locking
+macro Formater<1,1,1> operator-=(Out& out, cchar* fmt) { return Formater<1,1,1>(out, fmt); }    // -- console formatting, with auto-newline
 
 macro bool isAlignmentChar(char c){ return c >= '<' && c <= '>'; }
 
@@ -306,7 +314,7 @@ macro void applyFormat(cchar*& fmt, Out& out, const T& x)
 }
 
 
-template<bool nl, bool fl, class T> macro const Formater<nl,fl>& operator,(const Formater<nl,fl>& F, const T& x)
+template<bool nl, bool fl, bool lo, class T> macro const Formater<nl,fl,lo>& operator,(const Formater<nl,fl,lo>& F, const T& x)
 {
     applyFormat(F.fmt, *F.out, x);
     return F;
@@ -388,8 +396,8 @@ struct Pre_Formater {
 macro Pre_Formater operator%(Pre_Formater_Tag, cchar* fmt) {
     return Pre_Formater(fmt); }
 
-macro Formater<0,0> operator+=(Out& out, Pre_Formater P) { return Formater<0,0>(out, P.fmt); }
-macro Formater<0,0> operator, (Out& out, Pre_Formater P) { return Formater<0,0>(out, P.fmt); }
+macro Formater<0,0,0> operator+=(Out& out, Pre_Formater P) { return Formater<0,0,0>(out, P.fmt); }
+macro Formater<0,0,0> operator, (Out& out, Pre_Formater P) { return Formater<0,0,0>(out, P.fmt); }
 
 #define FMT_TAIL Pre_Formater_Tag()
 
@@ -398,14 +406,21 @@ macro Formater<0,0> operator, (Out& out, Pre_Formater P) { return Formater<0,0>(
 // -- Convenience macros:
 
 
-#define Write   std_out &=
-#define WriteLn std_out |=
-#define Shout   std_err &=
-#define ShoutLn std_err |=
+#define QWrite   std_out &=         // -- quick version; no locking
+#define QWriteLn std_out |=
+#define QShout   std_err &=
+#define QShoutLn std_err |=
+#define QNewLine std_out += NL
+
+#define Write   std_out *=          // -- atomic version (for threaded programs)
+#define WriteLn std_out -=
+#define Shout   std_err *=
+#define ShoutLn std_err -=
+#define WriteObj(c) (ZZ_Acquire_Lock(console), (void)(std_out += c), ZZ_Release_Lock(console))
+#define NewLine (ZZ_Acquire_Lock(console), (void)(std_out += NL), ZZ_Release_Lock(console))
+
 #define FWrite(  out) out %=        // -- no auto-flushing for "file" writing.
 #define FWriteLn(out) out /=
-
-#define NewLine std_out += NL
 #define FNewLine(out) out += NL
 
 #if defined(__GNUC__) || defined(sun)

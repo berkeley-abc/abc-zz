@@ -18,6 +18,9 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+ZZ_Decl_Global_Lock(console);       // -- may be used by user of this module to ensure monotonicity
+
+
 void useAnsiStdOut(bool value);
 void useAnsiStdErr(bool value);
 void useAnsi(bool value);

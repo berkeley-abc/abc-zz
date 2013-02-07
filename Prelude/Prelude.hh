@@ -61,6 +61,7 @@ Defines that control compilation:
 #include <cctype>
 #include <ctime>
 #include <cmath>
+#include <csignal>
 #include <new>
 
 #include <fcntl.h>
@@ -72,6 +73,9 @@ Defines that control compilation:
   #include <sys/resource.h>
   #include <sys/ioctl.h>
   #include <sys/time.h>
+  #if defined(__linux__)
+    #include <fpu_control.h>
+  #endif
   #if defined(sun)
     #include <procfs.h>
     #include <strings.h>
@@ -91,6 +95,9 @@ Defines that control compilation:
 
 #if defined(ZZ_PTHREADS)
   #include <pthread.h>
+  #if !defined(ZZ_NO_SMART_YMALLOC)
+    #define ZZ_NO_SMART_YMALLOC             // -- not thread-safe
+  #endif
 #endif
 
 #include "zlib.h"
@@ -110,6 +117,8 @@ Defines that control compilation:
 #include "Compare.ihh"
 #include "LBool.ihh"
 #include "ScopedPtr.ihh"
+#include "Threads.ihh"
+#include "Signals.ihh"
 #include "Mem.ihh"
 #include "Hash.ihh"
 #include "Tuples.ihh"

@@ -26,6 +26,9 @@ using namespace std;
 // Standard streams:
 
 
+ZZ_Global_Lock(stdout_writer);
+ZZ_Global_Lock(stderr_writer);
+
 StdInReader  std_in_reader;
 StdOutWriter std_out_writer;
 StdErrWriter std_err_writer;

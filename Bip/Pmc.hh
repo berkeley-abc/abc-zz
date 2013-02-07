@@ -1,21 +1,22 @@
 //_________________________________________________________________________________________________
 //|                                                                                      -- INFO --
-//| Name        : Cube.hh
+//| Name        : Pmc.hh
 //| Author(s)   : Niklas Een
 //| Module      : Bip
-//| Description : A cube is a set of literals (used to have a specialized implementation).
+//| Description : PDR inspired BMC implementation.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 
 //|________________________________________________________________________________________________
 
-#ifndef ZZ__Bip__Cube_hh
-#define ZZ__Bip__Cube_hh
+#ifndef ZZ__Bip__Pmc_hh
+#define ZZ__Bip__Pmc_hh
 
-#include "ZZ/Generics/Lit.hh"
-#include "ZZ/Generics/Pack.hh"
+#include "ZZ_CmdLine.hh"
+#include "ZZ_Netlist.hh"
+#include "ZZ_Bip.Common.hh"
 
 namespace ZZ {
 using namespace std;
@@ -24,8 +25,28 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-typedef Pack<Lit> Cube;
-static const Cube Cube_NULL;
+struct Params_Pmc {
+    bool        multi_sat;
+    bool        use_f_inf;
+    bool        term_check;
+    bool        cube_gen;
+    SolverType  sat_solver;
+
+    Params_Pmc() :
+        multi_sat(false),
+        use_f_inf(true),
+        term_check(true),
+        cube_gen(true),
+        sat_solver(sat_Abc)
+    {}
+};
+
+
+void addCli_Pmc(CLI& cli);
+void setParams(const CLI& cli, Params_Pmc& P);
+
+
+bool pmc(NetlistRef N, const Vec<Wire>& props, const Params_Pmc& P, Cex* cex);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

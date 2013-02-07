@@ -563,6 +563,30 @@ Cube extractModel(MetaSat& S, const Clausify<MetaSat>& C, bool keep_inputs) { re
 // Ternary simulation:
 
 
+static
+lbool ternaryEval(ftb4_t ftb, const lbool in[4])
+{
+    ftb4_t hi = ftb;
+    ftb4_t lo = ftb;
+    for (uint i = 0; i < 4; i++){
+        if (in[i] == l_True){
+            lo = (lo & lut4_buf[i]) >> (1u << i);
+            hi = (hi & lut4_buf[i]) >> (1u << i);
+            //*Tr*/WriteLn "  - in[%_]=1:  lo=%.4X  hi=%.4X", i, lo, hi;
+        }else if (in[i] == l_Undef){
+            hi |= hi >> (1u << i);
+            lo &= lo >> (1u << i);
+            //*Tr*/WriteLn "  - in[%_]=?:  lo=%.4X  hi=%.4X", i, lo, hi;
+        }
+        //*Tr*/else WriteLn "  - in[%_]=0:  lo=%.4X  hi=%.4X   (unchanged)", i, lo, hi;
+    }
+    hi &= 1;
+    lo &= 1;
+
+    return (hi == lo) ? lbool_lift(hi) : l_Undef;
+}
+
+
 void XSimulate::simulate(const Cex& cex, const WZetL* abstr)
 {
     assert(cex.depth() >= 0);
@@ -578,8 +602,16 @@ void XSimulate::simulate(const Cex& cex, const WZetL* abstr)
         case gate_PI:   sim[0](w) = cex.inputs[0][w]; break;
         case gate_Flop: sim[0](w) = cex.flops [0][w]; break;
         case gate_And:  sim[0](w) = (sim[0](w[0]) ^ sign(w[0])) & (sim[0](w[1]) ^ sign(w[1])); break;
+        case gate_SO:
         case gate_PO:   sim[0](w) = sim[0](w[0]) ^ sign(w[0]); break;
-        default: assert(false); }
+        case gate_Npn4:{
+            lbool in[4] = { l_Undef, l_Undef, l_Undef, l_Undef };
+            For_Inputs(w, v) in[Iter_Var(v)] = sim[0][v] ^ sign(v);
+            sim[0](w) = ternaryEval(npn4_repr[attr_Npn4(w).cl], in);
+            break;}
+        default:
+            ShoutLn "INTERNAL ERROR! Unexpected gate type: %_", GateType_name[type(w)];
+            assert(false); }
     }
 
     for (uint d = 1; d <= (uint)cex.depth(); d++){
@@ -590,7 +622,13 @@ void XSimulate::simulate(const Cex& cex, const WZetL* abstr)
             case gate_PI:   sim[d](w) = cex.inputs[d][w]; break;
             case gate_Flop: sim[d](w) = (abstr == NULL || abstr->has(w)) ? (sim[d-1][w[0]] ^ sign(w[0])) : cex.flops[d][w]; break;
             case gate_And:  sim[d](w) = (sim[d](w[0]) ^ sign(w[0])) & (sim[d](w[1]) ^ sign(w[1])); break;
+            case gate_SO:
             case gate_PO:   sim[d](w) = sim[d](w[0]) ^ sign(w[0]); break;
+            case gate_Npn4:{
+                lbool in[4] = { l_Undef, l_Undef, l_Undef, l_Undef };
+                For_Inputs(w, v) in[Iter_Var(v)] = sim[d][v] ^ sign(v);
+                sim[d](w) = ternaryEval(npn4_repr[attr_Npn4(w).cl], in);
+                break;}
             default: assert(false); }
         }
     }
@@ -1645,8 +1683,9 @@ Wire insertUnrolled(Wire w, uint k, NetlistRef F, Vec<CompactBmcMap>& n2f, const
 
 // Convert a CNF-mapped netlist (with 'Npn4' LUTs) to clauses. No strashing is done.
 // NOTE! 'roots' will be empty after this call.
-void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized,
-    /*outputs:*/ MetaSat& S, Vec<LLMap<GLit,Lit> >& m2s)
+template<class SAT>
+void lutClausify_(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized,
+    /*outputs:*/ SAT& S, Vec<LLMap<GLit,Lit> >& m2s)
 {
     Pec_FlopInit* ff_init = NULL;
     if (initialized){
@@ -1659,6 +1698,8 @@ void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized,
 
     for (uint i = 0; i < roots.size(); i++)
         m2s.growTo(roots[i].fst + 1);
+
+    /**/for (uint i = 0; i < m2s.size(); i++) assert(m2s[i].nil == lit_Undef);
 
     while (Q.size() > 0){
         uint d = Q.last().fst;
@@ -1743,6 +1784,16 @@ void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized,
         }
     }
 }
+
+
+void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized, MetaSat& S, Vec<LLMap<GLit,Lit> >& m2s) {
+    lutClausify_(M, roots, initialized, S, m2s); }
+
+void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized, SatPfl& S, Vec<LLMap<GLit,Lit> >& m2s) {
+    lutClausify_(M, roots, initialized, S, m2s); }
+
+void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized, SatStd& S, Vec<LLMap<GLit,Lit> >& m2s) {
+    lutClausify_(M, roots, initialized, S, m2s); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

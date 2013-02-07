@@ -66,7 +66,7 @@ Wire buildCofactor(Wire w, uint k, NetlistRef F, Vec<WMap<Wire> >& n2f, Vec<WMap
     #define insert(w, k) buildCofactor(w, k, F, n2f, n2g, cex)
     assert(Has_Pob(F, strash));
 
-    NetlistRef N = netlist(w);
+    NetlistRef N ___unused = netlist(w);
     Wire ret = n2g(k)[w];
     if (!ret){
         switch (type(w)){

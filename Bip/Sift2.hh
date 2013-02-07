@@ -1,22 +1,18 @@
 //_________________________________________________________________________________________________
 //|                                                                                      -- INFO --
-//| Name        : Cube.hh
+//| Name        : Sift2.hh
 //| Author(s)   : Niklas Een
 //| Module      : Bip
-//| Description : A cube is a set of literals (used to have a specialized implementation).
+//| Description : Second attempt at a sifting algorithm for inductive invariant finding.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 
 //|________________________________________________________________________________________________
 
-#ifndef ZZ__Bip__Cube_hh
-#define ZZ__Bip__Cube_hh
-
-#include "ZZ/Generics/Lit.hh"
-#include "ZZ/Generics/Pack.hh"
-
+#ifndef ZZ__Bip__Sift2_hh
+#define ZZ__Bip__Sift2_hh
 namespace ZZ {
 using namespace std;
 
@@ -24,8 +20,7 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-typedef Pack<Lit> Cube;
-static const Cube Cube_NULL;
+bool sift2(NetlistRef N, const Vec<Wire>& props, Cex* cex = NULL, NetlistRef N_invar = Netlist_NULL);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

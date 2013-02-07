@@ -21,7 +21,7 @@
 #include "ZZ/Generics/Heap.hh"
 #include "ZZ/Generics/RefC.hh"
 #include "ZZ/Generics/Sort.hh"
-#include "ZZ_AbcInterface.hh"
+//*ABC*/#include "ZZ_AbcInterface.hh"
 #include "TrebSat.hh"
 #include "ParClient.hh"
 
@@ -144,9 +144,9 @@ class Treb {
   //________________________________________
   //  ABC interaction:
 
-    GiaNums    gia_nums;
-    Gia_Man_t* gia;
-    Rnm_Man_t* rnm;
+//*ABC*/    GiaNums    gia_nums;
+//*ABC*/    Gia_Man_t* gia;
+//*ABC*/    Rnm_Man_t* rnm;
 
   //________________________________________
   //  Internal methods:
@@ -1072,6 +1072,219 @@ bool Treb::pdrRefine(ProofObl po, Cex* cex)
 {
     ZZ_PTimer_Scope(treb_abs_refine);
 
+#if 1
+    //**/nameByCurrentId(N); N.write("N.gig");
+
+    double T0 = cpuTime();
+    Cex abs_cex;
+    extractCex(po, abs_cex);
+    //**/dumpCex(N, abs_cex);
+
+    MiniSat2  S;
+    WMap<Lit> n2s;
+    Vec<Lit>  flop2act;
+
+    Get_Pob(N, flop_init);
+    Get_Pob(N, init_bad);
+    Vec<GLit> fixed(1, init_bad[1]);
+    Vec<Pair<GLit,Lit> > roots;     // -- abstract flops: (flop-gate, flop-sat-lit)
+    for (uint d = abs_cex.size(); d > 0;){ d--;
+        //**/WriteLn "==== d=%_", d;
+        Clausify<MiniSat2> C(S, N, n2s);
+
+        // Add constants to 'n2s' map:
+        For_Gatetype(N, gate_Flop, w){
+            if (d == 0){
+                if (flop_init[w] != l_Undef){
+                    n2s(w) = S.True() ^ (flop_init[w] == l_False);
+                    //**/WriteLn "INIT n2s(%_) = %_   [ff# %_]", w, n2s[w], attr_Flop(w).number;
+                }
+            }else{
+                if (abstr.has(w)){
+                    lbool val = abs_cex.flops[d][w]; assert(val != l_Undef);
+                    n2s(w) = S.True() ^ (val == l_False);
+                    //**/WriteLn "n2s(%_) = %_   [ff# %_]", w, n2s[w], attr_Flop(w).number;
+                }
+            }
+        }
+
+        // Insert and assert 'fixed':
+        //**/Dump(fixed);
+        for (uint i = 0; i < fixed.size(); i++)
+            S.addClause(C.clausify(fixed[i] + N));
+
+        // Insert and connect 'roots':
+        //**/Dump(roots);
+        for (uint i = 0; i < roots.size(); i++){
+            Wire w = roots[i].fst + N; assert(type(w) == gate_Flop); assert(!sign(w));
+            Lit p = C.clausify(w[0]);
+            Lit q = roots[i].snd;// ^ sign(w[0]);
+
+            // Insert 'act -> (p <-> q)':
+            int num = attr_Flop(w).number;
+            if (flop2act(num, lit_Undef) == lit_Undef)
+                flop2act[num] = S.addLit();
+
+            S.addClause(~flop2act[num], ~p, q);
+            S.addClause(~flop2act[num], ~q, p);
+        }
+
+        // Collect roots and fixed for next iteration:
+        fixed.clear();
+        roots.clear();
+        For_Gatetype(N, gate_Flop, w){
+            if (!n2s[w]) continue;
+
+            if (abstr.has(w)){
+                // Concrete flop, add to 'fixed':
+                lbool val = abs_cex.flops[d][w]; assert(val != l_Undef);
+                fixed.push(w[0] ^ (val == l_False));
+            }else{
+                // Abstract flop, add to 'roots':
+                roots.push(tuple(w, n2s[w]));
+            }
+        }
+
+        n2s.clear();
+    }
+
+    Vec<Lit> assumps;
+    for (uint i = 0; i < flop2act.size(); i++)
+        if (flop2act[i] != lit_Undef)
+            assumps.push(flop2act[i]);
+
+    lbool result = S.solve(assumps);
+
+    if (result == l_True){
+        // Abstract CEX was lifted to a real CEX:
+        // <<== must populate '*cex' here
+        /**/WriteLn "Proof-based refine found CEX";
+        return false;
+
+    }else{
+        // Refine:
+        Vec<GLit> ffs;
+        For_Gatetype(N, gate_Flop, w){
+            int num = attr_Flop(w).number; assert(num >= 0);
+            ffs(num, glit_NULL) = w;
+        }
+
+        uint abstr_sz = abstr.size();
+        Vec<Lit> confl;
+        S.getConflict(confl);
+        for (uint i = 0; i < flop2act.size(); i++){
+            if (flop2act[i] != lit_Undef && has(confl, flop2act[i])){
+                assert(!abstr.has(ffs[i] + N));
+                abstr.add(ffs[i] + N);
+            }
+        }
+        /**/WriteLn "  \a/~~> proof-based refine added \a*%_\a* flops   (total %_ of %_)\a/  [%t]", abstr.size() - abstr_sz, abstr.size()-1, N.typeCount(gate_Flop)-1, cpuTime() - T0;
+        return true;
+    }
+#endif
+
+#if 0
+    Netlist M;      // -- copy of 'N' with abstract counter-example states enforced
+    Cex abs_cex;
+    extractCex(po, abs_cex);
+
+    // Copy netlist:
+    for (uint i = gid_FirstUser; i < N.size(); i++){
+        Wire w = N[i];
+        if (!w)
+            M.addDeletedGate();
+        else{
+            Wire v;
+            switch (type(w)){
+            case gate_And:  v = M.add(And_()); assert(id(w) == id(v)); break;
+            case gate_PI:   v = M.add(PI_  (attr_PI(w)  .number)); assert(id(w) == id(v)); break;
+            case gate_PO:   v = M.add(PO_  (attr_PO(w)  .number)); assert(id(w) == id(v)); break;
+            case gate_Flop: v = M.add(Flop_(attr_Flop(w).number)); assert(id(w) == id(v)); break;
+            default: assert(false); }
+        }
+    }
+
+    For_Gates(N, w){
+        For_Inputs(w, v)
+            M[id(w)].set(Iter_Var(v), M[v.lit()]);
+    }
+
+    Get_Pob(N, flop_init);
+    Add_Pob2(M, flop_init, new_flop_init);
+    For_Gatetype(N, gate_Flop, w)
+        new_flop_init(M[id(w)]) = flop_init[w];
+
+    // Insert trace constraint logic:
+    int orig_n_flops = nextNum_Flop(M);
+    int flopC = orig_n_flops;
+
+    Wire conj = M.True();
+    For_Gatetype(N, gate_Flop, w){
+        if (!abstr.has(w)) continue;
+
+        Wire v = M.True();
+        for (uint i = abs_cex.size(); i > 0;){ i--;
+            lbool val = abs_cex.flops[i][w]; assert(val != l_Undef);
+            v = M.add(Flop_(flopC++), v);
+            new_flop_init(v) = val;
+        }
+
+        conj = mk_And(conj, mk_Equiv(v, M[id(w)]));
+    }
+
+    Wire v = M.True();
+    for (uint i = 0; i < abs_cex.size(); i++){
+        v = M.add(Flop_(flopC++), v);
+        new_flop_init(v) = l_False;
+    }
+    conj = mk_And(conj, ~v);
+
+    // Fold trace constraint:
+    Get_Pob(N, init_bad);
+    Wire was_ok = M.add(Flop_(flopC++));
+    new_flop_init(was_ok) = l_True;
+    Wire ok = mk_And(conj, was_ok);
+    was_ok.set(0, ok);
+    Wire prop = M[~init_bad[1].lit()];
+    Wire new_prop = mk_Or(prop[0] ^ sign(prop), ~ok);
+
+    Add_Pob(M, properties);
+    properties.push(M.add(PO_(), new_prop));
+
+    Vec<Wire> props(1, properties[0]);
+
+    // Call PDR recursively:
+    Params_Treb P_rec = P;
+    P_rec.use_abstr = false;
+    P_rec.restart_lim = 0;
+
+    /**/WriteLn "\a/Recursive refinement of CEX of depth %_.\a/\t+\t+", abs_cex.depth();
+    Netlist M_invar;
+    lbool result = treb(M, props, P_rec, cex, M_invar, NULL, NULL); assert(result != l_Undef);
+    /**/Write "\t-\t-";
+
+    // Refine or return counterexample:
+    if (result == l_True){
+        Vec<Wire> ff;
+        For_Gatetype(N, gate_Flop, w)
+            ff(attr_Flop(w).number) = w;
+
+        uint abstr_sz = abstr.size();
+        For_Gatetype(M_invar, gate_Flop, w){
+            int num = attr_Flop(w).number;
+            if (num < orig_n_flops)
+                abstr.add(ff[num]);
+        }
+        assert(abstr.size() > abstr_sz);
+        /**/WriteLn "  \a/~~> PDR REFINE: Added %_ flops  (total %_ of %_)\a/", abstr.size() - abstr_sz, abstr.size()-1, N.typeCount(gate_Flop)-1;
+
+        return true;
+
+    }else
+        return false;
+#endif
+
+#if 0
     WZetL abstr_copy;
     refining = true;
     if (!P.cmb_refinement)
@@ -1125,6 +1338,7 @@ bool Treb::pdrRefine(ProofObl po, Cex* cex)
             }
         }
     }
+#endif
 }
 
 
@@ -1212,9 +1426,6 @@ bool Treb::refineAbstr(const Cex& cex)
         return true;
     }else{
         return false; }
-
-
-    return false;
 }
 
 
@@ -1246,9 +1457,9 @@ Treb::Treb(NetlistRef N0_, const Vec<Wire>& props_, EffortCB* cb_, const Params_
     cb(cb_),
     Z(NULL),
     activity(0),
-    refining(false),
-    gia(NULL),
-    rnm(NULL)
+    refining(false)
+//*ABC*/    gia(NULL),
+//*ABC*/    rnm(NULL)
 {
     seed = P_.seed;
     if (cb) cb->info = &info;
@@ -1257,10 +1468,10 @@ Treb::Treb(NetlistRef N0_, const Vec<Wire>& props_, EffortCB* cb_, const Params_
 
 Treb::~Treb()
 {
-    if (gia)
-        Gia_ManStop(gia);
-    if (rnm)
-        Rnm_ManStop(rnm, 0);
+//*ABC*/    if (gia)
+//*ABC*/        Gia_ManStop(gia);
+//*ABC*/    if (rnm)
+//*ABC*/        Rnm_ManStop(rnm, 0);
 }
 
 
@@ -1278,8 +1489,8 @@ bool Treb::run(Cex* cex_out, NetlistRef N_invar)
     //**/N.write("N.gig"); WriteLn "Wrote: \a*N.gig\a*";
 
     if (P.use_abstr && P.abc_refinement){
-        gia = createGia(N, gia_nums);
-        Rnm_ManStart(gia);
+//*ABC*/        gia = createGia(N, gia_nums);
+//*ABC*/        Rnm_ManStart(gia);
     }
 
     F.push();                           // -- push "F[infinity]"
@@ -1400,6 +1611,7 @@ bool Treb::run(Cex* cex_out, NetlistRef N_invar)
                     uint orig_abstr_size = abstr.size();
                     if (!refineAbstr(cex)){
                         WriteLn "Counterexample found.";
+                        cex.flops.shrinkTo(1);
                         if (cex_out) translateCex(cex, N0, *cex_out, n0_to_n);
                         return false;
                     }else{
@@ -1565,6 +1777,7 @@ void addCli_Treb(CLI& cli)
     cli.add("orbits"    , "ufloat"   , (FMT "%_", P.orbits)         , "How many orbits should 'generalize()' use?");
     cli.add("gen-cex"   , "bool"     , P.gen_with_cex?"yes":"no"    , "Sets '-orbits' to infinity and stores CEXs during generalization to speedup fixedpoint.");
     cli.add("hq"        , "bool"     , P.hq?"yes":"no"              , "Use slow, high-quality generalization procedure.");
+    cli.add("redund"    , "bool"     , P.redund_cubes?"yes":"no"    , "Store cubes of F[n] at flop output of F[n-1] as well.");
     cli.add("dump-invar", "int[0:2]" , (FMT "%_", P.dump_invar)     , "Dump invariant: 0=no, 1=clause form, 2=PLA form.");
     cli.add("sat"       , sat_types  , sat_default                  , "SAT-solver to use.");
 }
@@ -1594,6 +1807,7 @@ void setParams(const CLI& cli, Params_Treb& P)
     P.orbits        = cli.get("orbits")    .float_val;
     P.gen_with_cex  = cli.get("gen-cex")   .bool_val;
     P.hq            = cli.get("hq")        .bool_val;
+    P.redund_cubes  = cli.get("redund")    .bool_val;
     P.dump_invar    = cli.get("dump-invar").int_val;
 
     P.sat_solver = (cli.get("sat").enum_val == 0) ? sat_Zz :

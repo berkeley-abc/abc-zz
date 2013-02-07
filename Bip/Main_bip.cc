@@ -26,24 +26,25 @@
 #include "Pdr.hh"
 #include "Treb.hh"
 #include "Pdr2.hh"
+#include "Pmc.hh"
 #include "SmvInterface.hh"
 #include "Reparam.hh"
 #include "Fixed.hh"
 #include "Sift.hh"
+#include "Sift2.hh"
+#include "ISift.hh"
 #include "ParClient.hh"
 #include "SemAbs.hh"
 #include "BestBwd.hh"
 #include "Saber.hh"
 #include "AbsBmc.hh"
 #include "Live.hh"
+#include "ConstrExtr.hh"
+
+#define NO_BERKELEY_ABC
 
 #if !defined(NO_BERKELEY_ABC)
 #include "Bdd.hh"
-#endif
-
-#include <csignal>
-#if defined(__linux__)
-  #include <fpu_control.h>
 #endif
 
 using namespace ZZ;
@@ -854,9 +855,18 @@ int main(int argc, char** argv)
     cli_pdr.add("dump-invar", "bool", "no", "Dump invariant in clause form.");
     cli.addCommand("pdr", "Property driven reachability analysis.", &cli_pdr);
 
+    // Command line -- PMC:
+    CLI cli_pmc;
+    addCli_Pmc(cli_pmc);
+    cli.addCommand("pmc", "Pounded Model Checking.", &cli_pmc);
+
     // Command line -- Sifting for k-inductive invariant:
     CLI cli_sift;
     cli.addCommand("sift", "k-inductive invariant sifting.", &cli_sift);
+
+    // Command line -- Sifting for k-inductive invariant:
+    CLI cli_isift;
+    cli.addCommand("isift", "interpolation based invariant sifting.", &cli_isift);
 
     // Command line -- interpolation:
     CLI cli_imc;
@@ -964,6 +974,12 @@ int main(int argc, char** argv)
     cli_live.add("gig", "string", "", "Output GIG file after conversion.");
     cli_live.add("eng", "{none, bmc, treb, treb-abs, pdr2, imc}", "none", "Proof-engine to apply to conversion.");
     cli.addCommand("live", "Liveness checking.", &cli_live);
+
+    // Command line -- constraint extraction:
+    CLI cli_constr;
+    cli_constr.add("k", "uint", "0", "Temporal decomposition frame.");
+    cli_constr.add("l", "uint", "0", "Target enlargement frame.");
+    cli.addCommand("constr", "Constraint extraction.", &cli_constr);
 
     // Command line -- show:
     CLI cli_show;
@@ -1247,10 +1263,7 @@ int main(int argc, char** argv)
     }
 
     // Set up signal handler:
-    signal(SIGINT, SIGINT_handler);     // <<== not in PAR mode?
-  #if !defined(_MSC_VER)
-    signal(SIGHUP, SIGINT_handler);
-  #endif
+    setupSignalHandlers();
 
     // Write logo:
     if (show_logo && !quiet){
@@ -1416,8 +1429,19 @@ int main(int argc, char** argv)
 
         outputVerificationResult(N, props, lbool_lift(result), &cex, orig_num_pis, N_inv, 0, cli.get("check").bool_val, output, quiet, T0, Tr0);
 
+    }else if (cli.cmd == "pmc"){
+        Params_Pmc P;
+        setParams(cli, P);
+        Cex     cex;
+        bool    result = pmc(N, props, P, &cex);
+
+        outputVerificationResult(N, props, lbool_lift(result), &cex, orig_num_pis, Netlist_NULL, 0, cli.get("check").bool_val, output, quiet, T0, Tr0);
+
     }else if (cli.cmd == "sift"){
-        lbool result ___unused = sift(N, props);
+        bool result ___unused = sift2(N, props);
+
+    }else if (cli.cmd == "isift"){
+        bool result ___unused = isift(N, props);
 
     }else if (cli.cmd == "pp"){
         imcPP(N, props);
@@ -1657,6 +1681,16 @@ int main(int argc, char** argv)
         if (result != l_Undef)
             ;// <<==  outputVerificationResult(N, props, result, &cex, orig_num_pis, NetlistRef(), bug_free_depth, false, output, quiet, T0, Tr0);
         if (!quiet) writeResourceUsage(T0, Tr0);
+
+    }else if (cli.cmd == "constr"){
+        uint k = cli.get("k").int_val;
+        uint l = cli.get("l").int_val;
+
+        Vec<GLit> bad;
+        for (uint i = 0; i < props.size(); i++)
+            bad.push(~props[i]);
+
+        constrExtr(N, bad, k, l);
     }
 
     return 0;

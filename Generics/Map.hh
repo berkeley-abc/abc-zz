@@ -98,7 +98,7 @@ public:
     bool peek(const Key_& key, Value_& result) const;
         // -- Returns, by copying to 'result', the value matching 'key'.
 
-    bool has(const Key_& key);
+    bool has(const Key_& key) const;
         // -- Does 'key' exist in the hash-table? Often you would want to use peek or get instead!
 
     bool set(const Key_& key, const Value_& value);
@@ -332,7 +332,7 @@ inline bool Map<K,V,H>::peek(const K& key, V& result) const
 
 
 template<class K, class V, class H>
-inline bool Map<K,V,H>::has(const K& key)
+inline bool Map<K,V,H>::has(const K& key) const
 {
     V* ptr;
     Map<K,V,H>& me = *const_cast<Map<K,V,H>*>(this);

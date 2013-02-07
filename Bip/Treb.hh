@@ -51,6 +51,7 @@ struct Params_Treb {
     float   orbits;             // How many orbits should 'generlize()' try?
     bool    gen_with_cex;       // Store counterexamples in 'generalize()' to speedup multiple orbits.
     bool    hq;                 // High quality generalization (slower)
+    bool    redund_cubes;       // Store cubes of F[n] at flop output of F[n-1] as well.
     uint    dump_invar;         // Dump invariant (0=no, 1=clauses, 2=PLA).
     SolverType sat_solver;      // SAT-solver to use
     bool    quiet;              // Suppress output.
@@ -76,6 +77,7 @@ struct Params_Treb {
         orbits(2),
         gen_with_cex(false),
         hq(false),
+        redund_cubes(false),
         dump_invar(0),
         sat_solver(sat_Msc),
         quiet(false)

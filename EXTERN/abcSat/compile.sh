@@ -1,5 +1,5 @@
 gcc arch_flags.c -o arch_flags
-AFLAGS=`arch_flags`
+AFLAGS=`./arch_flags`
 
 g++ $AFLAGS -I. "$@" -c satSolver.cc &&
 g++ $AFLAGS -I. "$@" -c satStore.cc  &&
