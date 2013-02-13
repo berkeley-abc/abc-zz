@@ -4,11 +4,11 @@
 //| Author(s)   : Niklas Een
 //| Module      : Bip
 //| Description :
-//| 
+//|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -521,8 +521,8 @@ struct ISift {
     Netlist         A;          // AIG storing the simplified interpolants used in 'F'
     Vec<Set<Cube> > F;
     Set<Cube>       F_inf;
-    MiniSat2        S;
-    ClMap           a2s;
+//    MiniSat2        S;
+//    ClMap           a2s;
 
     WZetS           tmp_seen;
 
@@ -632,6 +632,7 @@ bool ISift::runBmc(uint depth)
 
 #if 1
     // Add trace 'F':
+
 #endif
 
     // Solve:

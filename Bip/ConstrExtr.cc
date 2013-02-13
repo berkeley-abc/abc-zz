@@ -328,6 +328,7 @@ void constrExtr(NetlistRef N, const Vec<GLit>& bad, uint k, uint l)
     //**/writeAigerFile("tmp.aig", N);
     double T0 = cpuTime();
 
+#if 0
     Vec<Vec<GLit> > cands_fwd;
     Vec<Vec<GLit> > cands_bwd;
 
@@ -375,6 +376,40 @@ void constrExtr(NetlistRef N, const Vec<GLit>& bad, uint k, uint l)
 
     N.write("constr.gig");
     WriteLn "Wrote: \a*constr.gig\a*";
+
+#else
+    Get_Pob(N, fair_properties);
+
+    assert(fair_properties.size() == 1);
+  #if 0
+    Wire junc = N.True();
+    for (uint i = 0; i < fair_properties[0].size(); i++)
+        junc = s_And(junc, fair_properties[0][i]);
+  #else
+    Wire junc = ~N.True();
+    for (uint i = 0; i < fair_properties[0].size(); i++)
+        junc = s_Or(junc, fair_properties[0][i]);
+  #endif
+    N.add(PO_(), junc);
+
+    Vec<Vec<GLit> > cands_bwd;
+    Vec<GLit> prop(1, junc);
+    Invar cnstr(N, l, prop, true);
+
+    WriteLn "----------------------------------------";
+    WriteLn "BACKWARD PROP: Computing initial candidates...";
+    cnstr.getFirst(cands_bwd);
+
+    NewLine;
+    WriteLn "BACKWARD PROP: Refining classes...";
+    cnstr.refine(cands_bwd);
+
+    NewLine;
+    WriteLn "BACKWARD PROP: Finalizing classes by 1-induction...";
+    while (cnstr.refineInduct(cands_bwd));
+
+    WriteLn "CPU Time: %t", cpuTime() - T0;
+#endif
 }
 
 
