@@ -193,7 +193,7 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
             if (toggle_bad)
                 ffs[i].set(0, s_And(seen_prop[i], ~toggle));
             else
-                ffs[i].set(0, seen_prop[i]);
+                ffs[i].set(0, seen_prop[i]);        // <<== this doesn't quite work; need to debug!!
         }
 
         init_bad(1) = N.add(PO_(), s_And(toggle, ~w_cfail));

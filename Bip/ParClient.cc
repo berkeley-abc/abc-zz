@@ -571,7 +571,8 @@ void put_Cex(Vec<uchar>& data, const Cex& cex, NetlistRef N, bool concrete)
     // Inputs:
     Vec<GLit> pi;
     For_Gatetype(N, gate_PI, w)
-        pi(attr_PI(w).number, glit_NULL) = w;
+        if (attr_PI(w).number != num_NULL)
+            pi(attr_PI(w).number, glit_NULL) = w;
 
     putu(data, cex.inputs.size());
     for (uint d = 0; d < cex.inputs.size(); d++){
@@ -589,7 +590,8 @@ void put_Cex(Vec<uchar>& data, const Cex& cex, NetlistRef N, bool concrete)
     Vec<GLit>& ff = pi;
     ff.clear();
     For_Gatetype(N, gate_Flop, w)
-        ff(attr_Flop(w).number, glit_NULL) = w;
+        if (attr_Flop(w).number != num_NULL)
+            ff(attr_Flop(w).number, glit_NULL) = w;
 
     uint lim = cex.flops.size();
     if (concrete && lim > 1)
@@ -817,13 +819,15 @@ void sendMsg_Result_unknown(const Vec<uint>& props)
 
 
 // 'concrete' means flops are not abstracted => only the initial state will be included in the counterexample
-void sendMsg_Result_fails(const Vec<uint>& props, const Vec<uint>& depths, const Cex& cex, NetlistRef N, bool concrete_cex)
+void sendMsg_Result_fails(const Vec<uint>& props, const Vec<uint>& depths, const Cex& cex, NetlistRef N, bool concrete_cex, uint loop_frame)
 {
     Vec<uchar> data;
     data.push(l_False.value);
     put_vec_uint(data, props);
     put_vec_uint(data, depths);
     put_Cex(data, cex, N, concrete_cex);
+    if (loop_frame != UINT_MAX)
+        putu(data, loop_frame);
     sendMsg(101/*Result*/, data.slice());
 }
 

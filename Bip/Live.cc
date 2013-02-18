@@ -35,6 +35,7 @@
 #include "Treb.hh"
 #include "Bmc.hh"
 #include "Imc.hh"
+#include "ParClient.hh"
 
 namespace ZZ {
 using namespace std;
@@ -241,8 +242,12 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
     Wire    fair_mon;
     Wire    loop_start = Wire_ERROR;
 
+#if 0
     bool toggle_bad = (P.k != Params_Liveness::L2S);
     initBmcNetlist(N0, fairs, N, true, &fair_mon, toggle_bad);
+#else
+    initBmcNetlist(N0, fairs, N, true, &fair_mon, true);
+#endif
 
     if (P.k == Params_Liveness::L2S){
         liveToSafe(N, P, n_orig_flops, fair_mon, /*out*/loop_start);
@@ -275,6 +280,10 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
 
     Params_Treb P_treb;
     Params_Pdr2 P_pdr2;
+    Params_Bmc  P_bmc;
+    P_treb.par_send_result = false;
+    P_pdr2.par_send_result = false;
+    P_bmc .par_send_result = false;
 
     lbool ret;
     switch (P.eng){
@@ -283,7 +292,7 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
         break;
 
     case Params_Liveness::eng_Bmc:
-        ret = bmc(N, props, Params_Bmc(), &cex, &bug_free_depth);
+        ret = bmc(N, props, P_bmc, &cex, &bug_free_depth);
         break;
 
     case Params_Liveness::eng_Treb:
@@ -307,24 +316,13 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
 
     default: assert(false); }
 
-    // Extract and verify liveness CEX:
-    if (ret == l_False && loop_start != Wire_ERROR){
-        cex.inputs.pop();   // -- got one extra state because of match detection
+    // Report result:
+    Vec<uint> par_props(1, 0);      // -- for now, can only handle singel properties in PAR mode
 
-#if 0   /*DEBUG*/
-        for (uint d = 0; d < cex.inputs.size(); d++){
-            Write "PIs %_: ", d;
-            For_Gatetype(N, gate_PI, w)
-                Write "%_", cex.inputs[d][w];
-            NewLine;
-        }
-        for (uint d = 0; d < cex.flops.size(); d++){
-            Write "FFs %_: ", d;
-            For_Gatetype(N, gate_Flop, w)
-                Write "%_", cex.flops[d][w];
-            NewLine;
-        }
-#endif  /*END DEBUG*/
+    if (ret == l_False && loop_start != Wire_ERROR){
+        // Extract and verify liveness CEX:
+        WriteLn "LIVENESS: \a*Witness found.\a*";
+        cex.inputs.pop();   // -- got one extra state because of match detection
 
         uint loop_frame;
         bool ok = verifyInfCex(N, cex, loop_start, &loop_frame);
@@ -363,6 +361,24 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
 
             WriteLn "Wrote: \a*%_\a*", P.witness_output;
         }
+
+        if (par){
+            Vec<uint> depths;
+            depths.push(cex.depth());
+            sendMsg_Result_fails(par_props, depths, cex, N, true, loop_frame);
+        }
+
+    }else if (ret == l_False && loop_start == Wire_ERROR){
+        // Inconclusive k-liveness call:
+        WriteLn "LIVENESS: \a*Inconclusive.\a*";
+        if (par)
+            sendMsg_Result_unknown(par_props);
+
+    }else{ assert(ret == l_True);
+        // Invariant found => no fair witness exists:
+        WriteLn "LIVENESS: \a*No witness exists.\a*";
+        if (par)
+            sendMsg_Result_holds(par_props);
     }
 
     return ret;
@@ -384,5 +400,4 @@ injecera invarianta kuber vid inkrementel (kan jag räkna till 20?)
 benchmarka liveness / propagate fas
 
 -fce=0..3
-
 */

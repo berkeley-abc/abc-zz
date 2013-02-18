@@ -1722,7 +1722,7 @@ lbool treb( NetlistRef          N0,
         if (bug_free_depth)
             *bug_free_depth = (result == l_False) ? treb.bugFreeDepth() : INT_MAX;
 
-        if (par){
+        if (par && P.par_send_result){
             Vec<uint> props_; assert(props.size() == 1);      // -- for now, can only handle singel properties in PAR mode
             props_.push(0);
             if (result == l_False){

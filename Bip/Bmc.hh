@@ -31,14 +31,16 @@ struct Params_Bmc {
     uint    la_steps;           // -- look-ahead frames
     double  la_decay;           // -- relative focus between step k and k+1 (< 1 means less focus on k+1)
     bool    quiet;
+    bool    par_send_result;
 
     Params_Bmc() :
-        sat_solver    (sat_Msc),
-        simple_tseitin(false),
-        quant_claus   (false),
-        la_steps      (1),
-        la_decay      (0.8),
-        quiet         (false)
+        sat_solver     (sat_Msc),
+        simple_tseitin (false),
+        quant_claus    (false),
+        la_steps       (1),
+        la_decay       (0.8),
+        quiet          (false),
+        par_send_result(true)
     {}
 };
 

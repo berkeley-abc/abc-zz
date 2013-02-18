@@ -44,6 +44,7 @@ struct Params_Pdr2 {
     SolverType  sat_solver;
     bool        prop_init;
     bool        check_klive;
+    bool        par_send_result;        // -- place holder; Pdr2 doesn't support PAR yet
 
     Params_Pdr2() :
         recycling    (SOLVER),
@@ -59,7 +60,8 @@ struct Params_Pdr2 {
         tweak_cut    (false),
         sat_solver   (sat_Abc),
         prop_init    (false),
-        check_klive  (false)
+        check_klive  (false),
+        par_send_result(true)
     {}
 };
 

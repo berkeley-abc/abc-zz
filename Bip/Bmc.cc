@@ -466,7 +466,7 @@ lbool bmc_(NetlistRef N0, const Vec<Wire>& props, const Params_Bmc& P, Cex* cex,
 lbool bmc(NetlistRef N0, const Vec<Wire>& props, const Params_Bmc& P, Cex* cex, int* bf_depth, EffortCB* cb, uint max_depth)
 {
     lbool ret = bmc_(N0, props, P, cex, bf_depth, cb, max_depth);
-    if (par){
+    if (par && P.par_send_result){
         Vec<uint> props;
         props.push(0);
 
