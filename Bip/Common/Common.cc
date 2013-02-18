@@ -172,12 +172,16 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
 
         *fairness_monitor = N.add(Buf_());
 
+        Add_Pob(N, fair_properties);
+        fair_properties.push();
+
         Vec<Wire> seen_prop;
         Vec<Wire> ffs;
         Wire toggle = N.True();
         for (uint i = 0; i < props.size(); i++){
             assert(type(props[i]) == gate_PO);
             Wire wp = xlat[props[i][0]] ^ sign(props[i][0]) ^ sign(props[i]);
+            fair_properties.last().push(N.add(PO_(), wp));  // -- save fairness signals as a single fairness property for CEX verification:
 
             ffs.push(N.add(Flop_(flopC++)));
             seen_prop.push(s_And(s_Or(wp, ffs.last()), *fairness_monitor));
@@ -742,7 +746,7 @@ void XSimulate::propagateUndo()
 // NOTE! If 'N' has constraints, they will be folded by this function (so 'N' will change) and
 // the counterexample will be extended to include the new monitor flop.
 //
-bool verifyCex(NetlistRef N, const Vec<Wire>& props, Cex& cex, /*out*/Vec<uint>* fails_at)
+bool verifyCex(NetlistRef N, const Vec<Wire>& props, Cex& cex, /*out*/Vec<uint>* fails_at, const Vec<Wire>* observe, Vec<Vec<lbool> >* obs_val)
 {
     Get_Pob(N, flop_init);
 
@@ -787,6 +791,18 @@ bool verifyCex(NetlistRef N, const Vec<Wire>& props, Cex& cex, /*out*/Vec<uint>*
             if ((xsim[d][w] ^ sign(w)) == l_False){
                 verified = true;
                 if (fails_at) (*fails_at)[i] = d;
+            }
+        }
+    }
+
+    // Extract values for observed signals:
+    if (observe && obs_val){
+        obs_val->clear();
+        for (uint d = 0; d < cex.size(); d++){
+            obs_val->push();
+            for (uint i = 0; i < observe->size(); i++){
+                Wire w = (*observe)[i];
+                obs_val->last().push(xsim[d][w] ^ sign(w));
             }
         }
     }

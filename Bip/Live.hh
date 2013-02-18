@@ -41,6 +41,7 @@ struct Params_Liveness {
 
     String aig_output;
     String gig_output;
+    String witness_output;
 
     Params_Liveness() :
         k(L2S),

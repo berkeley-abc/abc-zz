@@ -972,6 +972,7 @@ int main(int argc, char** argv)
     cli_live.add("k", "uint | {inc, l2s}", "l2s", "Bound for k-liveness ('inc' = incremental) or 'l2s' for liveness-to-safety algorithm.");
     cli_live.add("aig", "string", "", "Output AIGER file after conversion.");
     cli_live.add("gig", "string", "", "Output GIG file after conversion.");
+    cli_live.add("wit", "string", "", "Output AIGER 1.9 witness.");
     cli_live.add("eng", "{none, bmc, treb, treb-abs, pdr2, imc}", "none", "Proof-engine to apply to conversion.");
     cli.addCommand("live", "Liveness checking.", &cli_live);
 
@@ -1674,6 +1675,7 @@ int main(int argc, char** argv)
                                            cli.get("k").enum_val == 0 ? Params_Liveness::INC : Params_Liveness::L2S;
         P.aig_output = cli.get("aig").string_val;
         P.gig_output = cli.get("gig").string_val;
+        P.witness_output = cli.get("wit").string_val;
         P.eng = (Params_Liveness::Engine)cli.get("eng").enum_val;
 
         lbool result = liveness(N, prop_no, P);

@@ -153,7 +153,7 @@ void translateCex(const CCex& ccex, NetlistRef N_cex, /*out*/Cex& cex);
 void translateCex(const Cex& cex, CCex& ccex, NetlistRef N);
 void makeCexInitial(NetlistRef N, Cex& cex);
 
-bool verifyCex(NetlistRef N, const Vec<Wire>& props, Cex& cex, /*out*/Vec<uint>* fails_at = NULL);
+bool verifyCex(NetlistRef N, const Vec<Wire>& props, Cex& cex, /*out*/Vec<uint>* fails_at = NULL, const Vec<Wire>* observe = NULL, Vec<Vec<lbool> >* obs_val = NULL);
 void dumpCex(NetlistRef N, const Cex& cex, Out& out = std_out);
 
 bool verifyInvariant(NetlistRef N, const Vec<Wire>& props, NetlistRef invariant, /*out*/uint* failed_prop = NULL);

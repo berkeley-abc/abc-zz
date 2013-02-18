@@ -43,10 +43,62 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+// Assumes on fairness property and no fairness constraints
+bool verifyInfCex(NetlistRef N, Cex& cex, Wire loop_start, /*out*/uint* out_loop_frame)
+{
+    Get_Pob(N, fair_properties);    // <<== ah, funkar inte. lever i N0 inte N
+
+    // Collect fairness signals:
+    Vec<Wire> observe;
+    append(observe, fair_properties[0]);
+    observe.push(loop_start);       // -- not a fairness signal; just to find the loop
+
+    // Fill in the flops of 'cex':
+    Vec<Vec<lbool> > obs_val;
+    Vec<Wire> empty;
+    verifyCex(N, empty, cex, NULL, &observe, &obs_val);
+
+    // Extract loop frame and check that all fairness signals happen in loop:
+    uint loop_frame = UINT_MAX;
+    Vec<bool> seen(observe.size() - 1, false);
+    for (uint d = 0; d < cex.size(); d++){
+        if (obs_val[d].last() == l_True && loop_frame == UINT_MAX)
+            loop_frame = d;
+
+        if (loop_frame != UINT_MAX){
+#if 0   /*DEBUG*/
+            Write "Observed %_: ", d;
+            for (uint i = 0; i < obs_val[d].size() - 1; i++)
+                Write "%_", obs_val[d][i];
+            NewLine;
+#endif  /*END DEBUG*/
+            for (uint i = 0; i < obs_val[d].size() - 1; i++)
+                if (obs_val[d][i] == l_True)
+                    seen[i] = true;
+        }
+    }
+
+    if (out_loop_frame) *out_loop_frame = loop_frame;
+
+    for (uint i = 0; i < seen.size(); i++)
+        if (!seen[i]){
+            /**/WriteLn "=> missing fairness signal %_ in cycle (starting at %_)", i, loop_frame;
+            return false; }
+
+    // <<== also verify that loop state and last state are equal? What about COI?
+
+    return loop_frame != UINT_MAX;
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+
+
 static
 void tidyUp(NetlistRef N)
 {
     Get_Pob(N, properties);
+    Get_Pob(N, fair_properties);
 
     // Number flops:
     int numC = nextNum_Flop(N);
@@ -56,7 +108,7 @@ void tidyUp(NetlistRef N)
 
     // Clean up:
     For_Gatetype(N, gate_PO, w)
-        if (w != properties[0])
+        if (w != properties[0] && !has(fair_properties[0], w))
             remove(w);
 
     removeBuffers(N);
@@ -64,7 +116,7 @@ void tidyUp(NetlistRef N)
 }
 
 
-void liveToSafe(NetlistRef N, const Params_Liveness& P, int n_orig_flops, Wire fair_mon)
+void liveToSafe(NetlistRef N, const Params_Liveness& P, int n_orig_flops, Wire fair_mon, Wire& loop_start)
 {
     assert(!Has_Pob(N, constraints));       // -- should have been folded into fairness monitor already
 
@@ -111,6 +163,7 @@ void liveToSafe(NetlistRef N, const Params_Liveness& P, int n_orig_flops, Wire f
 #else
 //    Wire has_seen_all = init_bad[1][0];
     Wire has_seen_all = N.add(Flop_(), init_bad[1][0]);
+    flop_init(has_seen_all) = l_False;
 #endif
 
     // If was watching and seen all and match => CEX:
@@ -119,6 +172,8 @@ void liveToSafe(NetlistRef N, const Params_Liveness& P, int n_orig_flops, Wire f
     properties.push(N.add(PO_(), ~s_And(was_watching, s_And(has_seen_all, match))));
 
     tidyUp(N);
+
+    loop_start = match;
 }
 
 
@@ -184,15 +239,18 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
     Netlist N;
     int     n_orig_flops ___unused = nextNum_Flop(N0); // -- don't introduce shadow registers for liveness monitor flops
     Wire    fair_mon;
+    Wire    loop_start = Wire_ERROR;
+
+    bool toggle_bad = (P.k != Params_Liveness::L2S);
+    initBmcNetlist(N0, fairs, N, true, &fair_mon, toggle_bad);
 
     if (P.k == Params_Liveness::L2S){
-        initBmcNetlist(N0, fairs, N, true, &fair_mon, false);
-        liveToSafe(N, P, n_orig_flops, fair_mon);
+        liveToSafe(N, P, n_orig_flops, fair_mon, /*out*/loop_start);
 
     }else{
-        initBmcNetlist(N0, fairs, N, true, &fair_mon, true);
         if (P.k == Params_Liveness::INC)
-            return kLive(N, P, fair_mon, 0, true);      // <<== use 'eng' parameter here
+            // Incremental:
+            return kLive(N, P, fair_mon, 0, true);      // <<== use 'eng' parameter here 
         else
             kLive(N, P, fair_mon, P.k, false);
     }
@@ -249,7 +307,63 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
 
     default: assert(false); }
 
-    // <<== extract and verify liveness CEX (if ret == l_False)
+    // Extract and verify liveness CEX:
+    if (ret == l_False && loop_start != Wire_ERROR){
+        cex.inputs.pop();   // -- got one extra state because of match detection
+
+#if 0   /*DEBUG*/
+        for (uint d = 0; d < cex.inputs.size(); d++){
+            Write "PIs %_: ", d;
+            For_Gatetype(N, gate_PI, w)
+                Write "%_", cex.inputs[d][w];
+            NewLine;
+        }
+        for (uint d = 0; d < cex.flops.size(); d++){
+            Write "FFs %_: ", d;
+            For_Gatetype(N, gate_Flop, w)
+                Write "%_", cex.flops[d][w];
+            NewLine;
+        }
+#endif  /*END DEBUG*/
+
+        uint loop_frame;
+        bool ok = verifyInfCex(N, cex, loop_start, &loop_frame);
+        if (!ok)
+            WriteLn "INTERNAL ERROR! Liveness CEX did not verify.";
+        else
+            WriteLn "Liveness CEX verifies correctly: length %_, loop %_", cex.depth(), loop_frame;
+
+        if (P.witness_output != ""){
+            OutFile out(P.witness_output);
+            FWriteLn(out) "1";
+            FWriteLn(out) "j%_", fair_prop_no;
+
+            uint n_ffs = nextNum_Flop(N0);
+            uint n_pis = nextNum_PI(N0);
+
+            Vec<char> text(n_ffs, '0');
+            For_Gatetype(N, gate_Flop, w){
+                int num = attr_Flop(w).number;
+                if (num != num_NULL && (uint)num < n_ffs && cex.flops[0][w] == l_True)
+                    text[num] = '1';
+            }
+            FWriteLn(out) "%_", text;
+
+            for (uint d = 0; d < cex.size(); d++){
+                text.reset(n_pis, '0');
+                For_Gatetype(N, gate_PI, w){
+                    int num = attr_PI(w).number;
+                    if (num != num_NULL && (uint)num < n_pis && cex.inputs[d][w] == l_True)
+                        text[num] = '1';
+                }
+                FWriteLn(out) "%_", text;
+            }
+
+            FWriteLn(out) ".";
+
+            WriteLn "Wrote: \a*%_\a*", P.witness_output;
+        }
+    }
 
     return ret;
 }
