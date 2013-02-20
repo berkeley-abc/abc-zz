@@ -130,7 +130,7 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
             flop_init_new(xlat[w]) = flop_init[w];
 
     // Fold constraints:
-    int flopC = nextNum_Flop(N);
+    int flopC = nextNum_Flop(N0);
     Wire w_cfail = ~N.True();       // -- outputs TRUE if constraints have failed
     if (Has_Pob(N0, constraints) && constraints.size() > 0){
         Wire w_constr = N.True();                           // -- 'w_constr' is conjunction of all constraints

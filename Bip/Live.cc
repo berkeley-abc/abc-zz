@@ -232,6 +232,7 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
 {
     Get_Pob(N0, fair_properties);
     Auto_Pob(N0, fair_constraints);
+    Vec<uint> par_props(1, 0);      // -- for now, can only handle singel properties in PAR mode
 
     Vec<Wire> fairs;
     append(fairs, fair_properties[fair_prop_no]);
@@ -253,10 +254,20 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
         liveToSafe(N, P, n_orig_flops, fair_mon, /*out*/loop_start);
 
     }else{
-        if (P.k == Params_Liveness::INC)
+        if (P.k == Params_Liveness::INC){
             // Incremental:
-            return kLive(N, P, fair_mon, 0, true);      // <<== use 'eng' parameter here 
-        else
+            lbool ret = kLive(N, P, fair_mon, 0, true);      // <<== use 'eng' parameter here
+            if (ret == l_Undef){
+                WriteLn "LIVENESS: \a*Inconclusive.\a*";
+                if (par) sendMsg_Result_unknown(par_props);
+
+            }else{ assert(ret == l_True);
+                WriteLn "LIVENESS: \a*No witness exists.\a*";
+                if (par) sendMsg_Result_holds(par_props);
+            }
+            return ret;         // -- EXIT POINT!
+
+        }else
             kLive(N, P, fair_mon, P.k, false);
     }
 
@@ -317,13 +328,11 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
     default: assert(false); }
 
     // Report result:
-    Vec<uint> par_props(1, 0);      // -- for now, can only handle singel properties in PAR mode
-
     if (ret == l_False && loop_start != Wire_ERROR){
-        // Extract and verify liveness CEX:
         WriteLn "LIVENESS: \a*Witness found.\a*";
-        cex.inputs.pop();   // -- got one extra state because of match detection
 
+        // Verify liveness CEX:
+        cex.inputs.pop();   // -- got one extra state because of match detection
         uint loop_frame;
         bool ok = verifyInfCex(N, cex, loop_start, &loop_frame);
         if (!ok)
@@ -331,6 +340,7 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
         else
             WriteLn "Liveness CEX verifies correctly: length %_, loop %_", cex.depth(), loop_frame;
 
+        // Write AIGER witness:
         if (P.witness_output != ""){
             OutFile out(P.witness_output);
             FWriteLn(out) "1";
@@ -339,12 +349,25 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
             uint n_ffs = nextNum_Flop(N0);
             uint n_pis = nextNum_PI(N0);
 
-            Vec<char> text(n_ffs, '0');
+            Get_Pob(N0, flop_init);
+            Vec<char> text(n_ffs, 'x');
+            For_Gatetype(N0, gate_Flop, w){
+                int num = attr_Flop(w).number;
+                if (num != num_NULL){
+                    if      (flop_init[w] == l_True ) text[num] = '1';
+                    else if (flop_init[w] == l_False) text[num] = '0';
+                }
+            }
             For_Gatetype(N, gate_Flop, w){
                 int num = attr_Flop(w).number;
-                if (num != num_NULL && (uint)num < n_ffs && cex.flops[0][w] == l_True)
-                    text[num] = '1';
+                if (num != num_NULL && (uint)num < n_ffs){
+                    if      (cex.flops[0][w] == l_True ){ assert(text[num] != '0'); text[num] = '1'; }
+                    else if (cex.flops[0][w] == l_False){ assert(text[num] != '1'); text[num] = '0'; }
+                }
             }
+            for (uint i = 0; i < text.size(); i++)
+                if (text[i] == 'x')
+                    text[i] = '0';
             FWriteLn(out) "%_", text;
 
             for (uint d = 0; d < cex.size(); d++){
@@ -374,11 +397,15 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
         if (par)
             sendMsg_Result_unknown(par_props);
 
-    }else{ assert(ret == l_True);
+    }else if (ret == l_True){
         // Invariant found => no fair witness exists:
         WriteLn "LIVENESS: \a*No witness exists.\a*";
         if (par)
             sendMsg_Result_holds(par_props);
+
+    }else{
+        if (P.gig_output == "" && P.aig_output == "")
+            WriteLn "No output file specified and no engine specified. Nothing done.";
     }
 
     return ret;
