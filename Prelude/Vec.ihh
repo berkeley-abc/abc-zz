@@ -126,6 +126,8 @@ public:
     T&       get       (uind i)               { assert_debug(i <= this->sz); return this->data[i]; }
     T&       operator()(uind i)               { growTo(i+1);      return this->data[i]; } // -- like operator [], but grow Vector if needed
     T&       operator()(uind i, const T& pad) { growTo(i+1, pad); return this->data[i]; }
+    const T& operator[](ReverseIndex r) const { uind i = this->sz - r.off; assert_debug(i <= this->sz); return this->data[i]; }
+    T&       operator[](ReverseIndex r)       { uind i = this->sz - r.off; assert_debug(i <= this->sz); return this->data[i]; }
 
   //________________________________________
   //  Copying/moving:

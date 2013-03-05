@@ -240,15 +240,17 @@ void readAiger_(In& in, NetlistRef N, bool store_comment)
             if (fs.size() != 1) throw Excp_AigerParseError("Expected a single number on each line in the 'liveness' section");
             fair_properties.push();
             fair_properties.last().setSize((uint)stringToUInt64(fs[0]));
+        }
 
-            for (uind i = 0; i < fair_properties.last().size(); i++){
+        for (uind n = 0; n < n_live; n++){
+            for (uind i = 0; i < fair_properties[n].size(); i++){
                 readLine(in, buf);
                 splitArray(buf.slice(), " ", fs);
                 if (fs.size() != 1) throw Excp_AigerParseError("Expected a single number on each line in the 'liveness' section");
 
                 uind lit = (uind)stringToUInt64(fs[0]);
                 Wire w_in = N[aig2nl[lit >> 1]] ^ (lit & 1);
-                fair_properties.last()[i] = N.add(PO_(N.typeCount(gate_PO)), w_in);
+                fair_properties[n][i] = N.add(PO_(N.typeCount(gate_PO)), w_in);
             }
         }
     }

@@ -24,6 +24,22 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Helper type for convenient access to last elements:
+
+
+struct ReverseIndex {
+    uind off;       // -- this amount will be subtracted from the 'size()' of a vector object
+    ReverseIndex(uind off_) : off(off_) {}
+
+    ReverseIndex operator-(uind v) const { return ReverseIndex(off + v); }
+    ReverseIndex operator+(uind v) const { return ReverseIndex(off - v); }
+};
+
+static const ReverseIndex LAST(1);
+static const ReverseIndex END(0);
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
 template<class T>
@@ -73,12 +89,13 @@ struct Array {
   //________________________________________
   //  Vector-style interface:
 
-    uind     size      ()       const { return sz; }
-    T&       operator[](uint i) const { assert_debug(i <= sz); return data[i]; }    // -- intentionally allow for one-beyond-last addressing
+    uind     size      ()               const { return sz; }
+    T&       operator[](uind i)         const { assert_debug(i <= sz); return data[i]; }    // -- intentionally allow for one-beyond-last addressing
+    T&       operator[](ReverseIndex r) const { uind i = this->sz - r.off; assert_debug(i <= sz); return data[i]; }
 
     T&       end () const { return data[sz]; }
     T&       last() const { return data[sz-1]; }
-    void     pop() { sz--; }
+    void     pop ()       { sz--; }
     void     shrinkTo(uind size) { if (sz > size) sz = size; }   // (will do nothing if already smaller)
 
     T*       base() const { return data; }
@@ -172,7 +189,6 @@ macro Array<T> Array_copy(const T& start, const T& end, ALLOC& mem)
     size_t quanta = sizeof(typename ALLOC::Elem);
     size_t alloc_sz = (tmp.sz * sizeof(T) + quanta - 1) / quanta;
     tmp.data = (T*)mem.alloc(alloc_sz);
-    //**/printf("tmp.sz=%u  sizeof(T)=%u  quanta=%u  alloc_sz=%u\n", (uint)tmp.sz, (uint)sizeof(T), (uint)quanta, (uint)alloc_sz); fflush(stdout);
     for (uind i = 0; i < tmp.sz; i++)
         new (&tmp.data[i]) T((&start)[i]);
     return tmp;

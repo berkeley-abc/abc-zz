@@ -43,8 +43,9 @@ macro void reverse(V& v) {
         swp(v[i], v[j]); }
 
 template<class V, class W>
-macro void append(V& v, W& w) {            // -- append 'w' to 'v'
-    for (uind i = 0; i < w.size(); i++)
+macro void append(V& v, W& w) {            // -- append 'w' to 'v' (allows for 'v == w')
+    uind sz = w.size();
+    for (uind i = 0; i < sz; i++)
         v.push(w[i]); }
 
 template<class V, class W>
@@ -158,6 +159,14 @@ macro void revPullOut(V& v, T x) {         // -- same as 'pullOut()' but take LA
         swp(tmp, v[i]);
     } }
 
+template<class V, class W>
+macro void vecCopy(const V& src, W& dst) {
+    dst.clear();
+    for (uind i = 0; i < src.size(); i++)
+        dst.push(src[i]);
+}
+
+
 // To initialize an empty vector 'v' to '{1, 2, 3}', do: 'pusher(v), 1, 2, 3'
 template<class V, class T> struct Pusher {
     V& v;
@@ -170,12 +179,14 @@ macro Pusher<V<T>,T> pusher(V<T>& v) {
     return Pusher<V<T>,T>(v); }
 
 
-template<class V, class W>
-macro void vecCopy(const V& src, W& dst) {
-    dst.clear();
-    for (uind i = 0; i < src.size(); i++)
-        dst.push(src[i]);
-}
+// Even more handy syntax for type 'Vec', simply do: 'vec += 10, 20, 30'
+template<class T, class S>
+macro Pusher<Vec<T>,T> operator+=(Vec<T>& vec, const S& elem) {
+    return Pusher<Vec<T>,T>(vec), elem; }
+
+template<class T, class S>
+macro void operator+=(Vec<T>& vec, const Vec<S>& vec2) {
+    append(vec, vec2); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
