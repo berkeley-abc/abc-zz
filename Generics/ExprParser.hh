@@ -125,7 +125,7 @@ private:
         ParseElem() : expr(NULL), prev(0), next(0), op_tag(0), pos(0), type(xop_NULL), prio(0) {}
     };
 
-    bool isOp  (const ParseElem& x) const { return x.op_tag != xop_NULL; }
+    bool isOp  (const ParseElem& x) const { return x.type != xop_NULL; }
     bool isExpr(const ParseElem& x) const { return !isOp(x); }
 
     struct ParenElem {

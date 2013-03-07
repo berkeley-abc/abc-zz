@@ -831,6 +831,7 @@ int main(int argc, char** argv)
     cli.add("vt", "ufloat | {inf}", "inf", "Virtual timeout (in \"seconds\").");
     cli.add("timeout", "ufloat | {inf}", "inf", "CPU timeout (in seconds).");
     cli.add("fpu", "bool", "no", "Leave FPU in native state (may affect variable activities).");
+    cli.add("old-sif", "bool", "no", "Use old SIF parsing through 'cip'.");
     cli.add("quiet", "bool", "no", "Run without progress output.");
 
     cli_hidden.add("profile", "bool", "no", "Activate profiling.");
@@ -1030,6 +1031,7 @@ int main(int argc, char** argv)
     bool   quiet      = cli.get("quiet").bool_val;
     bool   show_logo  = cli.get("logo").bool_val;
     bool   preprocess = cli.get("pre").bool_val;
+    bool   old_sif    = cli.get("old-sif").bool_val;
 
     if (!cli.get("fpu").bool_val){
       #if defined(__linux__)
@@ -1083,7 +1085,16 @@ int main(int argc, char** argv)
         }
 
     }else if (hasExtension(input, "sif")){
-        parseSif(input, N);
+        if (old_sif)
+            parseSif(input, N);
+        else{
+            try{
+                readSif(input, N);
+            }catch (Excp_SifParseError err){
+                ShoutLn "PARSE ERROR! %_", err.msg;
+                exit(1);
+            }
+        }
 
     }else if (hasExtension(input, "out")){     // -- Read ASCII AIG from result file (e.g. from reparam)
         try{
@@ -1100,7 +1111,8 @@ int main(int argc, char** argv)
                         readAiger(in2, N, false);
                         //*aiger*/For_Gatetype(N, gate_PO, w) w.set(0, ~w[0]);    // -- invert properties
                     }catch (Excp_AigerParseError err){
-                        ShoutLn "PARSE ERROR! %_", err.msg; exit(1);
+                        ShoutLn "PARSE ERROR! %_", err.msg;
+                        exit(1);
                     }
                     goto Found;
                 }

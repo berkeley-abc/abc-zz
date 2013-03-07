@@ -14,6 +14,7 @@
 #include "Prelude.hh"
 #include "ExportImport.hh"
 #include "ZZ/Generics/Sort.hh"
+#include "ZZ/Generics/ExprParser.hh"
 #include "StdLib.hh"
 #include "StdPob.hh"
 
@@ -879,6 +880,10 @@ void readBlif(String filename, NetlistRef N, bool expect_aig, bool store_names)
 // SIF parser:
 
 
+//=================================================================================================
+// -- Tokenizer:
+
+
 // Replace comments with spaces (preserving newlines). Returns FALSE if 'text' contains an 
 // unterminated block comment.
 static
@@ -927,6 +932,7 @@ bool removeCstyleComments(Array<char> text)
 static char sif_name_char[256];
 static char sif_token_char[256];
 
+
 ZZ_Initializer(sif, 0)
 {
     for (uint i = 0; i < 256; i++) sif_name_char[i] = sif_token_char[i] = 0;
@@ -953,16 +959,16 @@ ZZ_Initializer(sif, 0)
 class SifToken {
     uchar opc;
     uint  len : 24;
-    uint  off;
+    uind  off;
 
 public:
-    SifToken(uint offset, uint len_, char op = 0) { opc = (uchar)op; len = len_; off = offset; }
+    SifToken(uind offset, uint len_, char op = 0) { opc = (uchar)op; len = len_; off = offset; }
 
     bool isOp  ()         const { return opc != 0; }
     bool isName()         const { return !isOp(); }
     Str  name  (Str base) const { return Str(&base[off], len); }
     char op    ()         const { return (char)opc; }
-    uint offset()         const { return off; }
+    uind offset()         const { return off; }
 };
 
 
@@ -975,7 +981,7 @@ void sifTokenize(Str text, Vec<SifToken>& elems)
     cchar* p   = &text[0];
     cchar* p0  = &text[0];
     cchar* end = &text.end();
-    uint line_no = 1;
+    uind line_no = 1;
 
     for(;;){
         // Skip white-space:
@@ -994,7 +1000,7 @@ void sifTokenize(Str text, Vec<SifToken>& elems)
         }else if (*p == '\''){
             p++;
             cchar* start = p;
-            uint start_line = line_no;
+            uind start_line = line_no;
             while (p != end && *p != '\''){
                 if (*p == '\n') line_no++;
                 p++;
@@ -1019,6 +1025,119 @@ void sifTokenize(Str text, Vec<SifToken>& elems)
 }
 
 
+//=================================================================================================
+// -- Expression parsing:
+
+
+struct SifStream : XP_TokenStream {
+    NetlistRef N;
+    Array<char> text;
+    const Vec<SifToken>& elems;
+    uind& p;
+
+    SifStream(NetlistRef N_, Array<char> text_, const Vec<SifToken>& elems_, uind& p_) :
+        N(N_), text(text_), elems(elems_), p(p_) {}
+
+    GLit  toGLit(void* expr) const { return GLit(packed_, (uint)expr); }
+    void* toExpr(GLit w)     const { return (void*)w.data(); }
+
+    bool parseOp(uint& op_tag, uint& pos, XP_OpType& type, int& prio) {
+        if (p < elems.size() && elems[p].isOp()){
+            if (elems[p].op() == '^'){
+                p++;
+                type = xop_PREFIX;
+                prio = 1;
+                return true;
+            }else if (elems[p].op() == '&'){
+                p++;
+                type = xop_INFIXL;
+                prio = 0;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool parseLParen(uint& paren_tag, uint& pos) {
+        if (p < elems.size() && elems[p].isOp() && elems[p].op() == '('){
+            p++; return true; }
+        return false; }
+
+    bool parseRParen(uint& paren_tag, uint& pos) {
+        if (p < elems.size() && elems[p].isOp() && elems[p].op() == ')'){
+            p++; return true; }
+        return false; }
+
+    bool parseAtom(void*& atom_expr, uint& pos) {
+        if (p < elems.size() && elems[p].isName()){
+            Str name = elems[p].name(text);
+            GLit w = N.names().lookup(name);
+            if (!w) Throw(Excp_SifParseError) "[line %_] Undefined symbol: %_", countLineNo(text, elems[p].offset()), name;
+            atom_expr = toExpr(w);
+            p++;
+            return true;
+        }else
+            return false;
+    }
+
+    void* applyPrefix(uint, void* expr) {
+        return toExpr(~toGLit(expr)); }
+
+    void* applyPostfix(uint, void*) {
+        assert(false); }
+
+    void* applyInfix(uint, void* expr0, void* expr1) {
+        return toExpr(s_And(toGLit(expr0) + N, toGLit(expr1) + N)); }
+
+
+    void disposeExpr(void* expr) {
+        /*nothing*/ }
+};
+
+
+//=================================================================================================
+// -- Statement parsing:
+
+
+Str sifGetName(const Array<char>& text, const Vec<SifToken>& elems, uind& p, cchar* expected_name = NULL)
+{
+    if (p >= elems.size())
+        Throw(Excp_SifParseError) "Unexpected end-of-file.";
+    if (!elems[p].isName())
+        Throw(Excp_SifParseError) "[line %_] Expected name not operator: %_", countLineNo(text, elems[p].offset()), elems[p].op();
+
+    Str s = elems[p].name(text);
+    p++;
+
+    if (expected_name && !eq(s, expected_name))
+        Throw(Excp_SifParseError) "[line %_] Expected \"%_\", not: %_", countLineNo(text, elems[p].offset()), expected_name, s;
+
+    return s;
+}
+
+
+char sifGetOp(const Array<char>& text, const Vec<SifToken>& elems, uind& p, char expected_op = 0, bool just_probe = false)
+{
+    if (p >= elems.size())
+        Throw(Excp_SifParseError) "Unexpected end-of-file.";
+    if (!elems[p].isOp())
+        Throw(Excp_SifParseError) "[line %_] Expected operator not name: %_", countLineNo(text, elems[p].offset()), elems[p].op();
+
+    char c = elems[p].op();
+
+    if (just_probe){
+        if (c == expected_op) p++;
+        return c == expected_op;
+    }
+
+    p++;
+    if (expected_op && c != expected_op)
+        Throw(Excp_SifParseError) "[line %_] Expected \"%_\", not: %_", countLineNo(text, elems[p].offset()), expected_op, c;
+
+    return c;
+}
+
+
 void readSif(String filename, NetlistRef N, String* module_name, Vec<String>* liveness_names)
 {
     assert(N.empty());
@@ -1034,74 +1153,140 @@ void readSif(String filename, NetlistRef N, String* module_name, Vec<String>* li
     Vec<SifToken> elems;
     sifTokenize(text, elems);
 
-    if (elems.size() == 0)
-        Throw(Excp_SifParseError) "Empty file: %_", filename;
-    else if (elems.size() < 3 || !elems[0].isName() || !eq(elems[0].name(text), "MODULE") || !elems[1].isName() || !elems[2].isOp() || elems[2].op() != ';')
-        Throw(Excp_SifParseError) "[line %_] A sif-file must always start with \"MODULE <name> ;\".", countLineNo(text, elems[0].offset());
+    uind p = 0;
+    SifStream ss(N, text, elems, p);
+    Vec<Str> ff_reset;
 
+    #define EXPECT_NAME(name) sifGetName(text, elems, p, name)
+    #define READ_NAME         sifGetName(text, elems, p)
+    #define EXPECT_OP(op)     sifGetOp  (text, elems, p, op)
+    #define READ_OP           sifGetOp  (text, elems, p)
+    #define PROBE_OP(op)      sifGetOp  (text, elems, p, op, true)
+    #define THROW_UNDEF_SYM(name) Throw(Excp_SifParseError) "[line %_] Undefined symbol: %_", countLineNo(text, elems[p].offset()), name;
+
+
+    EXPECT_NAME("MODULE");
+    Str mod = READ_NAME;
+    EXPECT_OP(';');
     if (module_name)
-        *module_name = elems[1].name(text);
+        *module_name = mod;
 
-    uint p = 3;
+    // Parse statements:
     while (p < elems.size()){
-        if (elems[p].isOp())
-            Throw(Excp_SifParseError) "[line %_] Statement cannot start with operator character: %_", countLineNo(text, elems[p].offset()), elems[p].op();
-
-        Str s = elems[p].name(text);
-        Dump(s);
-        p++;
+        Str s = READ_NAME;
 
         if (eq(s, "INPUT")){
-            if (p >= elems.size() || !elems[p].isName())
-                Throw(Excp_SifParseError) "[line %_] Expected input name.", countLineNo(text, elems[p].offset());
             Wire w = N.add(PI_(N.typeCount(gate_PI)));
-            N.names().add(w, elems[p].name(text));
-            p++;
-
-            /**/WriteLn "Created PI: %_", w;
+            N.names().add(w, READ_NAME);
 
         }else if (eq(s, "ZERO")){
-            if (p >= elems.size() || !elems[p].isName())
-                Throw(Excp_SifParseError) "[line %_] Expected name for constant zero.", countLineNo(text, elems[p].offset());
-            N.names().add(~N.True(), elems[p].name(text));
-            p++;
-
-            /**/WriteLn "Named zero: %n", ~N.True();
+            N.names().add(~N.True(), READ_NAME);
 
         }else if (eq(s, "STATE_PLUS")){
+            Str ff_net = READ_NAME;
+            if (PROBE_OP('[')){
+                Wire w = N.add(Flop_(N.typeCount(gate_Flop)));  // -- add flop
+                N.names().add(w, ff_net);
+                ff_reset.push(READ_NAME);
+                EXPECT_OP(']');
+            }
+            if (PROBE_OP('=')){
+                Wire w = N.names().lookup(ff_net) + N;
+                if (!w) THROW_UNDEF_SYM(ff_net);
+
+                try{
+                    Wire w_in = ss.toGLit(ss.parse()) + N;
+                    if (!w_in) Throw(Excp_SifParseError) "[line %_] Empty expression.", countLineNo(text, elems[p].offset());
+                    w.set(0, w_in);
+                }catch (Excp_XP){
+                    Throw(Excp_SifParseError) "[line %_] Invalid expression.", countLineNo(text, elems[p].offset());
+                }
+            }
+
         }else if (eq(s, "CONSTRAINT")){
+            Str constr_net = READ_NAME;
+            Wire w = N.names().lookup(constr_net) + N;
+            if (!w) THROW_UNDEF_SYM(constr_net);
+
+            Assure_Pob(N, constraints);
+            constraints.push(N.add(PO_(N.typeCount(gate_PO)), w));
+
         }else if (eq(s, "INFINITELY_OFTEN")){
+            Str prop_name = READ_NAME;
+            if (liveness_names)
+                liveness_names->push(String(prop_name));
+
+            Vec<Str> nets;
+            nets.push(READ_NAME);
+            while (PROBE_OP('&'))
+                nets.push(READ_NAME);
+
+            Assure_Pob(N, fair_properties);
+            fair_properties.push();
+            for (uint i = 0; i < nets.size(); i++){
+                Wire w = N.names().lookup(nets[i]) + N;
+                if (!w) THROW_UNDEF_SYM(nets[i]);
+                fair_properties[LAST].push(N.add(PO_(N.typeCount(gate_PO)), w));
+            }
+
         }else if (eq(s, "TEST")){
+            Str test_net = READ_NAME;
+            Wire w = N.names().lookup(test_net) + N;
+            if (!w) THROW_UNDEF_SYM(test_net);
+
+            Assure_Pob(N, properties);
+            properties.push(N.add(PO_(N.typeCount(gate_PO)), w));
+
         }else if (eq(s, "END")){
+            // DONE!
+            break;
+
         }else{
+            EXPECT_OP('=');
+
+            try{
+                Wire w = ss.toGLit(ss.parse()) + N;
+                if (!w) Throw(Excp_SifParseError) "[line %_] Empty expression.", countLineNo(text, elems[p].offset());
+                N.names().add(w, s);
+            }catch (Excp_XP){
+                Throw(Excp_SifParseError) "[line %_] Invalid expression.", countLineNo(text, elems[p].offset());
+            }
         }
 
-        /*tmp*/while (p >= elems.size() || !elems[p].isOp() || elems[p].op() != ';') p++;
-
-        if (p >= elems.size() || !elems[p].isOp() || elems[p].op() != ';')
-            Throw(Excp_SifParseError) "[line %_] Expected ';' after statement.", countLineNo(text, elems[p].offset());
-        p++;
+        EXPECT_OP(';');
     }
 
-    N.write(std_out);
+    // Add reset logic:
+    Add_Pob(N, flop_init);
+    Scoped_Pob(N, fanouts);
+    Wire reset = Wire_NULL;
 
-/*
-Name of: PIs, FFs, Ands, SafetyProps(=POs?), LivenessProps
-*/
+    For_Gatetype(N, gate_Flop, w){
+        if (w == reset) continue;
+        int num = attr_Flop(w).number;
 
-#if 0
-    INPUT  -> PI
-    ZERO  -> name constant
-    STATE_PLUS -> Flop
-    CONSTRAINT -> PO
-    INFINITELY_OFTEN -> POs
-    TEST -> PO
-    name = ... -> And (or Buf or Inv if contains no '&')
+        Wire w_reset = N.names().lookup(ff_reset[num]) + N;
+        if (!w_reset) THROW_UNDEF_SYM(ff_reset[num]);
 
-    namnkrock för POs...
-#endif
+        if (w_reset == N.True())
+            flop_init(w) = l_True;
+        else if (w_reset == ~N.True())
+            flop_init(w) = l_False;
+        else if (type(w_reset) == gate_PI && fanouts[w_reset].size() == 1)
+            flop_init(w) = l_Undef;
+        else{
+            if (!reset){
+                reset = N.add(Flop_(N.typeCount(gate_Flop)), ~N.True());
+                flop_init(reset) = l_True;
+            }
+            Wire w_new = s_Mux(reset, w_reset, w);
+            Fanouts fs = fanouts[w];
+            for (uint i = 0; i < fs.size(); i++)
+                fs[i].replace(w_new);
 
-    // Connect gates:
+            flop_init(w) = l_Undef;
+        }
+    }
 }
 
 
