@@ -876,4 +876,234 @@ void readBlif(String filename, NetlistRef N, bool expect_aig, bool store_names)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// SIF parser:
+
+
+// Replace comments with spaces (preserving newlines). Returns FALSE if 'text' contains an 
+// unterminated block comment.
+static
+bool removeCstyleComments(Array<char> text)
+{
+    char* p   = &text[0];
+    char* end = &text.end();
+
+    while (p != end){
+        if (*p == '/' && p+1 != end && p[1] == '/'){
+            // Space out line comment:
+            for(;;){
+                if (p == end)
+                    break;
+                else if (*p == '\n'){
+                    p++; break;
+                }else
+                    *p++ = ' ';
+            }
+
+        }else if (*p == '/' && p+1 != end && p[1] == '*'){
+            // Space out block comment (preserving newlines):
+            p[0] = p[1] = ' ';
+            p += 2;
+            for(;;){
+                if (p == end)
+                    return false;       // -- unterminated comment
+                else if (*p == '\n')
+                    p++;
+                else if (*p == '*' && p+1 != end && p[1] == '/'){
+                    p[0] = p[1] = ' ';
+                    p += 2;
+                    break;
+                }else
+                    *p++ = ' ';
+            }
+
+        }else
+            p++;
+    }
+
+    return true;
+}
+
+
+static char sif_name_char[256];
+static char sif_token_char[256];
+
+ZZ_Initializer(sif, 0)
+{
+    for (uint i = 0; i < 256; i++) sif_name_char[i] = sif_token_char[i] = 0;
+
+    sif_name_char['_'] = 1;
+    sif_name_char['.'] = 1;
+    sif_name_char['#'] = 1;
+    sif_name_char['%'] = 1;
+    for (uint i = '0'; i <= '9'; i++) sif_name_char[i] = 1;
+    for (uint i = 'A'; i <= 'Z'; i++) sif_name_char[i] = 1;
+    for (uint i = 'a'; i <= 'z'; i++) sif_name_char[i] = 1;
+
+    sif_token_char['['] = 1;
+    sif_token_char[']'] = 1;
+    sif_token_char['('] = 1;
+    sif_token_char[')'] = 1;
+    sif_token_char['='] = 1;
+    sif_token_char['^'] = 1;
+    sif_token_char['&'] = 1;
+    sif_token_char[';'] = 1;
+}
+
+
+class SifToken {
+    uchar opc;
+    uint  len : 24;
+    uint  off;
+
+public:
+    SifToken(uint offset, uint len_, char op = 0) { opc = (uchar)op; len = len_; off = offset; }
+
+    bool isOp  ()         const { return opc != 0; }
+    bool isName()         const { return !isOp(); }
+    Str  name  (Str base) const { return Str(&base[off], len); }
+    char op    ()         const { return (char)opc; }
+    uint offset()         const { return off; }
+};
+
+
+void sifTokenize(Str text, Vec<SifToken>& elems)
+{
+    // A token is either a name or one of the following characters: [ ] ( ) = ^ & ;
+    // A name is either a sequence containing: [0-9] [a-z] [A-Z] _ . # %
+    // or (2) single-quoted: '<arbitary sequence of characters>'.
+
+    cchar* p   = &text[0];
+    cchar* p0  = &text[0];
+    cchar* end = &text.end();
+    uint line_no = 1;
+
+    for(;;){
+        // Skip white-space:
+        while (p != end && isWS(*p)){
+            if (*p == '\n') line_no++;
+            p++;
+        }
+
+        if (p == end)
+            break;      // DONE!
+
+        if (sif_token_char[(uchar)*p]){
+            elems.push(SifToken(p - p0, 1, *p));
+            p++;
+
+        }else if (*p == '\''){
+            p++;
+            cchar* start = p;
+            uint start_line = line_no;
+            while (p != end && *p != '\''){
+                if (*p == '\n') line_no++;
+                p++;
+            }
+            if (p == end)
+                Throw(Excp_SifParseError) "[line %_] Unterminated quoted name starting at line %_.", line_no, start_line;
+
+            elems.push(SifToken(start - p0, p - start));
+            p++;
+
+        }else{
+            cchar* start = p;
+            while (p != end && sif_name_char[(uchar)*p])
+                p++;
+
+            if (p == start)
+                Throw(Excp_SifParseError) "[line %_] Unexpected character: %_", line_no, *p;
+
+            elems.push(SifToken(start - p0, p - start));
+        }
+    }
+}
+
+
+void readSif(String filename, NetlistRef N, String* module_name, Vec<String>* liveness_names)
+{
+    assert(N.empty());
+    Add_Pob(N, strash);
+    N.names().enableLookup();
+
+    // Read file:
+    Array<char> text = readFile(filename);
+    if (!text)
+        Throw(Excp_SifParseError) "Could not open file: %_", filename;
+    removeCstyleComments(text);
+
+    Vec<SifToken> elems;
+    sifTokenize(text, elems);
+
+    if (elems.size() == 0)
+        Throw(Excp_SifParseError) "Empty file: %_", filename;
+    else if (elems.size() < 3 || !elems[0].isName() || !eq(elems[0].name(text), "MODULE") || !elems[1].isName() || !elems[2].isOp() || elems[2].op() != ';')
+        Throw(Excp_SifParseError) "[line %_] A sif-file must always start with \"MODULE <name> ;\".", countLineNo(text, elems[0].offset());
+
+    if (module_name)
+        *module_name = elems[1].name(text);
+
+    uint p = 3;
+    while (p < elems.size()){
+        if (elems[p].isOp())
+            Throw(Excp_SifParseError) "[line %_] Statement cannot start with operator character: %_", countLineNo(text, elems[p].offset()), elems[p].op();
+
+        Str s = elems[p].name(text);
+        Dump(s);
+        p++;
+
+        if (eq(s, "INPUT")){
+            if (p >= elems.size() || !elems[p].isName())
+                Throw(Excp_SifParseError) "[line %_] Expected input name.", countLineNo(text, elems[p].offset());
+            Wire w = N.add(PI_(N.typeCount(gate_PI)));
+            N.names().add(w, elems[p].name(text));
+            p++;
+
+            /**/WriteLn "Created PI: %_", w;
+
+        }else if (eq(s, "ZERO")){
+            if (p >= elems.size() || !elems[p].isName())
+                Throw(Excp_SifParseError) "[line %_] Expected name for constant zero.", countLineNo(text, elems[p].offset());
+            N.names().add(~N.True(), elems[p].name(text));
+            p++;
+
+            /**/WriteLn "Named zero: %n", ~N.True();
+
+        }else if (eq(s, "STATE_PLUS")){
+        }else if (eq(s, "CONSTRAINT")){
+        }else if (eq(s, "INFINITELY_OFTEN")){
+        }else if (eq(s, "TEST")){
+        }else if (eq(s, "END")){
+        }else{
+        }
+
+        /*tmp*/while (p >= elems.size() || !elems[p].isOp() || elems[p].op() != ';') p++;
+
+        if (p >= elems.size() || !elems[p].isOp() || elems[p].op() != ';')
+            Throw(Excp_SifParseError) "[line %_] Expected ';' after statement.", countLineNo(text, elems[p].offset());
+        p++;
+    }
+
+    N.write(std_out);
+
+/*
+Name of: PIs, FFs, Ands, SafetyProps(=POs?), LivenessProps
+*/
+
+#if 0
+    INPUT  -> PI
+    ZERO  -> name constant
+    STATE_PLUS -> Flop
+    CONSTRAINT -> PO
+    INFINITELY_OFTEN -> POs
+    TEST -> PO
+    name = ... -> And (or Buf or Inv if contains no '&')
+
+    namnkrock för POs...
+#endif
+
+    // Connect gates:
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }

@@ -186,6 +186,22 @@ template <class S, class T>
 fts_macro bool eq(const S& s, const T& t) {
     return vecEqual(strSlice(s), strSlice(t)); }
 
+template <class S, size_t len>
+fts_macro bool eq(const S& s, cchar t[len]) {
+    for (uind i = 0; i < s.size(); i++)
+        if (s[i] != t[i] || t[i] == 0) return false;
+    return true; }
+
+template <class S, size_t len>
+fts_macro bool eq(cchar t[len], const S& s) {
+    return eq(s, t); }
+
+template <class S>
+fts_macro bool pfx(const S& text, cchar* pfx) {
+    for (uind i = 0; pfx[i]; i++)
+        if (i == text.size() || text[i] != pfx[i]) return false;
+    return true; }
+
 template <class S, class T>
 fts_macro bool pfx(const S& text, const T& pfx) {
     return vecHasPrefix(strSlice(text), strSlice(pfx)); }
@@ -680,6 +696,9 @@ macro uind countLineNo(Str text, uind offset)
             line++;
     return line;
 }
+
+macro uind countLineNo(Str text, Str inside_text) {
+    return countLineNo(text, inside_text.base() - text.base()); }
 
 macro uind countLineNo(In& in) {    // -- must be an in-memory stream
     return countLineNo(slice(in), in.tell()); }

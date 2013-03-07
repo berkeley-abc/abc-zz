@@ -16,3 +16,6 @@
 #ifndef ZZ__Bip__Cube_hh
 #include "ZZ/Bip/Common/Cube.hh"
 #endif
+#ifndef ZZ__Bip__Common__Ltl_hh
+#include "ZZ/Bip/Common/Ltl.hh"
+#endif

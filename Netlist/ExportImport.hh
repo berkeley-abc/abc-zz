@@ -26,6 +26,7 @@ using namespace std;
 
 Declare_Exception(Excp_AigerParseError);
 Declare_Exception(Excp_BlifParseError);
+Declare_Exception(Excp_SifParseError);
 
 void writeTaig(Out& out, NetlistRef N);
 void writeTaig(String filename, NetlistRef N);
@@ -46,6 +47,9 @@ void makeAllOutputsProperties(NetlistRef N);
 
 void readBlif(String filename, NetlistRef N, bool expect_aig, bool store_names);
     // -- read a flat BLIF file, which must be either an AIG or a 4-input LUT netlist.
+
+void readSif(String filename, NetlistRef N, String* module_name = NULL, Vec<String>* liveness_names = NULL);
+    // -- throws 'Excp_SifParseError' if the file could not be opened or on parse error.
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
