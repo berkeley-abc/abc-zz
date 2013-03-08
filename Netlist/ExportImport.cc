@@ -884,7 +884,7 @@ void readBlif(String filename, NetlistRef N, bool expect_aig, bool store_names)
 // -- Tokenizer:
 
 
-// Replace comments with spaces (preserving newlines). Returns FALSE if 'text' contains an 
+// Replace comments with spaces (preserving newlines). Returns FALSE if 'text' contains an
 // unterminated block comment.
 static
 bool removeCstyleComments(Array<char> text)
@@ -1038,8 +1038,8 @@ struct SifStream : XP_TokenStream {
     SifStream(NetlistRef N_, Array<char> text_, const Vec<SifToken>& elems_, uind& p_) :
         N(N_), text(text_), elems(elems_), p(p_) {}
 
-    GLit  toGLit(void* expr) const { return GLit(packed_, (uint)expr); }
-    void* toExpr(GLit w)     const { return (void*)w.data(); }
+    GLit  toGLit(void* expr) const { return GLit(packed_, (uint)(uintp)expr); }
+    void* toExpr(GLit w)     const { return (void*)(uintp)w.data(); }
 
     bool parseOp(uint& op_tag, uint& pos, XP_OpType& type, int& prio) {
         if (p < elems.size() && elems[p].isOp()){
