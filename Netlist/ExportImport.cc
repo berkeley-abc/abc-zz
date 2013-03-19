@@ -1138,6 +1138,18 @@ char sifGetOp(const Array<char>& text, const Vec<SifToken>& elems, uind& p, char
 }
 
 
+/*
+Not yet supported:
+
+   LIVELOCK RWADR0;  // property which fails if the following does not hold AG AF !RWADR0 
+   FAIRNESS signalF; // constrains a LIVELOCK counterexample: signalF must hold at least once in the failing lasso loop 
+   ARRAY {R,W} #address_pins #columns #rows I{0,1,X initial value string of width #columns} {array_name}
+   ARRAY_PIN {array_name} {R,W,I} #port_num {E,A,D} #pin_num {signal_name_being_connected};
+
+   && for XOR
+   | for OR
+*/
+
 void readSif(String filename, NetlistRef N, String* module_name, Vec<String>* liveness_names)
 {
     assert(N.empty());

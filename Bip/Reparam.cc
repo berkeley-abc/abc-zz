@@ -57,10 +57,7 @@ bool analyzeRegion(NetlistRef N, const WZet& area, const WZet& int_pi, const WZe
                     val(w) = (bool)val[w[0]] ^ sign(w[0]);
             }
             seen[val[area.list()[0]]] = true;
-
-            //**/Write "%_", (uint)val[area.list()[0]];
         }
-        //**/NewLine;
         if (!seen[0] || !seen[1])
             return false;
     }
@@ -88,7 +85,7 @@ void reparamRegion(Wire w_dom, NetlistRef N_recons)
         }                                                   \
     }while(0)
 
-    // Compute dominator area: (not including 'w_dom' itself) (unless it is a flop in its own fanin cone)
+    // Compute dominator area:
     assert(type(w_dom) != gate_Flop);
     area.add(+w_dom);
     for (uind i = 0; i < area.size(); i++){
@@ -105,6 +102,15 @@ void reparamRegion(Wire w_dom, NetlistRef N_recons)
     }
     assert(int_pi.size() > 0);
 
+    // Store current external PIs:
+    WZet tmp;
+    for (uind i = 0; i < area.size(); i++){
+        Wire w = area.list()[i];
+        For_Inputs(w, v)
+            if (!area.has(v))
+                tmp.add(+v);
+    }
+
     // Remove nodes from 'area' not in the fanout cone of an internal PI:
     for (uind i = area.size(); i > 0;){ i--;
         Wire w = area.list()[i];
@@ -113,11 +119,11 @@ void reparamRegion(Wire w_dom, NetlistRef N_recons)
                 if (area.has(v))
                     goto Keep;
             area.exclude(w);
-            //**/WriteLn "Filtered: %_", w;
           Keep:;
         }
     }
     area.compact();
+
 
     // Extract external PIs:
     for (uind i = 0; i < area.size(); i++){
@@ -127,9 +133,11 @@ void reparamRegion(Wire w_dom, NetlistRef N_recons)
                 ext_pi.add(+v);
     }
 
+    if (tmp.size() < ext_pi.size()){
+        swp(tmp, ext_pi); }
+
     // <<== Grow area here to capture more reconvergence
 
-    //**/writeDot("last_reparam.dot", N, area);
     bool result = analyzeRegion(N, area, int_pi, ext_pi);
     if (result){
         int num = attr_PI(int_pi.list()[0]).number;
@@ -174,7 +182,6 @@ void reparam(NetlistRef N, const Params_Reparam& P, NetlistRef N_recons)
             gate_id d  = dom[N[d0]];
             while (d != d0){
                 if (d < N.size()){
-                    //**/WriteLn "PI# %_ (%_) dominated by %_", attr_PI(w).number, w, N[d];
                     cands.add(N[d]);
                     d0 = d;
                     d = dom[N[d0]];
@@ -182,11 +189,8 @@ void reparam(NetlistRef N, const Params_Reparam& P, NetlistRef N_recons)
                     break;
             }
 
-        }else if (cands.has(w)){
-            //**/WriteLn "----------------------------------------";
-            //**/WriteLn "PI dominator: %_", w;
+        }else if (cands.has(w))
             reparamRegion(w, N_recons);
-        }
     }
 
     For_Gatetype(N, gate_PI, w)
@@ -242,9 +246,6 @@ void reconstructCex(NetlistRef M, CCex& cex)  // + output netlist!
         For_Gatetype(M, gate_PO, w){
             int   num = attr_PO(w).number;
             lbool val = cex.inputs[d][num];
-//**/if (!(val == l_False || val == l_True)){
-//**/    Dump(num, w, d, cex.inputs[d].size());
-//**/}
             assert(val == l_False || val == l_True);
             Lit   p   = C.clausify(w);
             assumps.push(p ^ (val == l_False));
@@ -252,22 +253,11 @@ void reconstructCex(NetlistRef M, CCex& cex)  // + output netlist!
 
         lbool result = S.solve(assumps); assert(result == l_True);
 
-        /**/Write "frame %>2%_: ", d;
-        /**/for (uint num = 0; num < cex.inputs[d].size(); num++)
-        /**/    Write "%_", cex.inputs[d][num];
-        /**/NewLine;
-
         For_Gatetype(M, gate_PI, w){
             Lit   p   = C.clausify(w);
             lbool val = S.value(p);
             cex.inputs[d](attr_PI(w).number) = (val != l_Undef) ? val : l_False;
         }
-
-        /**/Write "frame %>2%_: ", d;
-        /**/for (uint num = 0; num < cex.inputs[d].size(); num++)
-        /**/    Write "%_", cex.inputs[d][num];
-        /**/NewLine;
-        /**/NewLine;
     }
 }
 

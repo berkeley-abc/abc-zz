@@ -661,13 +661,16 @@ void parseSif(String input, NetlistRef N)
     int ret ___unused = system(cmd.c_str());
     try{
         readAigerFile(tmp_file, N);
+#if 1
         unlink(tmp_file.c_str());
+#else
+        WriteLn "Wrote: %_", tmp_file;
+        exit(0);
+#endif
     }catch (Excp_AigerParseError err){
         ShoutLn "PARSE ERROR! %_", err.msg;
         exit(1);
     }
-
-//    For_Gatetype(N, gate_PO, w) w.set(0, ~w[0]);    // -- invert properties
 }
 
 
