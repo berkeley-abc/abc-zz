@@ -190,7 +190,7 @@ EXAMPLE:
 // 'output' will recreate the log as it is being replay. This may catch mismatches when debugging.
 // 'echo': 0=silent, 1=short, 2=long
 template<bool pfl>
-void replayTrace(MiniSat<pfl>& S, String input, String output, uint echo)
+void replayTrace(MiniSat<pfl>& S, String input, OutFile* out, uint echo)
 {
     S.verbosity = (echo <= 1) ? 0 : 1;
 
@@ -198,12 +198,6 @@ void replayTrace(MiniSat<pfl>& S, String input, String output, uint echo)
     if (in.null()) Throw(Excp_ParseError) "Could not open file: %_", input;
     Vec<char> buf;
     Vec<Lit>  ps;
-
-    OutFile* out = NULL;
-    if (output != ""){
-        out = new OutFile(output);
-        S.debug_api_out = out;
-    }
 
     uint line_no = 0;
     try{
@@ -395,6 +389,12 @@ void runRandomTests(SatPfl& S, uint n_tests, uint n_assumps, ProofCheck& pc)
 // Run SAT solver
 
 
+void flushMst(void* data)
+{
+    ((File*)data)->close();
+}
+
+
 template<bool pfl>
 void runSat(const CLI& C)
 {
@@ -410,12 +410,13 @@ void runSat(const CLI& C)
         if (mst != ""){
             mst_out = new OutFile(mst);
             S.debug_api_out = mst_out;
+            atExit(x_Always, flushMst, &mst_out->writer);
         }
 
         S.verbosity = (uint)C.get("verbosity").int_val;
 
         if (hasSuffix(input, ".mst"))
-            replayTrace(S, input, C.get("mst").string_val, (uint)C.get("echo").int_val);
+            replayTrace(S, input, mst_out, (uint)C.get("echo").int_val);
 
         else{
             // Parse assumptions:

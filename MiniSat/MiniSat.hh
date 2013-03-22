@@ -354,18 +354,22 @@ template<bool pfl>
 inline Var MiniSat<pfl>::addVar()
 {
     if (debug_api_out)
-        *debug_api_out |= "addVar()";
+        *debug_api_out &= "addVar()";
 
+    Var ret;
 #if 1   // <<== turn of variable recycling temporarily (debugging)
     if (free_vars.size() > 0)
-        return free_vars.popLastC();
-    else
+        ret = free_vars.popLastC();
 #endif
     {
-        Var ret = nVars();
+        ret = nVars();
         newVar();
-        return ret;
     }
+
+    if (debug_api_out)
+        *debug_api_out |= " # %_", (uint)ret;
+
+    return ret;
 }
 
 
