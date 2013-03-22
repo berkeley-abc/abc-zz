@@ -1038,8 +1038,8 @@ struct SifStream : XP_TokenStream {
     SifStream(NetlistRef N_, Array<char> text_, const Vec<SifToken>& elems_, uind& p_) :
         N(N_), text(text_), elems(elems_), p(p_) {}
 
-    GLit  toGLit(void* expr) const { return GLit(packed_, (uint)expr); }
-    void* toExpr(GLit w)     const { return (void*)w.data(); }
+    GLit  toGLit(void* expr) const { return GLit(packed_, (uint)(uintp)expr); }
+    void* toExpr(GLit w)     const { return (void*)(uintp)w.data(); }
 
     bool parseOp(uint& op_tag, uint& pos, XP_OpType& type, int& prio) {
         if (p < elems.size() && elems[p].isOp()){

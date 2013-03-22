@@ -146,6 +146,11 @@ template<> fts_macro void write_(Out& out, const int64&  num) { printInt (out, n
 template<> fts_macro void write_(Out& out, const int32&  num) { printInt (out, num); }
 template<> fts_macro void write_(Out& out, const int16&  num) { printInt (out, num); }
 
+#if defined(__APPLE__) && defined(ZZ_LP64)
+template<> fts_macro void write_(Out& out, const unsigned long& num) { printUInt(out, (uint64)num); }
+template<> fts_macro void write_(Out& out, const long&          num) { printInt (out, (int64)num); }
+#endif
+
 // Booleans:
 template<> fts_macro void write_(Out& out, const bool&  b) { if (b){ out += 't', 'r', 'u', 'e'; }else{ out += 'f', 'a', 'l', 's', 'e'; } }
 template<> fts_macro void write_(Out& out, const lbool& b) { out += name(b); }

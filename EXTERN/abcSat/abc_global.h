@@ -149,7 +149,8 @@ typedef int ABC_PTRINT_T;
 #if       defined(__ccdoc__)
 typedef platform_dependent_type ABC_INT64_T;
 #elif     defined(LIN64)
-typedef long ABC_INT64_T;
+//typedef long ABC_INT64_T;
+typedef long long ABC_INT64_T;
 #elif     defined(NT64) || defined(LIN)
 typedef long long ABC_INT64_T;
 #elif     defined(WIN32) || defined(NT)
@@ -164,7 +165,8 @@ typedef signed __int64 ABC_INT64_T;
 #if       defined(__ccdoc__)
 typedef platform_dependent_type ABC_UINT64_T;
 #elif     defined(LIN64)
-typedef unsigned long ABC_UINT64_T;
+//typedef unsigned long ABC_UINT64_T;
+typedef unsigned long long ABC_UINT64_T;
 #elif     defined(NT64) || defined(LIN)
 typedef unsigned long long ABC_UINT64_T;
 #elif     defined(WIN32) || defined(NT)

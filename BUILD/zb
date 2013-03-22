@@ -207,12 +207,21 @@ def magic():
 
 
 def zb_is_running():
-    with os.popen("ps a -f", "r") as p:
-        for t in p:
-            #een       9190 11941  1 11:24 pts/12   S+     0:00 python /home/een/bin/nnn/zb
-            ts = t.split()
-            if ts[-1].endswith("/zb") and int(ts[1]) != os.getpid():
-                return True
+    if os_name != "Darwin":
+        with os.popen("ps a -f", "r") as p:
+            for t in p:
+                #een       9190 11941  1 11:24 pts/12   S+     0:00 python /home/een/bin/nnn/zb
+                ts = t.split()
+                if ts[-1].endswith("/zb") and int(ts[1]) != os.getpid():
+                    return True
+    else:
+        with os.popen("ps a", "r") as p:
+            for t in p:
+                # 1784 s001  Ss     0:00.02 login -pfl een /bin/bash -c exec -la bash /bin/bash
+                ts = t.split()
+                if ts[-1].endswith("/zb") and int(ts[0]) != os.getpid():
+                    return True
+
     return False
 
 

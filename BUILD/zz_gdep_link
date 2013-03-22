@@ -79,7 +79,7 @@ def build_stub(objs, output_filename):
     # Collect symbols:
     syms = []
     r = re.compile(r".*((ZZ_Initializer|ZZ_Finalizer)_.*)_instance.")
-    with os.popen("nm " + " ".join(objs), "r") as f:
+    with os.popen("nm 2>/dev/null " + " ".join(objs), "r") as f:
         for line in f:
             m = r.match(line)
             if m:
