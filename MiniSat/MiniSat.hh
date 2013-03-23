@@ -367,7 +367,7 @@ inline Var MiniSat<pfl>::addVar()
     }
 
     if (debug_api_out)
-        *debug_api_out |= " # %_", (uint)ret;
+        *debug_api_out |= " # x%_", (uint)ret;
 
     return ret;
 }

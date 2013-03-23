@@ -1707,7 +1707,8 @@ int main(int argc, char** argv)
         for (uint i = 0; i < props.size(); i++)
             bad.push(~props[i]);
 
-        constrExtr(N, bad, k, l);
+        Vec<Cube> eq_classes;
+        constrExtr(N, bad, k, l, eq_classes);
     }
 
     return 0;

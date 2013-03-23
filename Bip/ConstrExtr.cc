@@ -323,43 +323,63 @@ bool Invar::refineInduct(Vec<Vec<GLit> >& cands)
 //=================================================================================================
 
 
-void constrExtr(NetlistRef N, const Vec<GLit>& bad, uint k, uint l)
+void constrExtr(NetlistRef N, const Vec<GLit>& bad, uint k, uint l, /*out*/Vec<Cube>& eq_classes)
 {
     //**/writeAigerFile("tmp.aig", N);
     double T0 = cpuTime();
 
-#if 0
     Vec<Vec<GLit> > cands_fwd;
     Vec<Vec<GLit> > cands_bwd;
 
-    Invar invar(N, k, bad, false);
-    Invar cnstr(N, l, bad, true);
+    WWMap rep;
+    For_Gates(N, w)
+        rep(w) = w;
 
-    WriteLn "FORWARD: Computing initial candidates...";
-    invar.getFirst(cands_fwd);
+    if (k != UINT_MAX){
+        Invar invar(N, k, bad, false);
 
-    NewLine;
-    WriteLn "FORWARD: Refining classes...";
-    invar.refine(cands_fwd);
+        WriteLn "FORWARD: Computing initial candidates...";
+        invar.getFirst(cands_fwd);
 
-    NewLine;
-    WriteLn "FORWARD: Finalizing classes by 1-induction...";
-    while (invar.refineInduct(cands_fwd));
+        NewLine;
+        WriteLn "FORWARD: Refining classes...";
+        invar.refine(cands_fwd);
 
-    WriteLn "----------------------------------------";
-    WriteLn "BACKWARD: Computing initial candidates...";
-    cnstr.getFirst(cands_bwd);
+        NewLine;
+        WriteLn "FORWARD: Finalizing classes by 1-induction...";
+        while (invar.refineInduct(cands_fwd));
 
-    NewLine;
-    WriteLn "BACKWARD: Refining classes...";
-    cnstr.refine(cands_bwd);
+        for (uint i = 0; i < cands_fwd.size(); i++){
+            for (uint j = 0; j < cands_fwd[i].size(); j++)
+                rep(cands_fwd[i][j]) = cands_fwd[i][0];
+        }
+    }
 
-    NewLine;
-    WriteLn "BACKWARD: Finalizing classes by 1-induction...";
-    while (cnstr.refineInduct(cands_bwd));
+    if (k != UINT_MAX && l != UINT_MAX)
+        WriteLn "----------------------------------------";
+
+    if (l != UINT_MAX){
+        Invar cnstr(N, l, bad, true);
+        WriteLn "BACKWARD: Computing initial candidates...";
+        cnstr.getFirst(cands_bwd);
+
+        NewLine;
+        WriteLn "BACKWARD: Refining classes...";
+        cnstr.refine(cands_bwd);
+
+        NewLine;
+        WriteLn "BACKWARD: Finalizing classes by 1-induction...";
+        while (cnstr.refineInduct(cands_bwd));
+
+        for (uint i = 0; i < cands_bwd.size(); i++){
+            for (uint j = 0; j < cands_bwd[i].size(); j++)
+                rep(cands_bwd[i][j]) = cands_bwd[i][0];
+        }
+    }
 
     WriteLn "CPU Time: %t", cpuTime() - T0;
 
+#if 0
     // For debugging -- add constraints to netlist and write it out:
     Assure_Pob(N, constraints);
     for (uint type = 0; type < 2; type++){
@@ -376,39 +396,6 @@ void constrExtr(NetlistRef N, const Vec<GLit>& bad, uint k, uint l)
 
     N.write("constr.gig");
     WriteLn "Wrote: \a*constr.gig\a*";
-
-#else
-    Get_Pob(N, fair_properties);
-
-    assert(fair_properties.size() == 1);
-  #if 0
-    Wire junc = N.True();
-    for (uint i = 0; i < fair_properties[0].size(); i++)
-        junc = s_And(junc, fair_properties[0][i]);
-  #else
-    Wire junc = ~N.True();
-    for (uint i = 0; i < fair_properties[0].size(); i++)
-        junc = s_Or(junc, fair_properties[0][i]);
-  #endif
-    N.add(PO_(), junc);
-
-    Vec<Vec<GLit> > cands_bwd;
-    Vec<GLit> prop(1, junc);
-    Invar cnstr(N, l, prop, true);
-
-    WriteLn "----------------------------------------";
-    WriteLn "BACKWARD PROP: Computing initial candidates...";
-    cnstr.getFirst(cands_bwd);
-
-    NewLine;
-    WriteLn "BACKWARD PROP: Refining classes...";
-    cnstr.refine(cands_bwd);
-
-    NewLine;
-    WriteLn "BACKWARD PROP: Finalizing classes by 1-induction...";
-    while (cnstr.refineInduct(cands_bwd));
-
-    WriteLn "CPU Time: %t", cpuTime() - T0;
 #endif
 }
 

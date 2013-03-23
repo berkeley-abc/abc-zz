@@ -425,6 +425,8 @@ Wire ImcTrace::approxImage(Wire s, uint k)
 
     Vec<Var> vs_kept;
     S.removeVars(vs, vs_kept);
+    //**/Dump(vs);
+    //**/Dump(vs_kept);
 
     return ret;
 }

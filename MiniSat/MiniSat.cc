@@ -462,6 +462,11 @@ void MiniSat<pfl>::newClause(const Vec<Lit>& ps_, clause_id id)
 {
     if (!ok) return;
 
+#if defined(ZZ_DEBUG)
+    for (uind i = 0; i < ps_.size(); i++)
+        assert(hasVar(var(ps_[i])));
+#endif
+
     bool learnt = (id != clause_id_NULL);
     vt += 30;       // -- just a crude approximation
 
