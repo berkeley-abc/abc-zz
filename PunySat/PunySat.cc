@@ -23,6 +23,26 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Helpers:
+
+
+static inline   // -- (inline because Sun can't handle static functions called from template code correctly)
+uint lubyLog(uint x)
+{
+    uint size, seq;
+    for (size = 1, seq = 0; size <= x; seq++, size = 2*size + 1);
+
+    while (x != size - 1){
+        size >>= 1;
+        seq--;
+        if (x >= size) x-= size;
+    }
+
+    return seq;
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // PunySat:
 
 
@@ -41,6 +61,8 @@ class PunySat {
     bool        ok;
     BV          assign;
     Vec<BV>     clauses;                // -- 'clauses[0]' is reserved ('cla_id == 0' is used as null value).
+    Vec<float>  c_activ;                // activities for clauses
+    double      cla_incr;
     uint        first_learned;
                                         // NOTE! Stored with literals negated!
     Vec<cla_id> occurs[BV::max_lits];
@@ -58,12 +80,15 @@ class PunySat {
 
     PQueue      order;
     double      activ [BV::max_vars];
+    uchar       polar [BV::max_vars];
     double      var_incr;
 
     BV          tmp;
 
     void    bumpVar(var_t x);
+    void    bumpCla(cla_id id);
     void    rescaleVarAct();
+    void    rescaleClaAct();
     void    decayVarAct() { var_incr *= (1.0 / 0.95); }
     void    clDoneLearned();
     void    undo(uint lv);
@@ -159,9 +184,11 @@ PS_(void) clear()
     dlev     = 0;
     first_learned = UINT_MAX;
     var_incr = 1.0;
+    cla_incr = 1.0;
 
     clauses.clear();
     clauses.push();
+    c_activ.push(0);
 
     for (uint p = 0; p < BV::max_lits; p++)
         occurs[p].clear();
@@ -175,6 +202,7 @@ PS_(void) clear()
         tr_lim[x] = 0;
         seen  [x] = 0;
         activ [x] = 0.0f;
+        polar [x] = 1;
     }
 
     tmp.clear();
@@ -198,6 +226,7 @@ PS_(void) clDone()
     else{
         cla_id id = clauses.size(); assert_debug(id == clauses.size()); // -- if fails, we ran out of clause IDs and need to use a bigger type    <<== throw exception so that problem can be rerun on bigger solver?
         clauses.push(tmp);
+        c_activ.push(0.0f);
         while (tmp){
             lit_t p = tmp.pop();
             occurs[p].push(id);
@@ -221,11 +250,27 @@ PS_inline(void) bumpVar(var_t x)
 }
 
 
+PS_inline(void) bumpCla(cla_id id)
+{
+    c_activ[id] += cla_incr;
+    if (c_activ[id] > 1e20)
+        rescaleClaAct();
+}
+
+
 PS_(void) rescaleVarAct()
 {
     for (uint i = 0; i < BV::max_vars; i++)
         activ[i] *= 1e-100;
     var_incr *= 1e-100;
+}
+
+
+PS_(void) rescaleClaAct()
+{
+    for (uint i = 0; i < clauses.size(); i++)
+        c_activ[i] *= 1e-20;
+    cla_incr *= 1e-20;
 }
 
 
@@ -261,6 +306,8 @@ PS_(void) clDoneLearned()
 
         id = clauses.size(); assert_debug(id == clauses.size()); // -- if fails, we ran out of clause IDs and need to use a bigger type    <<== throw exception so that problem can be rerun on bigger solver?
         clauses.push(tmp);
+        c_activ.push(0.0f);
+        bumpCla(id);
         while (tmp){
             lit_t p = tmp.pop();
             occurs[p].push(id);
@@ -277,15 +324,12 @@ PS_(void) undo(uint lv)
     // <<== can do this more efficiently by storing the entire assignment when creating new decision level
     if (dlev > lv){
         for (uint i = trail_sz; i > tr_lim[lv];){ i--;
-            /**/BV prev = assign;
-            assign.remove(trail[i]);
-            //**/WriteLn "prev=%_  assign=%_  trail[i]=%_", prev, assign, lit(trail[i]);
-            /**/assert(prev != assign);
-            order.weakAdd(BV::var(trail[i]));
-#if 0  // <<==later
-            if (i < trail_lim.last())
-                polarity[x] = trail[i].sign;
-#endif
+            lit_t q = trail[i];
+            var_t x = BV::var(q);
+            assign.remove(q);
+            order.weakAdd(x);
+            if (i < tr_lim[dlev])
+                polar[x] = BV::sign(q);
         }
         dlev = lv;
         trail_sz = tr_lim[lv];
@@ -341,7 +385,7 @@ PS_(bool) makeDecision()
 
     tr_lim[dlev] = trail_sz;
     dlev++;
-    enqueueQ(BV::mkLit(x), 0);      // <<== polarity heuristic goes here
+    enqueueQ(polar[x] ? BV::mkNeg(x) : BV::mkLit(x), 0);
     return true;
 #endif
 }
@@ -445,28 +489,36 @@ PS_(void) reduceDB()
 
 PS_(lbool) solve()
 {
-    uint max_learned = clauses.size() * 2;
-
     first_learned = clauses.size();
-    for(;;){
-        cla_id confl = propagate();
-        if (confl != 0){
-            if (dlev == 0){
-                ok = false;
-                clauses.shrinkTo(first_learned);
-                return l_False; }
 
-            analyzeConflict(confl);
+    for (uint n = 0;; n++){
+        double conflict_lim = pow(2, (double)lubyLog(n)) * 100;
+        double learned_lim = first_learned / 3 * pow(1.1, log((n_conflicts + conflict_lim) / first_learned) / log(1.5));
 
-            if (clauses.size() - first_learned >= max_learned)
-                reduceDB();
+        for(uint c = 0;; c++){
+            cla_id confl = propagate();
+            if (confl != 0){
+                if (dlev == 0){
+                    ok = false;
+                    clauses.shrinkTo(first_learned);
+                    return l_False; }
 
-            decayVarAct();
+                analyzeConflict(confl);
+                decayVarAct();
 
-        }else{
-            if (!makeDecision()){
-                clauses.shrinkTo(first_learned);
-                return l_True; }
+            }else{
+                if (c >= conflict_lim){
+                    /**/putchar('R'); fflush(stdout);
+                    undo(0);
+                    break; }        // -- break
+
+                if (clauses.size() - first_learned >= learned_lim)
+                    reduceDB();
+
+                if (!makeDecision()){
+                    clauses.shrinkTo(first_learned);
+                    return l_True; }
+            }
         }
     }
 
@@ -617,11 +669,11 @@ void punySatTest(int argc, char** argv)
 x16:  12.8 s   (512 vars)
 x32:  17.1 s   (1024 vars)
 
-variable activity
 clause activity
 proper reduce DB
-restarts
 watcher lists?
+restarts
+polartity heur
 */
 
 
