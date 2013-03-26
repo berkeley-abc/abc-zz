@@ -112,14 +112,14 @@ public:
         dst.get_id = get_id; }
 
     // Minor operations:
-    uind   size      () const     { return heap.size(); }
-    ElemT  peek      () const     { assert(size() > 0); return heap[0]; }
-    Prio_  peekPrio  () const     { assert(size() > 0); return (*prio)[get_id(heap[0])]; }
-    ElemT  pop       ()           { assert(size() > 0); id2pos[get_id(heap[0])] = UINT_MAX; ElemT tmp = heap.last(), ret = heap[0]; heap.pop(); if (size() > 0) siftDown(0, tmp); return ret; }
-    void   remove    (ElemT elem) { uind id = get_id(elem); assert(has(elem)); uind pos = id2pos[id]; id2pos[id] = UINT_MAX; ElemT tmp = heap.last(); heap.pop(); if (size() > pos){ siftUp(pos, tmp); siftDown(id2pos[get_id(tmp)], tmp); } }
-    void   add       (ElemT elem) { assert(!has(elem)); heap.push(); siftUp(heap.size() - 1, elem); }
-    bool   weakInsert(ElemT elem) { if (has(elem)) return false; heap.push(); siftUp(heap.size() - 1, elem); return true; }     // -- returns TRUE if element was inserted, FALSE if it already existed.
-    bool   has       (ElemT elem) { uind id = get_id(elem); return (uind(id) < id2pos.size() && id2pos[id] != UINT_MAX); }
+    uind   size    () const     { return heap.size(); }
+    ElemT  peek    () const     { assert(size() > 0); return heap[0]; }
+    Prio_  peekPrio() const     { assert(size() > 0); return (*prio)[get_id(heap[0])]; }
+    ElemT  pop     ()           { assert(size() > 0); id2pos[get_id(heap[0])] = UINT_MAX; ElemT tmp = heap.last(), ret = heap[0]; heap.pop(); if (size() > 0) siftDown(0, tmp); return ret; }
+    void   remove  (ElemT elem) { uind id = get_id(elem); assert(has(elem)); uind pos = id2pos[id]; id2pos[id] = UINT_MAX; ElemT tmp = heap.last(); heap.pop(); if (size() > pos){ siftUp(pos, tmp); siftDown(id2pos[get_id(tmp)], tmp); } }
+    void   add     (ElemT elem) { assert(!has(elem)); heap.push(); siftUp(heap.size() - 1, elem); }
+    bool   weakAdd (ElemT elem) { if (has(elem)) return false; heap.push(); siftUp(heap.size() - 1, elem); return true; }     // -- returns TRUE if element was inserted, FALSE if it already existed.
+    bool   has     (ElemT elem) { uind id = get_id(elem); return (uind(id) < id2pos.size() && id2pos[id] != UINT_MAX); }
 
     // Update when at most one node has changed (pre-condition):
     void   updateIncreased(ElemT elem) { uind id = get_id(elem); assert(has(elem)); if (max_heap) siftUp  (id2pos[id], elem); else siftDown(id2pos[id], elem); }

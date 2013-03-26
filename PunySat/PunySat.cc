@@ -14,6 +14,7 @@
 #include "Prelude.hh"
 #include "ZZ_CmdLine.hh"
 #include "ZZ/Generics/Lit.hh"
+#include "ZZ/Generics/IdHeap.hh"
 
 namespace ZZ {
 using namespace std;
@@ -35,6 +36,8 @@ class PunySat {
     typedef typename BV::var_t var_t;
     enum { lit_NULL = BV::max_lits };
 
+    typedef IdHeap<double,1,double[BV::max_vars]> PQueue;
+
     bool        ok;
     BV          assign;
     Vec<BV>     clauses;                // -- 'clauses[0]' is reserved ('cla_id == 0' is used as null value).
@@ -53,8 +56,16 @@ class PunySat {
 
     uchar       seen  [BV::max_vars];
 
+    PQueue      order;
+    double      activ [BV::max_vars];
+    double      var_incr;
+
     BV          tmp;
 
+    void    bumpVar(var_t x);
+    void    rescaleVarAct();
+    void    decayVarAct() { var_incr *= (1.0 / 0.95); }
+    void    clDoneLearned();
     void    undo(uint lv);
     void    enqueueQ(lit_t p, cla_id from);
     bool    enqueue(lit_t p, cla_id from);
@@ -73,14 +84,14 @@ public:
     void    clAddPos(var_t var) { tmp.add(BV::mkNeg(var)); }   // -- intentionally flipping sign
     void    clAddNeg(var_t var) { tmp.add(BV::mkLit(var)); }
     void    clDone();
-    void    clDoneLearned();
 
     lbool   solve();
 
-    void writeCompactCnf(String filename, String mapfile);      // -- for debugging mostly
+    void    writeCompactCnf(String filename, String mapfile);      // -- for debugging mostly
 };
 
 #define PS_(type) template<class BV, class cla_id> type PunySat<BV, cla_id>::
+#define PS_inline(type) template<class BV, class cla_id> inline type PunySat<BV, cla_id>::
     // -- template types are so tiresome...
 
 
@@ -142,6 +153,7 @@ PS_(void) clear()
     qhead    = 0;
     dlev     = 0;
     first_learned = UINT_MAX;
+    var_incr = 1.0;
 
     clauses.clear();
     clauses.push();
@@ -157,9 +169,12 @@ PS_(void) clear()
         trail [x] = 0;
         tr_lim[x] = 0;
         seen  [x] = 0;
+        activ [x] = 0.0f;
     }
 
     tmp.clear();
+
+    order.prio = &activ;
 }
 
 
@@ -174,8 +189,34 @@ PS_(void) clDone()
     else{
         cla_id id = clauses.size(); assert_debug(id == clauses.size()); // -- if fails, we ran out of clause IDs and need to use a bigger type    <<== throw exception so that problem can be rerun on bigger solver?
         clauses.push(tmp);
-        while (tmp) occurs[tmp.pop()].push(id);
+        while (tmp){
+            lit_t p = tmp.pop();
+            occurs[p].push(id);
+            order.weakAdd(BV::var(p));
+        }
     }
+}
+
+
+//=================================================================================================
+// -- Private:
+
+
+PS_inline(void) bumpVar(var_t x)
+{
+    activ[x] += var_incr;
+    if (activ[x] > 1e100)
+        rescaleVarAct();
+    if (order.has(x))
+        order.update(x);
+}
+
+
+PS_(void) rescaleVarAct()
+{
+    for (uint i = 0; i < BV::max_vars; i++)
+        activ[i] *= 1e-100;
+    var_incr *= 1e-100;
 }
 
 
@@ -211,14 +252,14 @@ PS_(void) clDoneLearned()
 
         id = clauses.size(); assert_debug(id == clauses.size()); // -- if fails, we ran out of clause IDs and need to use a bigger type    <<== throw exception so that problem can be rerun on bigger solver?
         clauses.push(tmp);
-        while (tmp) occurs[tmp.pop()].push(id);
+        while (tmp){
+            lit_t p = tmp.pop();
+            occurs[p].push(id);
+            bumpVar(BV::var(p));
+        }
     }
     ok &= enqueue(BV::neg(p0), id);   // -- neg to undo inversion in clAdd
 }
-
-
-//=================================================================================================
-// -- Private:
 
 
 PS_(void) undo(uint lv)
@@ -231,11 +272,10 @@ PS_(void) undo(uint lv)
             assign.remove(trail[i]);
             //**/WriteLn "prev=%_  assign=%_  trail[i]=%_", prev, assign, lit(trail[i]);
             /**/assert(prev != assign);
+            order.weakAdd(BV::var(trail[i]));
 #if 0  // <<==later
             if (i < trail_lim.last())
                 polarity[x] = trail[i].sign;
-            if (!order.has(i))
-                order.add(i);
 #endif
         }
         dlev = lv;
@@ -269,6 +309,7 @@ PS_(bool) enqueue(lit_t p, cla_id from)
 
 PS_(bool) makeDecision()
 {
+#if 0
     uint x;
     if (assign.firstFreeVar(x)){
         // <<== check here if x == max var no
@@ -279,6 +320,20 @@ PS_(bool) makeDecision()
         return true;
     }else
         return false;
+
+#else
+    var_t x;
+    do{
+        if (order.size() == 0)
+            return false;   // -- model found
+        x = order.pop();
+    }while (assign.hasVar(x));
+
+    tr_lim[dlev] = trail_sz;
+    dlev++;
+    enqueueQ(BV::mkLit(x), 0);      // <<== polarity heuristic goes here
+    return true;
+#endif
 }
 
 
@@ -325,6 +380,7 @@ PS_(void) analyzeConflict(cla_id confl)
             //**/WriteLn "  - popped: %_   (seen=%_  level=%_  dlev=%_)", lit(BV::neg(q)), (uint)seen[xq], (uint)level[xq], (uint)dlev;
             if (seen[xq] == 0 && level[xq] > 0){
                 seen[xq] = 1;   // <<== useful for cc-min, which is not yet implemented (could move it to cc++ line)
+                bumpVar(xq);
                 if (level[xq] == dlev){
                     //**/WriteLn "    (queued: cc=%_)", cc+1;
                     cc++; }
@@ -392,6 +448,8 @@ PS_(lbool) solve()
 
             if (clauses.size() - first_learned >= max_learned)
                 reduceDB();
+
+            decayVarAct();
 
         }else{
             if (!makeDecision()){
