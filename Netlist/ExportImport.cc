@@ -884,7 +884,7 @@ void readBlif(String filename, NetlistRef N, bool expect_aig, bool store_names)
 // -- Tokenizer:
 
 
-// Replace comments with spaces (preserving newlines). Returns FALSE if 'text' contains an 
+// Replace comments with spaces (preserving newlines). Returns FALSE if 'text' contains an
 // unterminated block comment.
 static
 bool removeCstyleComments(Array<char> text)
