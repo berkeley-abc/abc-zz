@@ -55,27 +55,27 @@ class PunySat {
 
     BV          tmp;
 
-    void   undo(uint lv);
-    void   enqueueQ(lit_t p, cla_id from);
-    bool   enqueue(lit_t p, cla_id from);
-    bool   makeDecision();
-    cla_id propagate();                 // -- returns 0 if no conflict
-    void   analyzeConflict(cla_id confl);
-    void   reduceDB();
+    void    undo(uint lv);
+    void    enqueueQ(lit_t p, cla_id from);
+    bool    enqueue(lit_t p, cla_id from);
+    bool    makeDecision();
+    cla_id  propagate();                 // -- returns 0 if no conflict
+    void    analyzeConflict(cla_id confl);
+    void    reduceDB();
 
-    Lit    lit(lit_t p) const { return (p == lit_NULL) ? Lit_MAX : Lit(BV::var(p), BV::sign(p)); }
-    void   dumpState();       // -- for debugging
+    Lit     lit(lit_t p) const { return (p == lit_NULL) ? Lit_MAX : Lit(BV::var(p), BV::sign(p)); }
+    void    dumpState();       // -- for debugging
 
 public:
     PunySat() { clear(); }
-    void clear();
+    void    clear();
 
-    void clAddPos(var_t var) { tmp.add(BV::mkNeg(var)); }   // -- intentionally flipping sign
-    void clAddNeg(var_t var) { tmp.add(BV::mkLit(var)); }
-    void clDone();
-    void clDoneLearned();
+    void    clAddPos(var_t var) { tmp.add(BV::mkNeg(var)); }   // -- intentionally flipping sign
+    void    clAddNeg(var_t var) { tmp.add(BV::mkLit(var)); }
+    void    clDone();
+    void    clDoneLearned();
 
-    lbool solve();
+    lbool   solve();
 
     void writeCompactCnf(String filename, String mapfile);      // -- for debugging mostly
 };
@@ -182,7 +182,6 @@ PS_(void) clDone()
 // Will also clear 'seen[]' for literal present in conflict clause
 PS_(void) clDoneLearned()
 {
-    /**/putchar('.'); fflush(stdout);
     //**/WriteLn "clDoneLearned(%_)", tmp.inv();
     lit_t p0 = lit_NULL;
     cla_id id = 0;
@@ -354,7 +353,7 @@ PS_(void) analyzeConflict(cla_id confl)
 
 PS_(void) reduceDB()
 {
-    /**/WriteLn "reduceDB()";
+    /**/putchar('r'); fflush(stdout);
     // For now, delete all clauses not locked:
     cla_id j = first_learned;
     for (cla_id i = first_learned; i < clauses.size(); i++){
@@ -505,7 +504,7 @@ void punySatTest(int argc, char** argv)
 
     cli.parseCmdLine(argc, argv);
 
-    PunySat<BV64x<8>, ushort> S;
+    PunySat<BV64x<4>, uint> S;
     InFile in(cli.get("input").string_val);
     parse_DIMACS(in, S);
 
@@ -532,6 +531,12 @@ void punySatTest(int argc, char** argv)
  x8:  10.0 s   (256 vars)
 x16:  12.8 s   (512 vars)
 x32:  17.1 s   (1024 vars)
+
+variable activity
+clause activity
+proper reduce DB
+restarts
+watcher lists?
 */
 
 

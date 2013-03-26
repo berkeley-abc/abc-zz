@@ -226,8 +226,8 @@ class BV64x {
 public:
     enum { max_lits = sizeof(full_t) * 8 };
     enum { max_vars = max_lits / 2 };
-    typedef ushort lit_t;   // <<== see if uchar makes a difference
-    typedef ushort var_t;   // <<== (ditto)
+    typedef uint lit_t;   // }- 'ushort' suffices but is slower ('uchar' is too small)
+    typedef uint var_t;   // }
 
     static lit_t mkLit(var_t x) { assert_debug(x < max_vars); return x; }
     static lit_t mkNeg(var_t x) { assert_debug(x < max_vars); return x + max_vars; }
