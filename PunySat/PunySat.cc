@@ -88,6 +88,11 @@ public:
     lbool   solve();
 
     void    writeCompactCnf(String filename, String mapfile);      // -- for debugging mostly
+
+    // Statistics:
+    uint64  n_conflicts;
+    uint64  n_decisions;
+    uint64  n_propagations;
 };
 
 #define PS_(type) template<class BV, class cla_id> type PunySat<BV, cla_id>::
@@ -175,6 +180,10 @@ PS_(void) clear()
     tmp.clear();
 
     order.prio = &activ;
+
+    n_conflicts = 0;
+    n_decisions = 0;
+    n_propagations = 0;
 }
 
 
@@ -309,6 +318,7 @@ PS_(bool) enqueue(lit_t p, cla_id from)
 
 PS_(bool) makeDecision()
 {
+    n_decisions++;
 #if 0
     uint x;
     if (assign.firstFreeVar(x)){
@@ -340,6 +350,7 @@ PS_(bool) makeDecision()
 PS_(cla_id) propagate()
 {
     while (qhead < trail_sz){
+        n_propagations++;
         lit_t p = trail[qhead];
         qhead++;
 
@@ -363,6 +374,7 @@ PS_(cla_id) propagate()
 
 PS_(void) analyzeConflict(cla_id confl)
 {
+    n_conflicts++;
     uint idx = trail_sz;
     lit_t p = lit_NULL;
     uint cc = 0;
@@ -433,7 +445,7 @@ PS_(void) reduceDB()
 
 PS_(lbool) solve()
 {
-    uint max_learned = clauses.size();
+    uint max_learned = clauses.size() * 2;
 
     first_learned = clauses.size();
     for(;;){
@@ -567,9 +579,24 @@ void punySatTest(int argc, char** argv)
     parse_DIMACS(in, S);
 
     if (cli.cmd == "solve"){
-        lbool result = S.solve();
-        WriteLn "Result: %_", result;
-        WriteLn "CPU time: %t", cpuTime();
+        double T0c = cpuTime();
+        double T0r = realTime();
+        lbool  result = S.solve();
+        double cpu_time  = cpuTime() - T0c;
+        double real_time = realTime() - T0r;
+        /**/putchar('\n'); fflush(stdout);
+
+        if      (result == l_True) WriteLn "SAT";
+        else if (result == l_False) WriteLn "UNSAT";
+        else                        WriteLn "(undetermined)";
+        NewLine;
+
+        WriteLn "conflicts:    %>15%,d    (%,d /sec)", S.n_conflicts   , uint64(S.n_conflicts    / cpu_time);
+        WriteLn "decisions:    %>15%,d    (%,d /sec)", S.n_decisions   , uint64(S.n_decisions    / cpu_time);
+        WriteLn "propagations: %>15%,d    (%,d /sec)", S.n_propagations, uint64(S.n_propagations / cpu_time);
+        WriteLn "Memory used:  %>14%^DB", memUsed();
+        WriteLn "Real time:    %>13%.2f s", real_time;
+        WriteLn "CPU time:     %>13%.2f s", cpu_time;
 
     }else if (cli.cmd == "write"){
         String output = cli.get("output").string_val;
