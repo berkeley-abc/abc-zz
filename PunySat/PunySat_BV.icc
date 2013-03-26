@@ -1,0 +1,340 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : PunySat_BV.icc
+//| Author(s)   : Niklas Een
+//| Module      : PunySat
+//| Description : Bit-vector implementations for various sizes.
+//| 
+//| (C) Copyright 2013, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//|________________________________________________________________________________________________
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Common tags:
+
+
+const struct Tag_pos { Tag_pos(){} } pos_;
+const struct Tag_neg { Tag_neg(){} } neg_;
+const struct Tag_lit { Tag_lit(){} } lit_;
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// BV32:
+
+
+class BV32 {
+    typedef uint   full_t;
+    typedef ushort half_t;
+
+    full_t data;
+    BV32(full_t d) : data(d) {}
+
+public:
+    enum { max_lits = 32 };
+    enum { max_vars = 16 };
+    typedef uchar lit_t;
+    typedef uchar var_t;
+
+    static lit_t mkLit(var_t x) { assert_debug(x < max_vars); return x; }
+    static lit_t mkNeg(var_t x) { assert_debug(x < max_vars); return x + max_vars; }
+    static lit_t neg  (lit_t p) { assert_debug(p < max_lits); return p ^ max_vars; }
+    static var_t var  (lit_t p) { assert_debug(p < max_lits); return p & (max_vars-1); }
+    static bool  sign (lit_t p) { assert_debug(p < max_lits); return bool(p & max_vars); }
+
+    BV32() : data(0) {}
+
+    typedef full_t BV32::*bool_type;
+    operator bool_type() const { return (data == 0) ? 0 : &BV32::data; }
+        // -- "null" function for empty set check
+
+    void clear() { data = 0u; }
+    void add(lit_t p) { assert_debug(p < max_lits); data |= 1u << p; }
+    void remove(lit_t p) { assert_debug(p < max_lits); data &= ~(1u << p); }
+    bool has(lit_t p) const { assert_debug(p < max_lits); return bool((1u << p) & data); }
+    bool hasVar(var_t x) const { assert_debug(x < max_vars); return bool(((1u << x) | (1u << (x+max_vars))) & data); }
+    bool singleton() const { return (data & (data-1)) == 0; }   // -- actually true for empty clause as well
+    BV32 inv() const { return BV32((data >> max_vars) | (data << max_vars)); }
+
+    lit_t pop() {   // -- remove lowest bit set and return its position
+        assert_debug(data != 0);
+        lit_t ret = __builtin_ctz(data);
+        data &= data-1;
+        return ret;
+    }
+
+    bool firstFreeVar(uint& ret) {
+        half_t mask = ~(half_t(data) | half_t(data >> max_vars));
+        if (mask == 0)
+            return false;
+        ret = __builtin_ctz(mask);
+        return true;
+    }
+
+    bool confl(const BV32& assign) const {  // -- assumes '*this' is an inverted clause
+        return (data & ~assign.data) == 0; }
+
+    bool bcp(const BV32& assign, lit_t& prop_lit) const {
+        full_t mask = (data & ~assign.data);
+        if ((mask & (mask-1)) == 0){
+            assert_debug(mask != 0);
+            prop_lit = neg(__builtin_ctz(mask));
+            return true;
+        }else
+            return false;
+    }
+
+    bool operator==(const BV32& other) const { return data == other.data; }
+
+    // Debug:
+    void write(Out& out) const;
+};
+
+
+void BV32::write(Out& out) const {
+    FWrite(out) "{";
+    bool first = true;
+    for (var_t x = 0; x < max_vars; x++){
+        if (has(mkLit(x))){
+            if (!first) FWrite(out) ", ";
+            FWrite(out) "x%_", (uint)x;
+            first = false;
+        }
+        if (has(mkNeg(x))){
+            if (!first) FWrite(out) ", ";
+            FWrite(out) "~x%_", (uint)x;
+            first = false;
+        }
+    }
+    FWrite(out) "}";
+}
+
+
+template<> fts_macro void write_(Out& out, const BV32& v) {
+    v.write(out); }
+
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// BV64:
+
+
+class BV64 {
+    typedef uint64 full_t;
+    typedef uint   half_t;
+
+    full_t data;
+    BV64(full_t d) : data(d) {}
+
+public:
+    enum { max_lits = 64 };
+    enum { max_vars = 32 };
+    typedef uchar lit_t;
+    typedef uchar var_t;
+
+    static lit_t mkLit(var_t x) { assert_debug(x < max_vars); return x; }
+    static lit_t mkNeg(var_t x) { assert_debug(x < max_vars); return x + max_vars; }
+    static lit_t neg  (lit_t p) { assert_debug(p < max_lits); return p ^ max_vars; }
+    static var_t var  (lit_t p) { assert_debug(p < max_lits); return p & (max_vars-1); }
+    static bool  sign (lit_t p) { assert_debug(p < max_lits); return bool(p & max_vars); }
+
+    BV64() : data(0) {}
+
+    typedef full_t BV64::*bool_type;
+    operator bool_type() const { return (data == 0) ? 0 : &BV64::data; }
+        // -- "null" function for empty set check
+
+    void clear() { data = 0ull; }
+    void add(lit_t p) { assert_debug(p < max_lits); data |= 1ull << p; }
+    void remove(lit_t p) { assert_debug(p < max_lits); data &= ~(1ull << p); }
+    bool has(lit_t p) const { assert_debug(p < max_lits); return bool((1ull << p) & data); }
+    bool hasVar(var_t x) const { assert_debug(x < max_vars); return bool(((1ull << x) | (1ull << (x+max_vars))) & data); }
+    bool singleton() const { return (data & (data-1)) == 0; }   // -- actually true for empty clause as well
+    BV64 inv() const { return BV64((data >> max_vars) | (data << max_vars)); }
+
+    lit_t pop() {   // -- remove lowest bit set and return its position
+        assert_debug(data != 0);
+        lit_t ret = __builtin_ctzll(data);
+        data &= data-1;
+        return ret;
+    }
+
+    bool firstFreeVar(uint& ret) {
+        half_t mask = ~(half_t(data) | half_t(data >> max_vars));
+        if (mask == 0)
+            return false;
+        ret = __builtin_ctzll(mask);
+        return true;
+    }
+
+    bool confl(const BV64& assign) const {  // -- assumes '*this' is an inverted clause
+        return (data & ~assign.data) == 0; }
+
+    bool bcp(const BV64& assign, lit_t& prop_lit) const {
+        full_t mask = (data & ~assign.data);
+        if ((mask & (mask-1)) == 0){
+            assert_debug(mask != 0);
+            prop_lit = neg(__builtin_ctzll(mask));
+            return true;
+        }else
+            return false;
+    }
+
+    bool operator==(const BV64& other) const { return data == other.data; }
+
+    // Debug:
+    void write(Out& out) const;
+};
+
+
+void BV64::write(Out& out) const {
+    FWrite(out) "{";
+    bool first = true;
+    for (var_t x = 0; x < max_vars; x++){
+        if (has(mkLit(x))){
+            if (!first) FWrite(out) ", ";
+            FWrite(out) "x%_", (uint)x;
+            first = false;
+        }
+        if (has(mkNeg(x))){
+            if (!first) FWrite(out) ", ";
+            FWrite(out) "~x%_", (uint)x;
+            first = false;
+        }
+    }
+    FWrite(out) "}";
+}
+
+
+template<> fts_macro void write_(Out& out, const BV64& v) {
+    v.write(out); }
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// BV64x:
+
+
+template<uint N>
+class BV64x {
+    typedef uint64 full_t[N];
+
+    full_t data;
+    BV64x(const full_t& d) { for (uint i = 0; i < elemsof(data); i++) data[i] = d[i]; }
+
+public:
+    enum { max_lits = sizeof(full_t) * 8 };
+    enum { max_vars = max_lits / 2 };
+    typedef ushort lit_t;   // <<== see if uchar makes a difference
+    typedef ushort var_t;   // <<== (ditto)
+
+    static lit_t mkLit(var_t x) { assert_debug(x < max_vars); return x; }
+    static lit_t mkNeg(var_t x) { assert_debug(x < max_vars); return x + max_vars; }
+    static lit_t neg  (lit_t p) { assert_debug(p < max_lits); return p ^ max_vars; }
+    static var_t var  (lit_t p) { assert_debug(p < max_lits); return p & (max_vars-1); }
+    static bool  sign (lit_t p) { assert_debug(p < max_lits); return bool(p & max_vars); }
+
+    BV64x() { for (uint i = 0; i < N; i++) data[i] = 0ull; }
+
+    typedef full_t BV64x::*bool_type;
+    operator bool_type() const {    // -- "null" function for empty set check
+        for (uint i = 0; i < N; i++)
+            if (data[i] != 0) return &BV64x::data;
+        return 0;
+    }
+
+    uint size() const {
+        uint sz = 0;
+        for (uint i = 0; i < N; i++)
+            sz += __builtin_popcountll(data[i]);
+        return sz;
+    }
+
+    void clear() { for (uint i = 0; i < N; i++) data[i] = 0ull; }
+    void add(lit_t p) { assert_debug(p < max_lits); data[p>>6] |= 1ull << (p&63); }
+    void remove(lit_t p) { assert_debug(p < max_lits); data[p>>6] &= ~(1ull << (p&63)); }
+    bool has(lit_t p) const { assert_debug(p < max_lits); return bool((1ull << (p&63)) & data[p>>6]); }
+    bool hasVar(var_t x) const { assert_debug(x < max_vars); return has(mkLit(x)) || has(mkNeg(x)); }   // <<== for now
+    bool singleton() const { return size() <= 1; }        // -- actually true for empty clause as well
+
+    BV64x inv() const {
+        BV64x ret(data);
+        for (uint i = 0; i < N/2; i++)
+            swp(ret.data[i], ret.data[i + N/2]);
+        return ret;
+    }
+
+    lit_t pop() {   // -- remove lowest bit set and return its position
+        for (uint i = 0; i < N; i++){
+            if (data[i] != 0){
+                uint ret = __builtin_ctzll(data[i]);
+                data[i] &= data[i]-1;
+                return ret + (i * 64); }
+        }
+        assert(false);
+    }
+
+    bool firstFreeVar(uint& ret) {
+        for (uint i = 0; i < N/2; i++){
+            uint64 mask = ~(data[i] | data[i + N/2]);
+            if (mask != 0ull){
+                ret = __builtin_ctzll(mask) + (i * 64);
+                return true; }
+        }
+        return false;
+    }
+
+    bool confl(const BV64x& assign) const {  // -- assumes '*this' is an inverted clause
+        for (uint i = 0; i < N; i++)
+            if ((data[i] & ~assign.data[i]) != 0)
+                return false;
+        return true;
+    }
+
+    bool bcp(const BV64x& assign, lit_t& prop_lit) const {
+        for (uint i = 0; i < N; i++){
+            uint64 mask = (data[i] & ~assign.data[i]);
+            if (mask != 0){
+                if ((mask & (mask-1)) == 0){
+                    for (uint j = i+1; j < N; j++)  // -- check that rest is zero
+                        if ((data[j] & ~assign.data[j]) != 0) return false;
+                    prop_lit = neg(__builtin_ctzll(mask) + (i * 64));
+                    return true;
+                }else
+                    return false;
+            }
+        }
+        assert(false);  // -- 'confl()' should have returned TRUE and this function never called
+    }
+
+    bool operator==(const BV64x& other) const {
+        for (uint i = 0; i < N; i++)
+            if (data[i] != other.data[i]) return false;
+        return true;
+    }
+
+    // Debug:
+    void write(Out& out) const {
+        FWrite(out) "{";
+        bool first = true;
+        for (var_t x = 0; x < max_vars; x++){
+            if (has(mkLit(x))){
+                if (!first) FWrite(out) ", ";
+                FWrite(out) "x%_", (uint)x;
+                first = false;
+            }
+            if (has(mkNeg(x))){
+                if (!first) FWrite(out) ", ";
+                FWrite(out) "~x%_", (uint)x;
+                first = false;
+            }
+        }
+        FWrite(out) "}";
+    }
+};
+
+
+template<> fts_macro void write_(Out& out, const BV64x<2>& v) { v.write(out); }
+template<> fts_macro void write_(Out& out, const BV64x<4>& v) { v.write(out); }
+template<> fts_macro void write_(Out& out, const BV64x<8>& v) { v.write(out); }

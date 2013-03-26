@@ -440,7 +440,7 @@ def setup_cflags(pri, secs, cxx_mode):
     flags = []
 
     # General:
-    flags.append("-Wall -ffloat-store -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS")
+    flags.append("-Wall -ffloat-store -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS -msse2")
     flags.append("-DZZ_CONSTANTS_AS_MACROS")
 
     # Primary type:

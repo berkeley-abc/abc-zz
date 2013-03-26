@@ -817,7 +817,7 @@ clause_id MiniSat<pfl>::analyze(Clause* _confl, Vec<Lit>& out_learnt)
             Lit q = c[j];
 
             if (visit[q] == 0){
-                 if (level(q) > 0){
+                if (level(q) > 0){
                     varBumpActivity(q);
                     visit(q) = 1;
                     if (level(q) == dl())
