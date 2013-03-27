@@ -61,11 +61,12 @@ class PunySat {
 
     bool        ok;
     BV          assign;
-    Vec<BV>     clauses;                // -- 'clauses[0]' is reserved ('cla_id == 0' is used as null value).
+    Vec<BV>     clauses;                // -- 'clauses[0]' is reserved ('cla_id == 0' is used as null value). NOTE! Stored with literals negated!
     Vec<float>  c_activ;                // activities for clauses
     double      cla_incr;
-    uint        first_learned;
-                                        // NOTE! Stored with literals negated!
+
+    uint        first_learned;          // Size of 'clauses' when solve begins
+
     Vec<cla_id> occurs[BV::max_lits];
     cla_id      reason[BV::max_vars];   // }- undefined if '!assign.hasVar(x)'
     var_t       level [BV::max_vars];   // }  NOTE! Also stored with literals negated.
@@ -91,6 +92,7 @@ class PunySat {
     void    rescaleVarAct();
     void    rescaleClaAct();
     void    decayVarAct() { var_incr *= (1.0 / 0.95); }
+    void    decayClaAct() { cla_incr *= (1.0 / 0.999); }
     void    clDoneLearned();
     void    undo(uint lv);
     void    enqueueQ(lit_t p, cla_id from);
@@ -119,6 +121,8 @@ public:
     uint64  n_conflicts;
     uint64  n_decisions;
     uint64  n_propagations;
+    uint64  n_deleted;
+    uint64  n_restarts;
 };
 
 #define PS_(type) template<class BV, class cla_id> type PunySat<BV, cla_id>::
@@ -213,6 +217,8 @@ PS_(void) clear()
     n_conflicts = 0;
     n_decisions = 0;
     n_propagations = 0;
+    n_deleted = 0;
+    n_restarts = 0;
 }
 
 
@@ -427,6 +433,7 @@ PS_(void) analyzeConflict(cla_id confl)
     //**/dumpState();
     for(;;){
         // Add literals of 'confl' to queue ('seen') or conflict clause ('tmp'):
+        bumpCla(confl);
         BV cl = clauses[confl];
         //**/WriteLn "-- analyzing clause: %_   (idx=%_  p=%_  cc=%_)", cl.inv(), idx, lit(p), cc;
         while (cl){
@@ -449,6 +456,7 @@ PS_(void) analyzeConflict(cla_id confl)
         // Dequeue next literal:
         do idx--; while (seen[BV::var(trail[idx])] == 0);
         p = BV::neg(trail[idx]);
+        /**/assert(assign.has(BV::neg(p)));
         confl = reason[BV::var(p)];
         cc--;
         seen[BV::var(p)] = 0;       // -- we want only the literals of the final conflict-clause to be 1 in 'seen'
@@ -468,7 +476,7 @@ PS_(void) reduceDB()
 {
     /**/putchar('r'); fflush(stdout);
 
-    /**/dumpState();
+    // Quick and dirty way of sorting clauses with locked/high activity clauses first:
     Vec<uint>  cl_map(reserve_, clauses.size() - first_learned);
     Vec<uchar> locked(reserve_, clauses.size() - first_learned);
     for (uint i = first_learned; i < clauses.size(); i++){
@@ -479,26 +487,29 @@ PS_(void) reduceDB()
 
     Array<float> acts = slice(c_activ[first_learned], c_activ.end());
     Array<BV>    clas = slice(clauses[first_learned], clauses.end());
-//    sobSort(ordReverse(ordByFirst(ordLexico(sob(locked), sob(acts)), sob(cl_map))));
     sobSort(ordReverse(ordByFirst(ordLexico(sob(locked), sob(acts)), ordByFirst(sob(cl_map), sob(clas))))); // <<== add "ordCombine"?
+
+    Vec<uint>  rev_map(clauses.size());
+    for (uint i = 0; i < first_learned; i++)
+        rev_map[i] = i;
+    for (uint i = 0; i < cl_map.size(); i++)
+        rev_map[cl_map[i]] = i + first_learned;
 
     for (uint i = 0; i < BV::max_vars; i++)
         if (assign.hasVar(i) && reason[i] >= first_learned)
-            reason[i] = cl_map[reason[i] - first_learned]; // apply in other order...
-    /**/dumpState();
+            reason[i] = rev_map[reason[i]];
 
+    // Remove half of the low-active, non-locked clauses:
+    uint first_nonlocked = first_learned;
+    while (first_nonlocked < clauses.size() && locked[first_nonlocked - first_learned])
+        first_nonlocked++;
 
-    // For now, delete all clauses not locked:
-    cla_id j = first_learned;
-    for (cla_id i = first_learned; i < clauses.size(); i++){
-        lit_t p;
-        if (clauses[i].bcp(assign, p) && reason[BV::var(p)] == i){    // -- i.e. clause is locked
-            reason[BV::var(p)] = j;
-            clauses[j++] = clauses[i];
-        }
-    }
-    clauses.shrinkTo(j);
-    c_activ.shrinkTo(j);
+    n_deleted += clauses.size() - (first_nonlocked + clauses.size()) / 2;
+    clauses.shrinkTo((first_nonlocked + clauses.size()) / 2);
+    c_activ.shrinkTo((first_nonlocked + c_activ.size()) / 2);
+
+    /*debug*/for (uint x = 0; x < BV::max_vars; x++)
+    /*debug*/    if (assign.hasVar(x)) assert(reason[x] < clauses.size());
 
     // Rebuild occurs lists:
     for (uint i = 0; i < BV::max_lits; i++)
@@ -528,14 +539,16 @@ PS_(lbool) solve()
 
                 analyzeConflict(confl);
                 decayVarAct();
+                decayClaAct();
 
             }else{
                 if (c >= conflict_lim){
                     /**/putchar('R'); fflush(stdout);
+                    n_restarts++;
                     undo(0);
                     break; }        // -- break
 
-                if (clauses.size() - first_learned >= learned_lim)
+                if (clauses.size() - first_learned >= learned_lim + trail_sz)
                     reduceDB();
 
                 if (!makeDecision()){
@@ -666,9 +679,11 @@ void punySatTest(int argc, char** argv)
         else                        WriteLn "(undetermined)";
         NewLine;
 
+        WriteLn "restarts:     %>15%,d", S.n_restarts;
         WriteLn "conflicts:    %>15%,d    (%,d /sec)", S.n_conflicts   , uint64(S.n_conflicts    / cpu_time);
         WriteLn "decisions:    %>15%,d    (%,d /sec)", S.n_decisions   , uint64(S.n_decisions    / cpu_time);
         WriteLn "propagations: %>15%,d    (%,d /sec)", S.n_propagations, uint64(S.n_propagations / cpu_time);
+        WriteLn "deleted clauses: %>12%,d", S.n_deleted;
         WriteLn "Memory used:  %>14%^DB", memUsed();
         WriteLn "Real time:    %>13%.2f s", real_time;
         WriteLn "CPU time:     %>13%.2f s", cpu_time;
@@ -692,11 +707,12 @@ void punySatTest(int argc, char** argv)
 x16:  12.8 s   (512 vars)
 x32:  17.1 s   (1024 vars)
 
-clause activity
-proper reduce DB
+clause activity   [DONE]
+proper reduce DB  [DONE]
 watcher lists?
-restarts
-polartity heur
+restarts          [DONE]
+polartity heur    [DONE]
+conflict clause min.
 */
 
 
