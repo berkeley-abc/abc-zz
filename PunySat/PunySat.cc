@@ -15,6 +15,7 @@
 #include "ZZ_CmdLine.hh"
 #include "ZZ/Generics/Lit.hh"
 #include "ZZ/Generics/IdHeap.hh"
+#include "ZZ/Generics/Sort.hh"
 
 namespace ZZ {
 using namespace std;
@@ -466,6 +467,27 @@ PS_(void) analyzeConflict(cla_id confl)
 PS_(void) reduceDB()
 {
     /**/putchar('r'); fflush(stdout);
+
+    /**/dumpState();
+    Vec<uint>  cl_map(reserve_, clauses.size() - first_learned);
+    Vec<uchar> locked(reserve_, clauses.size() - first_learned);
+    for (uint i = first_learned; i < clauses.size(); i++){
+        cl_map.push(i);
+        lit_t p;
+        locked.push((clauses[i].bcp(assign, p) && reason[BV::var(p)] == i) ? 1 : 0);
+    }
+
+    Array<float> acts = slice(c_activ[first_learned], c_activ.end());
+    Array<BV>    clas = slice(clauses[first_learned], clauses.end());
+//    sobSort(ordReverse(ordByFirst(ordLexico(sob(locked), sob(acts)), sob(cl_map))));
+    sobSort(ordReverse(ordByFirst(ordLexico(sob(locked), sob(acts)), ordByFirst(sob(cl_map), sob(clas))))); // <<== add "ordCombine"?
+
+    for (uint i = 0; i < BV::max_vars; i++)
+        if (assign.hasVar(i) && reason[i] >= first_learned)
+            reason[i] = cl_map[reason[i] - first_learned]; // apply in other order...
+    /**/dumpState();
+
+
     // For now, delete all clauses not locked:
     cla_id j = first_learned;
     for (cla_id i = first_learned; i < clauses.size(); i++){
@@ -476,6 +498,7 @@ PS_(void) reduceDB()
         }
     }
     clauses.shrinkTo(j);
+    c_activ.shrinkTo(j);
 
     // Rebuild occurs lists:
     for (uint i = 0; i < BV::max_lits; i++)
