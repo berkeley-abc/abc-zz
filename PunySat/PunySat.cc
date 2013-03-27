@@ -327,8 +327,6 @@ PS_(void) clDoneLearned()
 
 PS_(void) undo(uint lv)
 {
-    //**/WriteLn "undo(%_)", lv;
-    // <<== can do this more efficiently by storing the entire assignment when creating new decision level
     if (dlev > lv){
         for (uint i = trail_sz; i > tr_lim[lv];){ i--;
             lit_t q = trail[i];
@@ -529,7 +527,8 @@ PS_(lbool) solve()
         double conflict_lim = pow(2, (double)lubyLog(n)) * 100;
         double learned_lim = first_learned / 3 * pow(1.1, log((n_conflicts + conflict_lim) / first_learned) / log(1.5));
 
-        for(uint c = 0;; c++){
+        uint conflC = 0;
+        for(;;){
             cla_id confl = propagate();
             if (confl != 0){
                 if (dlev == 0){
@@ -537,12 +536,13 @@ PS_(lbool) solve()
                     clauses.shrinkTo(first_learned);
                     return l_False; }
 
+                conflC++;
                 analyzeConflict(confl);
                 decayVarAct();
                 decayClaAct();
 
             }else{
-                if (c >= conflict_lim){
+                if (conflC >= conflict_lim){
                     /**/putchar('R'); fflush(stdout);
                     n_restarts++;
                     undo(0);
@@ -662,7 +662,7 @@ void punySatTest(int argc, char** argv)
 
     cli.parseCmdLine(argc, argv);
 
-    PunySat<BV64x<4>, uint> S;
+    PunySat<BV64x<8>, uint> S;
     InFile in(cli.get("input").string_val);
     parse_DIMACS(in, S);
 
