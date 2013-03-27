@@ -100,6 +100,7 @@ class PunySat {
     bool    makeDecision();
     cla_id  propagate();                 // -- returns 0 if no conflict
     void    analyzeConflict(cla_id confl);
+    bool    analyzeRemovable(lit_t p0, uint64 levels);
     void    reduceDB();
 
     Lit     lit(lit_t p) const { return (p == lit_NULL) ? Lit_MAX : Lit(BV::var(p), BV::sign(p)); }
@@ -123,6 +124,8 @@ public:
     uint64  n_propagations;
     uint64  n_deleted;
     uint64  n_restarts;
+    uint64  n_conflits_orig;
+    uint64  n_conflits_min;
 };
 
 #define PS_(type) template<class BV, class cla_id> type PunySat<BV, cla_id>::
@@ -219,6 +222,8 @@ PS_(void) clear()
     n_propagations = 0;
     n_deleted = 0;
     n_restarts = 0;
+    n_conflits_orig = 0;
+    n_conflits_min = 0;
 }
 
 
@@ -281,7 +286,6 @@ PS_(void) rescaleClaAct()
 }
 
 
-// Will also clear 'seen[]' for literal present in conflict clause
 PS_(void) clDoneLearned()
 {
     //**/WriteLn "clDoneLearned(%_)", tmp.inv();
@@ -290,6 +294,7 @@ PS_(void) clDoneLearned()
     if (tmp.singleton()){
         undo(0);
         p0 = tmp.pop();
+        /**/putchar('*'); fflush(stdout);
     }else{
         uint max_lv = 0;
         uint sec_lv = 0;
@@ -305,8 +310,6 @@ PS_(void) clDoneLearned()
                 p0 = p;
             }else if (lv > sec_lv)
                 sec_lv = lv;
-
-            seen[x] = 0;
         }
         assert(sec_lv < max_lv);
         undo(sec_lv);
@@ -427,27 +430,21 @@ PS_(void) analyzeConflict(cla_id confl)
     uint idx = trail_sz;
     lit_t p = lit_NULL;
     uint cc = 0;
-    //**/WriteLn "\a***** CONFLICT CLAUSE ANALYZIS ****\a*";
-    //**/dumpState();
     for(;;){
         // Add literals of 'confl' to queue ('seen') or conflict clause ('tmp'):
         bumpCla(confl);
         BV cl = clauses[confl];
-        //**/WriteLn "-- analyzing clause: %_   (idx=%_  p=%_  cc=%_)", cl.inv(), idx, lit(p), cc;
         while (cl){
             lit_t q = cl.pop();
             if (p == q) continue;
 
             var_t xq = BV::var(q);
-            //**/WriteLn "  - popped: %_   (seen=%_  level=%_  dlev=%_)", lit(BV::neg(q)), (uint)seen[xq], (uint)level[xq], (uint)dlev;
             if (seen[xq] == 0 && level[xq] > 0){
                 seen[xq] = 1;   // <<== useful for cc-min, which is not yet implemented (could move it to cc++ line)
                 bumpVar(xq);
                 if (level[xq] == dlev){
-                    //**/WriteLn "    (queued: cc=%_)", cc+1;
                     cc++; }
                 else{
-                    //**/WriteLn "    (to learned)";
                     tmp.add(q); }
             }
         }
@@ -458,15 +455,88 @@ PS_(void) analyzeConflict(cla_id confl)
         confl = reason[BV::var(p)];
         cc--;
         seen[BV::var(p)] = 0;       // -- we want only the literals of the final conflict-clause to be 1 in 'seen'
-        //**/WriteLn "-- next literal: %_   (idx=%_  cc=%_  confl=%_)", lit(p), idx, cc, (uint)confl;
         if (cc == 0) break;
     }
-    //**/if (!(level[BV::var(p)] == dlev)){ WriteLn "ASSERT-FAILED"; exit(0); }
     assert(level[BV::var(p)] == dlev);
     tmp.add(BV::neg(p));
 
+    // Conflict clause minimization:
+#if 1
+    //**/WriteLn "tmp before: %_", tmp;
+    BV tmp_copy = tmp;
+    uint64 levels = 0;
+    while (tmp){
+        lit_t q = tmp.pop();
+        levels |= 1ull << (level[BV::var(q)] & 63);
+        n_conflits_orig++;
+    }
+
+    while (tmp_copy){
+        lit_t q = tmp_copy.pop();
+        if (q == BV::neg(p)) continue;
+
+        if (reason[BV::var(q)] == 0 || !analyzeRemovable(q, levels)){
+            tmp.add(q);
+            n_conflits_min++; }
+    }
+    tmp.add(BV::neg(p));
+    n_conflits_min++;
+    //**/WriteLn "tmp after : %_", tmp;
+#endif
+
     // Add learned clause and backtrack:
     clDoneLearned();
+
+    // Clear 'seen':
+    memset(seen, 0, sizeof(seen));
+}
+
+
+// Implicitly takes 'seen' as argument
+PS_(bool) analyzeRemovable(lit_t p0, uint64 levels)
+{
+    // In 'seen':
+    //   - bit 0: True if original conflict clause literal.
+    //   - bit 1: Processed by this procedure
+    //   - bit 2: 0=non-removable, 1=removable
+
+    var_t xp0 = BV::var(p0); assert(xp0 < BV::max_vars);
+    if (seen[xp0] & 2){
+        return bool(seen[xp0] & 4); }
+
+    cla_id r = reason[xp0];
+    if (r == 0){
+        seen[xp0] |= 2;
+        return false; }
+    BV c = clauses[r];
+
+    while (c){
+        lit_t p = c.pop();
+        var_t xp = BV::var(p); assert(xp < BV::max_vars);
+        if (xp == xp0) continue;
+
+        if (seen[xp] & 1){
+            analyzeRemovable(p, levels);
+
+        }else{
+            if (level[xp] == 0 || seen[xp] == 6)
+                continue;           // -- 'p' checked before, found to be removable (or belongs to the toplevel)
+            if (seen[xp] == 2){
+                seen[xp0] |= 2;
+                return false; }     // -- 'p' checked before, found NOT to be removable
+
+            if ((levels & (1ull << (level[xp] & 63))) == 0){
+                seen[xp0] |= 2;
+                return false; }     // -- 'p' belongs to a level that cannot be removed
+
+            if (!analyzeRemovable(p, levels)){
+                seen[xp0] |= 2;
+                return false; }
+        }
+    }
+
+    seen[xp0] |= 6;
+    return true;
 }
 
 
@@ -546,6 +616,7 @@ PS_(lbool) solve()
                     /**/putchar('R'); fflush(stdout);
                     n_restarts++;
                     undo(0);
+                    // <<== simplify DB
                     break; }        // -- break
 
                 if (clauses.size() - first_learned >= learned_lim + trail_sz)
@@ -561,6 +632,9 @@ PS_(lbool) solve()
     clauses.shrinkTo(first_learned);
     return l_Undef;
 }
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
 PS_(void) writeCompactCnf(String filename, String mapfile)
@@ -683,6 +757,7 @@ void punySatTest(int argc, char** argv)
         WriteLn "conflicts:    %>15%,d    (%,d /sec)", S.n_conflicts   , uint64(S.n_conflicts    / cpu_time);
         WriteLn "decisions:    %>15%,d    (%,d /sec)", S.n_decisions   , uint64(S.n_decisions    / cpu_time);
         WriteLn "propagations: %>15%,d    (%,d /sec)", S.n_propagations, uint64(S.n_propagations / cpu_time);
+        WriteLn "conf.lits.deleted: %>8%.2f %%", (S.n_conflits_orig - S.n_conflits_min)*100.0 / S.n_conflits_orig;
         WriteLn "deleted clauses: %>12%,d", S.n_deleted;
         WriteLn "Memory used:  %>14%^DB", memUsed();
         WriteLn "Real time:    %>13%.2f s", real_time;

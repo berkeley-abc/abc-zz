@@ -26,6 +26,18 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
+    struct rlimit res;
+    int result;
+
+    result = getrlimit(RLIMIT_STACK, &res);
+    if (result == 0){
+        res.rlim_cur = 64L * 1024L * 1024L;
+        result = setrlimit(RLIMIT_STACK, &res);
+        if (result != 0){
+            ShoutLn "Stack size could not be increased. Error code from 'setrlimit()': %_", result;
+            exit(1); }
+    }
+
     punySatTest(argc, argv);
 
     return 0;
