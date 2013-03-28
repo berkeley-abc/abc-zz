@@ -371,19 +371,6 @@ PS_(bool) enqueue(lit_t p, cla_id from)
 PS_(bool) makeDecision()
 {
     n_decisions++;
-#if 0
-    uint x;
-    if (assign.firstFreeVar(x)){
-        // <<== check here if x == max var no
-        tr_lim[dlev] = trail_sz;
-        dlev++;
-        enqueueQ(BV::mkLit(x), 0);
-        //**/if (occurs[BV::mkLit(x)].size() > 0 || occurs[BV::mkNeg(x)].size() > 0) WriteLn "makeDecision(%_)", lit(BV::mkLit(x));
-        return true;
-    }else
-        return false;
-
-#else
     var_t x;
     do{
         if (order.size() == 0)
@@ -395,13 +382,12 @@ PS_(bool) makeDecision()
     dlev++;
     enqueueQ(polar[x] ? BV::mkNeg(x) : BV::mkLit(x), 0);
     return true;
-#endif
 }
 
 
 PS_(cla_id) propagate()
 {
-#if 0
+#if 1
     while (qhead < trail_sz){
         n_propagations++;
         lit_t p = trail[qhead];
@@ -718,23 +704,6 @@ PS_(void) writeCompactCnf(String filename, String mapfile)
     }
 }
 
-/*
-
-analysis
-
-*/
-
-/* LATER:
-
-    Vec<Lit>        assumps;
-
-    Vec<double>     activity;
-    Vec<uchar>      polarity;
-    double          var_inc;
-    double          var_decay;
-    IdHeap<double,1>order;
-*/
-
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // DIMACS Parser:
@@ -767,18 +736,6 @@ static void parse_DIMACS(In& in, Solver& S)
 
 void punySatTest(int argc, char** argv)
 {
-#if 0
-    BV128 x;
-    x.add(64);
-    x.add(42);
-    x.add(67);
-
-    while (x)
-        WriteLn "pop: %_", (uint)x.pop();
-
-    exit(0);
-#endif
-
     cli.add("input" , "string", arg_REQUIRED, "Input CNF.", 0);
     cli.add("output" , "string", "", "Output CNF.", 1);
     cli.add("outmap" , "string", "", "Output map.", 2);
@@ -787,7 +744,11 @@ void punySatTest(int argc, char** argv)
 
     cli.parseCmdLine(argc, argv);
 
+  #if defined(ZZ_LP64)
     PunySat<BV64x<8>, uint> S;
+  #else
+    PunySat<BV32x<16>, uint> S;
+  #endif
     InFile in(cli.get("input").string_val);
     parse_DIMACS(in, S);
 

@@ -296,6 +296,7 @@ public:
         for (uint i = 0; i < N; i++){
             uint64 mask = (data[i] & ~assign.data[i]);
             if (mask != 0){
+//              if (__builtin_popcountll(mask) == 1){
                 if ((mask & (mask-1)) == 0){
                     for (uint j = i+1; j < N; j++)  // -- check that rest is zero
                         if ((data[j] & ~assign.data[j]) != 0) return false;
@@ -338,3 +339,131 @@ public:
 template<> fts_macro void write_(Out& out, const BV64x<2>& v) { v.write(out); }
 template<> fts_macro void write_(Out& out, const BV64x<4>& v) { v.write(out); }
 template<> fts_macro void write_(Out& out, const BV64x<8>& v) { v.write(out); }
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// BV32x:
+
+
+template<uint N>
+class BV32x {
+    typedef uint full_t[N];
+
+    full_t data;
+    BV32x(const full_t& d) { for (uint i = 0; i < elemsof(data); i++) data[i] = d[i]; }
+
+public:
+    enum { max_lits = sizeof(full_t) * 8 };
+    enum { max_vars = max_lits / 2 };
+    typedef uint lit_t;   // }- 'ushort' suffices but is slower ('uchar' is too small)
+    typedef uint var_t;   // }
+
+    static lit_t mkLit(var_t x) { assert_debug(x < max_vars); return x; }
+    static lit_t mkNeg(var_t x) { assert_debug(x < max_vars); return x + max_vars; }
+    static lit_t neg  (lit_t p) { assert_debug(p < max_lits); return p ^ max_vars; }
+    static var_t var  (lit_t p) { assert_debug(p < max_lits); return p & (max_vars-1); }
+    static bool  sign (lit_t p) { assert_debug(p < max_lits); return bool(p & max_vars); }
+
+    BV32x() { for (uint i = 0; i < N; i++) data[i] = 0ull; }
+
+    typedef full_t BV32x::*bool_type;
+    operator bool_type() const {    // -- "null" function for empty set check
+        for (uint i = 0; i < N; i++)
+            if (data[i] != 0) return &BV32x::data;
+        return 0;
+    }
+
+    uint size() const {
+        uint sz = 0;
+        for (uint i = 0; i < N; i++)
+            sz += __builtin_popcount(data[i]);
+        return sz;
+    }
+
+    void clear() { for (uint i = 0; i < N; i++) data[i] = 0u; }
+    void add(lit_t p) { assert_debug(p < max_lits); data[p>>5] |= 1u << (p&31); }
+    void remove(lit_t p) { assert_debug(p < max_lits); data[p>>5] &= ~(1u << (p&31)); }
+    bool has(lit_t p) const { assert_debug(p < max_lits); return bool((1u << (p&31)) & data[p>>5]); }
+    bool hasVar(var_t x) const { assert_debug(x < max_vars); return has(mkLit(x)) || has(mkNeg(x)); }   // <<== for now
+    bool singleton() const { return size() <= 1; }        // -- actually true for empty clause as well
+
+    BV32x inv() const {
+        BV32x ret(data);
+        for (uint i = 0; i < N/2; i++)
+            swp(ret.data[i], ret.data[i + N/2]);
+        return ret;
+    }
+
+    lit_t pop() {   // -- remove lowest bit set and return its position
+        for (uint i = 0; i < N; i++){
+            if (data[i] != 0){
+                uint ret = __builtin_ctz(data[i]);
+                data[i] &= data[i]-1;
+                return ret + (i * 32); }
+        }
+        assert(false);
+    }
+
+    bool firstFreeVar(uint& ret) {
+        for (uint i = 0; i < N/2; i++){
+            uint mask = ~(data[i] | data[i + N/2]);
+            if (mask != 0u){
+                ret = __builtin_ctz(mask) + (i * 32);
+                return true; }
+        }
+        return false;
+    }
+
+    bool confl(const BV32x& assign) const {  // -- assumes '*this' is an inverted clause
+        for (uint i = 0; i < N; i++)
+            if ((data[i] & ~assign.data[i]) != 0)
+                return false;
+        return true;
+    }
+
+    bool bcp(const BV32x& assign, lit_t& prop_lit) const {
+        for (uint i = 0; i < N; i++){
+            uint mask = (data[i] & ~assign.data[i]);
+            if (mask != 0){
+                if ((mask & (mask-1)) == 0){
+                    for (uint j = i+1; j < N; j++)  // -- check that rest is zero
+                        if ((data[j] & ~assign.data[j]) != 0) return false;
+                    prop_lit = neg(__builtin_ctz(mask) + (i * 32));
+                    return true;
+                }else
+                    return false;
+            }
+        }
+        assert(false);  // -- 'confl()' should have returned TRUE and this function never called
+    }
+
+    bool operator==(const BV32x& other) const {
+        for (uint i = 0; i < N; i++)
+            if (data[i] != other.data[i]) return false;
+        return true;
+    }
+
+    // Debug:
+    void write(Out& out) const {
+        FWrite(out) "{";
+        bool first = true;
+        for (var_t x = 0; x < max_vars; x++){
+            if (has(mkLit(x))){
+                if (!first) FWrite(out) ", ";
+                FWrite(out) "x%_", (uint)x;
+                first = false;
+            }
+            if (has(mkNeg(x))){
+                if (!first) FWrite(out) ", ";
+                FWrite(out) "~x%_", (uint)x;
+                first = false;
+            }
+        }
+        FWrite(out) "}";
+    }
+};
+
+
+template<> fts_macro void write_(Out& out, const BV32x<2>& v) { v.write(out); }
+template<> fts_macro void write_(Out& out, const BV32x<4>& v) { v.write(out); }
+template<> fts_macro void write_(Out& out, const BV32x<8>& v) { v.write(out); }
