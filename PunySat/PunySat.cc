@@ -4,11 +4,11 @@
 //| Author(s)   : Niklas Een
 //| Module      : PunySat
 //| Description : Experimental SAT solver using bit-vectors as clause representation.
-//|
+//| 
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//|
+//| 
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -401,12 +401,12 @@ PS_(bool) makeDecision()
 
 PS_(cla_id) propagate()
 {
+#if 0
     while (qhead < trail_sz){
         n_propagations++;
         lit_t p = trail[qhead];
         qhead++;
 
-        //**/if (occurs[p].size() > 0 || occurs[BV::neg(p)].size() > 0) WriteLn "propagating %_", lit(p);
         for (uint i = 0; i < occurs[p].size(); i++){
             cla_id from = occurs[p][i];
             const BV& cl = clauses[from];
@@ -419,6 +419,57 @@ PS_(cla_id) propagate()
                 enqueueQ(q, from);
         }
     }
+
+#else
+    static Vec<uchar> cs; cs.growTo(clauses.size(), 0);
+
+    while (qhead < trail_sz){
+        n_propagations++;
+
+        if (trail_sz - qhead == 1){
+            lit_t p = trail[qhead];
+            qhead++;
+
+            for (uint i = 0; i < occurs[p].size(); i++){
+                cla_id from = occurs[p][i];
+                const BV& cl = clauses[from];
+
+                if (cl.confl(assign)){
+                    return from; }
+
+                lit_t q;
+                if (cl.bcp(assign, q) && !assign.has(q))
+                    enqueueQ(q, from);
+            }
+
+        }else{
+            for (; qhead < trail_sz; qhead++){
+                Vec<cla_id>& os = occurs[trail[qhead]];
+                for (uint i = 0; i < os.size(); i++)
+                    cs[os[i]] = 1;
+            }
+
+            for (uint i = 1; i < clauses.size(); i++){
+                if (cs[i] == 0) continue;
+                cs[i] = 0;
+                const BV& cl = clauses[i];
+
+                if (cl.confl(assign)){
+                    return i; }
+
+                lit_t q;
+                if (cl.bcp(assign, q) && !assign.has(q)){
+                    enqueueQ(q, i);
+                  #if 0
+                    Vec<cla_id>& os = occurs[q];
+                    for (uint i = 0; i < os.size(); i++)
+                        cs[os[i]] = 1;
+                  #endif
+                }
+            }
+        }
+    }
+#endif
 
     return 0;
 }
