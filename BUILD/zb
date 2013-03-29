@@ -87,6 +87,7 @@ machine    = None   # Result of 'uname -n'
 os_name    = None   # Result of 'uname'
 n_cores    = None   # Number of CPU cores. Good default for '-j' in the make call
 static_cxx = None
+popcnt     = None
 qt_libpath = None
 
 
@@ -109,13 +110,20 @@ def get_n_cores():
     n_cores = multiprocessing.cpu_count()
 
 
+def try_gcc(arg):
+    with os.popen('echo "int main(){ return 0; }" | g++ -xc ' + arg + ' - -o /dev/null 2>&1', "r") as p:
+        tmp = p.readline()
+        #print "arg:", arg, "  tmp:", tmp
+        if "unrecognized" in tmp:
+            return False
+        else:
+            return True
+
 def get_gcc_version():
     global static_cxx
-    with os.popen("g++ -static-libstdc++ 2>&1", "r") as p:
-        if "unrecognized option" in p.readline():
-            static_cxx = False
-        else:
-            static_cxx = True
+    global popcnt
+    static_cxx = try_gcc("-static-libstdc++")
+    popcnt = try_gcc("-mpopcnt")
 
 def get_qt_libpath():
     global qt_libpath
@@ -440,7 +448,7 @@ def setup_cflags(pri, secs, cxx_mode):
     flags = []
 
     # General:
-    flags.append("-Wall -ffloat-store -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS -msse2 -mpopcnt")
+    flags.append("-Wall -ffloat-store -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS -msse2" + (" -mpopcnt" if popcnt else ""))
     flags.append("-DZZ_CONSTANTS_AS_MACROS")
 
     # Primary type:
