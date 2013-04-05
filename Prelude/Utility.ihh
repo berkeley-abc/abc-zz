@@ -578,6 +578,7 @@ macro float getF(In& in) {
 
 Declare_Exception(Excp_ParseError);
 
+macro bool isZero(char c) { return c == 0; }
 macro bool isWS(char c) { return (c >= 8 && c <= 13) || c == 32; }
 macro bool isUpAlpha(char c) { return (c >= 'A') && (c <= 'Z'); }
 macro bool isLoAlpha(char c) { return (c >= 'a') && (c <= 'z'); }
@@ -652,7 +653,6 @@ void gets(In& in, Vec<char>& result, EosPred eos = EosPred()) {
         result.push(in++);
     }
 }
-
 
 // NOTE! 'trim' is destructive, 'strip' returns a substring 'Str'.
 

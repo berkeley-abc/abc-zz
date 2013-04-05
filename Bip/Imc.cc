@@ -314,7 +314,7 @@ lbool imcStd(NetlistRef N0, const Vec<Wire>& props, const Params_ImcStd& P, Cex*
             assert(bf_depth);
             assert(*bf_depth + 1 >= 0);
             Vec<uint> depths;
-            depths.push(uint(*bf_depth + 1));
+            depths.push(uint(cex->depth()));
             sendMsg_Result_fails(props, depths, *cex, N0, true);
 
         }else{ assert(ret == l_True);

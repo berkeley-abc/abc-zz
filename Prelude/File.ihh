@@ -57,7 +57,7 @@ public:
     #define DEFAULTS fd(-1), mode(READ), buf(NULL), size(-1), pos(0), own_fd(true)
 
     File()                                             : DEFAULTS {}
-    File(int fd_, FileMode mode_, bool own_fd_ = true) : DEFAULTS { open(fd_, mode_, own_fd_); }
+    File(int fd_, FileMode mode_, bool own_fd_ = true) : DEFAULTS { open(fd_, mode_, own_fd_); }    // -- 'fd' MUST be a file, not a socket or a pipe
     File(cchar* name, cchar* mode_)                    : DEFAULTS { open(name, mode_); }
     File(String name, String mode_)                    : DEFAULTS { open(name.c_str(), mode_.c_str()); }
    ~File() { close(); }

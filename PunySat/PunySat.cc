@@ -357,7 +357,7 @@ PS_(void) enqueueQ(lit_t p, cla_id from)
 
 PS_(bool) enqueue(lit_t p, cla_id from)
 {
-    if (assign.has(p))
+    if (assign.has(p))      // <<== can improve this a little
         return true;
     else if (assign.has(BV::neg(p)))
         return false;
@@ -385,9 +385,15 @@ PS_(bool) makeDecision()
 }
 
 
+ZZ_PTimer_Add(propagate);
+ZZ_PTimer_Add(propagate_confl);
+ZZ_PTimer_Add(propagate_bcp);
+
+
 PS_(cla_id) propagate()
 {
 #if 1
+    ZZ_PTimer_Scope(propagate);
     while (qhead < trail_sz){
         n_propagations++;
         lit_t p = trail[qhead];
@@ -397,12 +403,18 @@ PS_(cla_id) propagate()
             cla_id from = occurs[p][i];
             const BV& cl = clauses[from];
 
+            ZZ_PTimer_Begin(propagate_confl);
             if (cl.confl(assign)){
+                ZZ_PTimer_End(propagate_confl);
                 return from; }
+            ZZ_PTimer_End(propagate_confl);
 
+            ZZ_PTimer_Begin(propagate_bcp);
             lit_t q;
-            if (cl.bcp(assign, q) && !assign.has(q))
-                enqueueQ(q, from);
+            if (cl.bcp(assign, q) && !assign.has(q)){
+                ZZ_PTimer_End(propagate_bcp);
+                enqueueQ(q, from); }
+            else ZZ_PTimer_End(propagate_bcp);
         }
     }
 
@@ -800,6 +812,61 @@ watcher lists?
 restarts          [DONE]
 polartity heur    [DONE]
 conflict clause min.
+
+
+[een@turbantad] ~/ZZ/PunySat> valgrind --tool=cachegrind punysat_ref x1_24.shuffled.cnf 
+==22179== Cachegrind, a cache and branch-prediction profiler
+=
+...
+UNSAT
+
+restarts:               3,033
+conflicts:          1,531,211    (1,525 /sec)
+decisions:          2,375,142    (2,366 /sec)
+propagations:      22,217,836    (22,135 /sec)
+conf.lits.deleted:    12.08 %
+deleted clauses:    1,530,812
+Memory used:          68.7 MB
+Real time:          1006.02 s
+CPU time:           1003.72 s
+==22179== 
+==22179== I   refs:      70,492,187,635
+==22179== I1  misses:           421,998
+==22179== L2i misses:             3,507
+==22179== I1  miss rate:           0.00%
+==22179== L2i miss rate:           0.00%
+==22179== 
+==22179== D   refs:      36,111,626,220  (25,633,594,642 rd   + 10,478,031,578 wr)
+==22179== D1  misses:       141,979,231  (   128,435,135 rd   +     13,544,096 wr)
+==22179== L2d misses:            12,898  (         6,459 rd   +          6,439 wr)
+==22179== D1  miss rate:            0.3% (           0.5%     +            0.1%  )
+==22179== L2d miss rate:            0.0% (           0.0%     +            0.0%  )
+==22179== 
+==22179== L2 refs:          142,401,229  (   128,857,133 rd   +     13,544,096 wr)
+==22179== L2 misses:             16,405  (         9,966 rd   +          6,439 wr)
+==22179== L2 miss rate:             0.0% (           0.0%     +            0.0%  )
+
+
+vs. zzminisat
+
+==22248== 
+==22248== I   refs:      14,955,847,644
+==22248== I1  misses:         6,570,747
+==22248== L2i misses:            16,551
+==22248== I1  miss rate:           0.04%
+==22248== L2i miss rate:           0.00%
+==22248== 
+==22248== D   refs:       8,090,686,543  (5,533,315,492 rd   + 2,557,371,051 wr)
+==22248== D1  misses:         6,057,328  (    4,975,507 rd   +     1,081,821 wr)
+==22248== L2d misses:            16,330  (       12,235 rd   +         4,095 wr)
+==22248== D1  miss rate:            0.0% (          0.0%     +           0.0%  )
+==22248== L2d miss rate:            0.0% (          0.0%     +           0.0%  )
+==22248== 
+==22248== L2 refs:           12,628,075  (   11,546,254 rd   +     1,081,821 wr)
+==22248== L2 misses:             32,881  (       28,786 rd   +         4,095 wr)
+==22248== L2 miss rate:             0.0% (          0.0%     +           0.0%  )
+
+
 */
 
 
