@@ -22,6 +22,8 @@ $MAKEFILE_DEFINES
 
 namespace abc_sat {
 
+typedef long long int64;        // -- hack
+
 struct sat_solver_t;
 typedef struct sat_solver_t sat_solver;
 typedef int lit;
