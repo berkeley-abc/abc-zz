@@ -43,6 +43,7 @@ def make_makefile(out, obj_suffix, opt_flags, lib_name):
         text = re.sub(r"OPTFLAGS *:=.*\n", "OPTFLAGS := " + opt_flags + "\n", text)
         text = re.sub(r"lib\$\(PROG\)\.a", lib_name, text)
         text = re.sub(r"-ldl", "", text)
+        text = re.sub(r"-Wno-unused-but-set-variable", "", text)
 
         out.write(text)
         out.write("%." + obj_suffix + " : %.c\n\techo \`\` Compiling: $<\n\t$(CC) -c $(CFLAGS) $< -o $@\n")
