@@ -30,8 +30,8 @@ struct Job {
     uint64      id;     // Job ID
     uint        prio;   // Job priority (positive): higher runs first, 0 means "put on hold".
     uint        conc;   // Concurrency: number of other jobs that can run in parallel.
-    String      group;  // Which group
-    String      batch;
+    String      group;  // <<== remove
+    String      batch;  // Only processes from the same batch may run concurrently
 
     String      exec;   // Name of executable (full path)
     Vec<String> args;   // Arguments to pass to executable

@@ -226,7 +226,7 @@ char startProcess(const String& cmd, const Vec<String>& args, int& out_pid, int 
         }
     }
 
-    bool ret = startProcess(cmd, args, out_pid, out_std, mode);
+    char ret = startProcess(cmd, args, out_pid, out_std, mode);
 
     for (uint i = 0; i < clear.size(); i++){
         unsetenv(clear[i].c_str()); }

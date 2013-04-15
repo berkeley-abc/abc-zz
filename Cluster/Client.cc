@@ -150,21 +150,22 @@ void cl_kill(int fd, uint64 job_id)
 
 void launchJob(const String& username, const Job& job)
 {
-    struct rlimit lim;
-
-
-
-    // fork?
-    // change user
-    // set limits
-    // connect FDs to file
-    // 'setpgrp()' -- move to its own process group
+    ProcMode mode;
+    if (username != "" && username != userName())
+        mode.username = username;
+    mode.dir = job.cwd;
+    mode.own_group = true;
+    mode.timeout = job.cpu;     // -- real-time is monitored in client loop
+    mode.memout = job.mem;
+    mode.stdin_file = job.stdin;
+    mode.stdout_file = job.stdout;
+    mode.stderr_file = job.stderr;
 
     pid_t child_pid;
     int child_io[3];
-    bool ok = startProcess(job.exec, job.args, child_pid, child_io, job.env);
+    char ret = startProcess(job.exec, job.args, child_pid, child_io, job.env, mode);
 
-    /**/if (!ok) WriteLn "Failed to run '%_' with args '%_'.", job.exec, job.args;
+    /**/if (ret != 0) WriteLn "Failed to run '%_' with args '%_'. Error code: %_", job.exec, job.args, ret;
 
     char buf[4096];
     for(;;){
