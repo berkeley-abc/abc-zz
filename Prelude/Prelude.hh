@@ -52,6 +52,7 @@ Defines that control compilation:
 #endif
 
 #include <cassert>
+#include <cerrno>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -64,6 +65,7 @@ Defines that control compilation:
 #include <csignal>
 #include <new>
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 

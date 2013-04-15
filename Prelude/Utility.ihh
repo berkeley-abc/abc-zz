@@ -106,6 +106,21 @@ macro String currDir() {
     return ret; }
 
 
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct FileInfo {
+    String name;
+    String full;    // Full name with path.
+    uint64 size;
+    int64  date;
+    FileInfo(String name_, String full_, uint64 size_, time_t date_) : name(name_), full(full_), size(size_), date(date_) {}
+};
+
+
+bool readDir(String path, Vec<FileInfo>& files, Vec<FileInfo>& dirs);
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // 'printf' style operations:
 

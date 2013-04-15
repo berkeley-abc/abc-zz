@@ -451,7 +451,6 @@ def setup_cflags(pri, secs, cxx_mode):
     flags.append("-Wall -ffloat-store -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS -msse2")
     flags.append("-DZZ_CONSTANTS_AS_MACROS")
     if popcnt: flags.append("-mpopcnt")
-    #flags.append("-mmacosx-version-min=10.6")
 
     # Primary type:
     if pri == "r": flags.append("-O3 -fomit-frame-pointer")

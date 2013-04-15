@@ -476,6 +476,7 @@ void printInt(Out& out, int64 x)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Printf to newly allocated string:
 
 
 static FILE* printf_dummy_file;
@@ -591,6 +592,44 @@ void pushf(Vec<uchar>& out, cchar* format, ...)
     while (*tmp != 0)
         out.push(uchar(*tmp++));
     xfree(addr);
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Directories:
+
+
+bool readDir(String path, Vec<FileInfo>& files, Vec<FileInfo>& dirs)
+{
+    char* cwd0 = getcwd(NULL, 0);
+    int err = chdir(path.c_str());
+    if (err != 0) return false;
+    char* cwd1 = getcwd(NULL, 0);
+
+    DIR* dir = opendir(".");
+    if (dir == NULL)
+        return false;
+
+    struct dirent* entry;
+    for(;;){
+        entry = readdir(dir);
+        if (entry == NULL) break;
+
+        char* name = entry->d_name;
+        struct stat st;
+        String filename = (FMT "%_/%_", cwd1, name);
+        stat(filename.c_str(), &st);
+        FileInfo info(name, filename, st.st_size, st.st_mtime);
+
+        if (S_ISREG(st.st_mode))
+            files.push(info);
+        else if (S_ISDIR(st.st_mode))
+            dirs.push(info);
+    }
+    closedir(dir);
+    int err2 = chdir(cwd0); assert(err2 == 0);
+
+    return true;
 }
 
 
