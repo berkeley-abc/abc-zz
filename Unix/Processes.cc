@@ -12,12 +12,41 @@
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
+#include "Processes.hh"
+#include <pwd.h>
+#include <grp.h>
 
 namespace ZZ {
 using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+
+
+static
+bool setUser(const String& username)
+{
+    int bufsize = sysconf(_SC_GETPW_R_SIZE_MAX); assert(bufsize > 0);
+    char* buf = xmalloc<char>(bufsize);
+    On_Scope_Exit(xfree<char>, buf);
+
+    struct passwd  pw;
+    struct passwd* result = NULL;
+    if (getpwnam_r(username.c_str(), &pw, buf, bufsize, &result) != 0 || result == NULL)
+        return false;
+    if (setegid(pw.pw_gid) == -1)
+        return false;
+    if (initgroups(pw.pw_name, pw.pw_gid) == -1)
+        return false;
+    if (seteuid(pw.pw_uid) == -1)
+        return false;
+    if (chdir(pw.pw_dir) == -1)
+        return false;
+    return true;
+}
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
 static
@@ -30,6 +59,7 @@ void setCloseOnExec(int fd)
 
 
 // Close all file descriptors except 'fd' and: STDIN, STDOUT, STDERR
+static
 void closeAllBut(int fd)
 {
     int n = sysconf(_SC_OPEN_MAX);
@@ -39,11 +69,25 @@ void closeAllBut(int fd)
 }
 
 
-void closeChildIo(int out_std[3])
+static
+bool connectFd(int fd, const String& filename, bool write)
 {
-    close(out_std[0]);
-    close(out_std[1]);
-    close(out_std[2]);
+    int new_fd = write ? open(filename.c_str(), O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
+                       : open(filename.c_str(), O_RDONLY);
+
+    if (new_fd == -1)
+        return false;
+
+    dup2(new_fd, fd);
+    return true;
+}
+
+
+static
+void fail(int signal_pipe[2], char err)
+{
+    int tmp ___unused = write(signal_pipe[1], &err, 1);
+    _exit(255);
 }
 
 
@@ -52,17 +96,17 @@ void closeChildIo(int out_std[3])
 // the child processes' stdin, stdout and stderr (in that order). NOTE! All three file descriptors
 // need to be closed by parent.
 //
-bool startProcess(const String& cmd, const Vec<String>& args, int& out_pid, int out_std[3])
+char startProcess(const String& cmd, const Vec<String>& args, int& out_pid, int out_std[3], const ProcMode& mode)
 {
-    int stdin_pipe[2];
-    int stdout_pipe[2];
-    int stderr_pipe[2];
+    int res;
+    int stdin_pipe [2] = {-1, -1};
+    int stdout_pipe[2] = {-1, -1};
+    int stderr_pipe[2] = {-1, -1};
     int signal_pipe[2];
 
-    int res;
-    res = pipe(stdin_pipe ); assert(res == 0);
-    res = pipe(stdout_pipe); assert(res == 0);
-    res = pipe(stderr_pipe); assert(res == 0);
+    if (mode.stdin_file  == ""){ res = pipe(stdin_pipe ); assert(res == 0); }
+    if (mode.stdout_file == ""){ res = pipe(stdout_pipe); assert(res == 0); }
+    if (mode.stderr_file == ""){ res = pipe(stderr_pipe); assert(res == 0); }
     res = pipe(signal_pipe); assert(res == 0);
 
     setCloseOnExec(signal_pipe[0]);
@@ -71,12 +115,50 @@ bool startProcess(const String& cmd, const Vec<String>& args, int& out_pid, int 
     pid_t child_pid = fork(); assert(child_pid != -1);
 
     if (child_pid == 0){
-        // Child:
-        dup2(stdin_pipe [0], STDIN_FILENO);
-        dup2(stdout_pipe[1], STDOUT_FILENO);
-        dup2(stderr_pipe[1], STDERR_FILENO);
+        //
+        // CHILD:
+        //
+
+        // Setup process mode:
+        if (mode.username != "" && !setUser(mode.username)) fail(signal_pipe, 'u');
+        if (mode.dir != "" && chdir(mode.dir.c_str()) == -1) fail(signal_pipe, 'd');
+
+        struct rlimit lim;
+        if (mode.timeout != DBL_MAX){
+            lim.rlim_cur = lim.rlim_max = (mode.timeout > ~rlim_t(0)) ? ~rlim_t(0) : mode.timeout;
+            if (setrlimit(RLIMIT_CPU, &lim) == -1) fail(signal_pipe, 't'); }
+
+        if (mode.memout != UINT64_MAX){
+            lim.rlim_cur = lim.rlim_max = (mode.memout > ~rlim_t(0)) ? ~rlim_t(0) : mode.memout;
+            if (setrlimit(RLIMIT_AS, &lim) == -1) fail(signal_pipe, 'm'); }
+
+        lim.rlim_cur = lim.rlim_max = 0;    // -- no core-files
+        setrlimit(RLIMIT_CORE, &lim);
+
+        if (mode.own_group)
+            setpgrp();  // -- move to its own process group
+
+        // Redirect standard streams:
+        if (mode.stdin_file == "")
+            dup2(stdin_pipe [0], STDIN_FILENO);
+        else if (!connectFd(STDIN_FILENO, mode.stdin_file, false))
+            fail(signal_pipe, 'i');
+
+        if (mode.stdout_file == "")
+            dup2(stdout_pipe[1], STDOUT_FILENO);
+        else if (!connectFd(STDOUT_FILENO, mode.stdout_file, true))
+            fail(signal_pipe, 'o');
+
+        if (mode.stderr_file == "")
+            dup2(stderr_pipe[1], STDERR_FILENO);
+        else if (eq(mode.stdout_file, mode.stderr_file))
+            dup2(STDOUT_FILENO, STDERR_FILENO);
+        else if (!connectFd(STDERR_FILENO, mode.stderr_file, true))
+            fail(signal_pipe, 'e');
+
         closeAllBut(signal_pipe[1]);
 
+        // Call executable:
         bool use_path = (cmd.size() > 0 && cmd[0] == '*');
         char* exec_cmd = cmd.c_str() + use_path;
         char** exec_args = xmalloc<char*>(args.size() + 2);
@@ -92,15 +174,13 @@ bool startProcess(const String& cmd, const Vec<String>& args, int& out_pid, int 
 
         // Exec failed, let parent know:
         assert(res == -1);
-        res = write(signal_pipe[1], "!", 1);
-        assert(res != -1);
-        _exit(255);
+        fail(signal_pipe, 'x');
     }
 
     // Parent continues:
-    close(stdin_pipe [0]);
-    close(stdout_pipe[1]);
-    close(stderr_pipe[1]);
+    if (stdin_pipe [0] != -1) close(stdin_pipe [0]);
+    if (stdout_pipe[1] != -1) close(stdout_pipe[1]);
+    if (stderr_pipe[1] != -1) close(stderr_pipe[1]);
     close(signal_pipe[1]);
 
     out_pid = child_pid;
@@ -113,13 +193,13 @@ bool startProcess(const String& cmd, const Vec<String>& args, int& out_pid, int 
     bool success = (read(signal_pipe[0], buf, sizeof(buf)) == 0);
     close(signal_pipe[0]);
 
-    return success;
+    return success ? 0 : buf[0];
 }
 
 
 // Each element in 'env' should be on form "key=value" or just "key" (an entry "key" will unset that key).
 //
-bool startProcess(const String& cmd, const Vec<String>& args, int& out_pid, int out_std[3], const Vec<String>& env)
+char startProcess(const String& cmd, const Vec<String>& args, int& out_pid, int out_std[3], const Vec<String>& env, const ProcMode& mode)
 {
     Vec<String> clear;
     Vec<Pair<String,String> > restore;
@@ -146,7 +226,7 @@ bool startProcess(const String& cmd, const Vec<String>& args, int& out_pid, int 
         }
     }
 
-    bool ret = startProcess(cmd, args, out_pid, out_std);
+    bool ret = startProcess(cmd, args, out_pid, out_std, mode);
 
     for (uint i = 0; i < clear.size(); i++){
         unsetenv(clear[i].c_str()); }
@@ -154,6 +234,14 @@ bool startProcess(const String& cmd, const Vec<String>& args, int& out_pid, int 
         setenv(restore[i].fst.c_str(), restore[i].snd.c_str(), 1); }
 
     return ret;
+}
+
+
+void closeChildIo(int out_std[3])
+{
+    if (out_std[0] != -1) close(out_std[0]);
+    if (out_std[1] != -1) close(out_std[1]);
+    if (out_std[2] != -1) close(out_std[2]);
 }
 
 

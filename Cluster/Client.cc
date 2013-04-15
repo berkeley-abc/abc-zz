@@ -148,8 +148,12 @@ void cl_kill(int fd, uint64 job_id)
 // Launch job:
 
 
-void launchJob(const Job& job)
+void launchJob(const String& username, const Job& job)
 {
+    struct rlimit lim;
+
+
+
     // fork?
     // change user
     // set limits
@@ -206,7 +210,7 @@ void receivePackage(Vec<char>& pkg)
             case req_Launch: {
                 Job job;
                 job.deserialize(in);
-                launchJob(job);
+                launchJob(username(req), job);
                 removePrefix(pkg, sizeof(ReqHeader) + len);
                 break;}
 
@@ -334,11 +338,6 @@ void clientLoop(int port)
         }
     }
 }
-
-
-/*
-- Loggfiler .1 .2
-*/
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

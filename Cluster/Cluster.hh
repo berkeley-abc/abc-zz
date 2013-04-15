@@ -48,6 +48,8 @@ struct Job {
     String      status; // File to write status to
     String      topmon; // File to write "top" data to
 
+    // + behavior when other processes are disturbing this one (after X seconds, pause until no activity for Y seconds (or restart))
+
     Job() :
         id(job_NULL),
         prio(0),
