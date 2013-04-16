@@ -115,7 +115,13 @@ void send(const Job& job)
     }
 
     cl_launch(fd, job);
-    /**/cl_launch(fd, job);
+
+    ClMsg msg;
+    ssize_t n = read(fd, &msg, sizeof(msg));
+    if (n == sizeof(msg))
+        WriteLn "Reply:  type=%_  id=%_  data=%C", (uint)msg.type, msg.id, (char)msg.data;
+    else
+        WriteLn "Failed to read %_ bytes (got %_)", sizeof(msg), n;
 }
 
 

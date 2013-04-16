@@ -3,7 +3,7 @@
 //| Name        : Client.cc
 //| Author(s)   : Niklas Een
 //| Module      : Cluster
-//| Description : 
+//| Description : Daemon running on client machines (drones). 
 //| 
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
@@ -166,7 +166,16 @@ bool cl_kill(int fd, uint64 job_id)
 // Launch job:
 
 
-void launchJob(const String& username, const Job& job)
+static
+void sendMsg(const ClMsg& msg, int server_fd)
+{
+    ssize_t n = write(server_fd, &msg, sizeof(msg));
+    if (n != sizeof(msg))
+        syslog(LOG_ERR, "Could not send reply to server: server_fd=%d.", server_fd);
+}
+
+
+void launchJob(const String& username, const Job& job, int server_fd)
 {
     ProcMode mode;
     if (username != "" && username != userName())
@@ -183,11 +192,10 @@ void launchJob(const String& username, const Job& job)
     int child_io[3];
     char ret = startProcess(job.exec, job.args, child_pid, child_io, job.env, mode);
 
-    if (ret != 0){
-        // <<== report error back to server here (need FD)
-        WriteLn "Failed to run '%_' with args '%_'. Error code: %_", job.exec, job.args, ret;
-    }
-    // <<== also report back success?
+    if (ret != 0)
+        sendMsg(ClMsg(clmsg_LaunchFailed, job.id, ret), server_fd);
+    else
+        sendMsg(ClMsg(clmsg_LaunchSucceeded, job.id), server_fd);
 }
 
 
@@ -203,7 +211,7 @@ void removePrefix(Vec<char>& v, uind len)
 }
 
 
-void receivePackage(Vec<char>& pkg)
+void receivePackage(Vec<char>& pkg, int server_fd)
 {
     for(;;){
         if (pkg.size() < sizeof(ReqHeader))
@@ -230,7 +238,7 @@ void receivePackage(Vec<char>& pkg)
             case req_Launch: {
                 Job job;
                 job.deserialize(in);
-                launchJob(username(req), job);
+                launchJob(username(req), job, server_fd);
                 removePrefix(pkg, sizeof(ReqHeader) + len);
                 break;}
 
@@ -354,7 +362,7 @@ void clientLoop(int port)
                     }
                 }
 
-                receivePackage(pkg);        // -- will clear 'pkg' if complete
+                receivePackage(pkg, server_fd);     // -- will clear 'pkg' if complete
             }
         }
     }
