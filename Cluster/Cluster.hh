@@ -35,7 +35,7 @@ struct Job {
 
     String      exec;   // Name of executable (full path)
     Vec<String> args;   // Arguments to pass to executable
-    String      cwd;    // Current working directory
+    String      dir;    // Current working directory
     Vec<String> env;    // Environment: vector of strings "key=value"
 
     float       real;   // Real time limit

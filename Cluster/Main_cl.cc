@@ -119,10 +119,48 @@ void send(const Job& job)
 }
 
 
+/*
+Add the following to your 'rsyslog.conf' file, or one of the files 
+under '/etc/rsyslog.d/':
+
+-------------------------------------------------------------------------------
+!cl-client
+*.*             /var/log/cl-client.log
+!cl-server
+*.*             /var/log/cl-server.log
+!*
+-------------------------------------------------------------------------------
+*/
+
+
+/*
+       LOG_EMERG      system is unusable
+       LOG_ALERT      action must be taken immediately
+       LOG_CRIT       critical conditions
+       LOG_ERR        error conditions
+       LOG_WARNING    warning conditions
+       LOG_NOTICE     normal, but significant, condition
+       LOG_INFO       informational message
+       LOG_DEBUG      debug-level message
+*/
+
+
+
+
 int main(int argc, char** argv)
 {
     ZZ_Init;
 
+#if 0
+    openlog("cl-client", LOG_PID, LOG_USER);
+    syslog(LOG_ALERT, "BB Testing, testing: %d", 42);
+    syslog(LOG_ERR  , "BB ...more testing: %d\n", 4711);
+    for (uint i = 500; i < 1000000; i++)
+        syslog(LOG_CRIT , "BB ...even more testing: %d\n", i);
+    closelog();
+#endif
+
+#if 1
     cli.addCommand("job", "Connect to client and send a job.");
     cli.addCommand("client", "Start a client process.");
     cli.parseCmdLine(argc, argv);
@@ -139,6 +177,7 @@ int main(int argc, char** argv)
 
         send(job);
     }
+#endif
 
 #if 0
     TopMonitor top(0.5);

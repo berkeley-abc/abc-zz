@@ -26,18 +26,10 @@ using namespace std;
 
 void clientLoop(int port);   // -- will listen for connection from server on given port
 
-void cl_launch(int fd, const Job& job);
-void cl_pause (int fd, uint64 job_id);
-void cl_resume(int fd, uint64 job_id);
-void cl_kill  (int fd, uint64 job_id);
-
-/*
-Information going in other direction:
-
-  - failed to launch job
-  - job finished
-  - job disturbed (and paused/aborted): command line of disturbing process(es)
-*/
+bool cl_launch(int fd, const Job& job);
+bool cl_pause (int fd, uint64 job_id);
+bool cl_resume(int fd, uint64 job_id);
+bool cl_kill  (int fd, uint64 job_id);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

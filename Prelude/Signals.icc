@@ -21,11 +21,14 @@ using namespace std;
 // Setup signal handlers:
 
 
+bool silent_interrupt = false;
+bool silent_crash     = false;
 static bool catching_interrupt = false;
 static bool catching_crash     = false;
 
 
 ZZ_Initializer(catching, -10000) {
+    silent_interrupt = silent_crash = false;
     catching_interrupt = catching_crash = false;
 }
 
@@ -60,9 +63,11 @@ extern "C" void interruptHandler(int signum)
 {
     catchInterrupt(SIG_DFL);
 
-    char buf[64];
-    sprintf(buf, "\n*** INTERRUPTED *** [signal %d]\n", signum);
-    ssize_t ignore ___unused = write(2/*stderr*/, buf, strlen(buf));
+    if (!silent_interrupt){
+        char buf[64];
+        sprintf(buf, "\n*** INTERRUPTED *** [signal %d]\n", signum);
+        ssize_t ignore ___unused = write(2/*stderr*/, buf, strlen(buf));
+    }
 
     flushAtExits(x_Interrupt, signum * 256);
 
@@ -88,9 +93,11 @@ extern "C" void crashHandler(int signum)
 {
     catchCrash(SIG_DFL);
 
-    char buf[64];
-    sprintf(buf, "\n*** CRASHED *** [signal %d]\n", signum);
-    ssize_t ignore ___unused = write(2/*stderr*/, buf, strlen(buf));
+    if (!silent_crash){
+        char buf[64];
+        sprintf(buf, "\n*** CRASHED *** [signal %d]\n", signum);
+        ssize_t ignore ___unused = write(2/*stderr*/, buf, strlen(buf));
+    }
 
     flushAtExits(x_Crash, signum * 256);
 

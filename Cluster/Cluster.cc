@@ -57,7 +57,7 @@ void Job::serialize(Out& out) const
 
     puts(out, exec);
     putu(out, args.size()); for (uint i = 0; i < args.size(); i++) puts(out, args[i]);
-    puts(out, cwd);
+    puts(out, dir);
     putu(out, env .size()); for (uint i = 0; i < env .size(); i++) puts(out, env [i]);
 
     putF(out, real);
@@ -82,7 +82,7 @@ void Job::deserialize(In& in)
 
     gets (in, exec);
     getSz(in, args); for (uint i = 0; i < args.size(); i++) gets(in, args[i]);
-    gets (in, cwd);
+    gets (in, dir);
     getSz(in, env); for (uint i = 0; i < env .size(); i++) gets(in, env [i]);
 
 
@@ -91,7 +91,7 @@ void Job::deserialize(In& in)
     getu(in, mem);
 
     gets(in, stdin);
-    gets(in, stdin);
+    gets(in, stdout);
     gets(in, stderr);
     gets(in, status);
     gets(in, topmon);
@@ -103,7 +103,7 @@ void Job::prettyPrint(Out& out) const
     FWriteLn(out) "id:     %_", id;
     FWriteLn(out) "prio:   %_", prio;
     FWriteLn(out) "exec:   %_", exec;
-    FWriteLn(out) "cwd:    %_", cwd;
+    FWriteLn(out) "dir:    %_", dir;
     FWriteLn(out) "env:    %_", env;
     FWriteLn(out) "args:   %_", args;
     FWriteLn(out) "batch:  %_", batch;
@@ -160,8 +160,8 @@ void Job::readConf(String filename)
             }else if (eq(key, "args")){
                 if (!append) args.clear();
                 args += val;    // <<== break on space and interpret backslash
-            }else if (eq(key, "cwd")){
-                cwd = val;
+            }else if (eq(key, "dir")){
+                dir = val;
             }else if (eq(key, "env")){
                 if (!append) env.clear();
                 env += val;     // <<== break on space and interpret backslash 

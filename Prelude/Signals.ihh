@@ -18,6 +18,10 @@ using namespace std;
 // Program exit handling:
 
 
+extern bool silent_interrupt;   // Change to 'true' to suppress '*** INTERRUPTED ***' output.
+extern bool silent_crash;       // Change to 'true' to suppress '*** CRASHED ***' output.
+
+
 const uint x_Normal    = 1;
 const uint x_Interrupt = 2;
 const uint x_Crash     = 4;
@@ -65,8 +69,8 @@ void flushAtExits(uint mask = x_Normal, uint exit_code = 0);
 
 macro void setupSignalHandlers() { atExit(x_Abnormal, nop<>); }
     // -- Installs signal handlers for SIGINT, SIGHUP, SIGTERM, SIGABRT, SIGSEGV, SIGBUG
-    // and exists program a little bit nicer. Function 'atExit()' will also install handlers
-    // on demand.
+    // and exists program a little bit nicer. Function 'atExit()' will also install 
+    // these handlers on its first call.
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

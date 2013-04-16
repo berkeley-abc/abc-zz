@@ -16,9 +16,8 @@
 #include "ZZ_Md5.hh"
 #include "Cluster.hh"
 #include "Client.hh"
-
-
 #include <errno.h>
+#include <syslog.h>
 
 #define PROBE_INTERVAL 0.5
 
@@ -109,38 +108,57 @@ bool validateRequest(const ReqHeader& req)
 // Server->Client communication:
 
 
-void cl_launch(int fd, const Job& job)
+static
+bool cl_send(int fd, const String& pkg, ReqType type)
 {
-    String pkg;
-    job.serialize(pkg);
-
     ReqHeader req;
-    makeRequest(req, userName(), pkg.size(), req_Launch);
+    makeRequest(req, userName(), pkg.size(), type);
 
     ssize_t m = write(fd, &req, sizeof(req));
     ssize_t n = write(fd, pkg.base(), pkg.size());
 
     if (m != sizeof(req) || n != (ind)pkg.size()){
-        ShoutLn "ERROR! 'cl_launch()' failed to send whole package.";
-        exit(1); }
+        syslog(LOG_ERR, "'cl_send()' failed: fd=%d.", fd);
+        return false;
+    }else
+        return true;
 }
 
 
-void cl_pause(int fd, uint64 job_id)
+bool cl_launch(int fd, const Job& job)
 {
-
+    String pkg;
+    job.serialize(pkg);
+    return cl_send(fd, pkg, req_Launch);
 }
 
 
-void cl_resume(int fd, uint64 job_id)
+bool cl_pause(int fd, uint64 job_id)
 {
+    String pkg;
+    for (uint i = 0; i < 8; i++)
+        pkg.push(char(job_id >> (i * 8)));
 
+    return cl_send(fd, pkg, req_Pause);
+}
+
+bool cl_resume(int fd, uint64 job_id)
+{
+    String pkg;
+    for (uint i = 0; i < 8; i++)
+        pkg.push(char(job_id >> (i * 8)));
+
+    return cl_send(fd, pkg, req_Resume);
 }
 
 
-void cl_kill(int fd, uint64 job_id)
+bool cl_kill(int fd, uint64 job_id)
 {
+    String pkg;
+    for (uint i = 0; i < 8; i++)
+        pkg.push(char(job_id >> (i * 8)));
 
+    return cl_send(fd, pkg, req_Kill);
 }
 
 
@@ -153,26 +171,23 @@ void launchJob(const String& username, const Job& job)
     ProcMode mode;
     if (username != "" && username != userName())
         mode.username = username;
-    mode.dir = job.cwd;
+    mode.dir = job.dir;
     mode.own_group = true;
     mode.timeout = job.cpu;     // -- real-time is monitored in client loop
     mode.memout = job.mem;
-    mode.stdin_file = job.stdin;
-    mode.stdout_file = job.stdout;
-    mode.stderr_file = job.stderr;
+    mode.stdin_file  = (job.stdin  != "") ? job.stdin  : String("/dev/null");
+    mode.stdout_file = (job.stdout != "") ? job.stdout : String("/dev/null");
+    mode.stderr_file = (job.stderr != "") ? job.stderr : String("/dev/null");
 
     pid_t child_pid;
     int child_io[3];
     char ret = startProcess(job.exec, job.args, child_pid, child_io, job.env, mode);
 
-    /**/if (ret != 0) WriteLn "Failed to run '%_' with args '%_'. Error code: %_", job.exec, job.args, ret;
-
-    char buf[4096];
-    for(;;){
-        ssize_t n = read(child_io[1], buf, sizeof(buf));
-        if (n == 0) break;
-        ssize_t m ___unused = write(STDOUT_FILENO, buf, n);
+    if (ret != 0){
+        // <<== report error back to server here (need FD)
+        WriteLn "Failed to run '%_' with args '%_'. Error code: %_", job.exec, job.args, ret;
     }
+    // <<== also report back success?
 }
 
 
@@ -196,12 +211,16 @@ void receivePackage(Vec<char>& pkg)
         const ReqHeader& req = *reinterpret_cast<const ReqHeader*>(pkg.base());
 
         if (!validateRequest(req)){
-            WriteLn "WARNING! Spurious request.";
+            syslog(LOG_ALERT, "Spurious request data received.");
             pkg.clear();
             return; }
 
         // Get package size:
         uint64 len = pkgLen(req);
+        if (len > 1000000){   // -- request packets shouldn't be this big
+            syslog(LOG_ALERT, "Spurious request header received.");
+            pkg.clear();
+            return; }
 
         if (pkg.size() >= sizeof(ReqHeader) + len){
             // Received a complete package:
@@ -223,7 +242,7 @@ void receivePackage(Vec<char>& pkg)
                 break; }
 
             default:
-                WriteLn "INTERNAL ERROR! Invalid package tag in 'receivePackage()': %_", (uint)pkgTag(req);
+                syslog(LOG_CRIT, "Spurious request tag received: %d  [aborting]", (int)pkgTag(req));
                 exit(1);
             }
 
@@ -256,7 +275,7 @@ void clientLoop(int port)
 
     signal(SIGCHLD, SIGCHLD_signalHandler);     // -- setup empty signal handler to make 'select()' abort on child process termination.
 
-    WriteLn "Starting CL client.";
+    syslog(LOG_INFO, "CL-client started.");
 
     Vec<char> pkg;
     int server_fd = -1;
@@ -284,7 +303,8 @@ void clientLoop(int port)
             // Child process terminated:
             while (child_sz > 0){
                 child_sz--;
-                WriteLn "Child died:  pid=%_  status=%_", child_pid[child_sz], child_stat[child_sz];
+                // <<== report to server
+                //WriteLn "Child died:  pid=%_  status=%_", child_pid[child_sz], child_stat[child_sz];
             }
 
         }else if (n == 0){
@@ -294,11 +314,11 @@ void clientLoop(int port)
             if (FD_ISSET(sock_fd, &fds)){
                 // New connection:
                 int fd = acceptConnection(sock_fd);
-                WriteLn "New server connection: %_", fd;
+                syslog(LOG_NOTICE, "New server connection: fd=%d", fd);
                 pkg.clear();
 
                 if (server_fd != -1){
-                    WriteLn "Closing old server fd: %_", server_fd;
+                    syslog(LOG_NOTICE, "Closing old server connection: fd=%d", server_fd);
                     shutdown(server_fd, SHUT_RDWR);
                     close(server_fd);
                 }
@@ -316,12 +336,12 @@ void clientLoop(int port)
                     ssize_t size = read(server_fd, buf, sizeof(buf));
                     if (size < 0){
                         if (errno != EAGAIN)
-                            WriteLn "Error: %_", strerror(errno);
+                            syslog(LOG_ERR, "Unexpected error while reading data from server: %s", strerror(errno));
                         break;
                     }else if (size == 0){
                         if (tot_size == 0){
                             // First read was empty; assume socket is closed:
-                            WriteLn "Server disconnected, closing fd: %_", server_fd;
+                            syslog(LOG_NOTICE, "Server disconnected: fd=%d", server_fd);
                             shutdown(server_fd, SHUT_RDWR);
                             close(server_fd);
                             server_fd = -1;
