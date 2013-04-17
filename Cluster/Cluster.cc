@@ -52,7 +52,6 @@ void Job::serialize(Out& out) const
     putu(out, id);
     putu(out, prio);
     putu(out, conc);
-    puts(out, group);
     puts(out, batch);
 
     puts(out, exec);
@@ -69,6 +68,12 @@ void Job::serialize(Out& out) const
     puts(out, stderr);
     puts(out, status);
     puts(out, topmon);
+
+    putF(out, ztrig);
+    putF(out, zpause);
+    putF(out, zkill);
+    putF(out, zrest);
+    putF(out, zclear);
 }
 
 
@@ -77,7 +82,6 @@ void Job::deserialize(In& in)
     getu(in, id);
     getu(in, prio);
     getu(in, conc);
-    gets(in, group);
     gets(in, batch);
 
     gets (in, exec);
@@ -95,28 +99,40 @@ void Job::deserialize(In& in)
     gets(in, stderr);
     gets(in, status);
     gets(in, topmon);
+
+    getF(in, ztrig);
+    getF(in, zpause);
+    getF(in, zkill);
+    getF(in, zrest);
+    getF(in, zclear);
 }
 
 
+// <<== should be parsable by 'readConf()'.
 void Job::prettyPrint(Out& out) const
 {
-    FWriteLn(out) "id:     %_", id;
-    FWriteLn(out) "prio:   %_", prio;
-    FWriteLn(out) "exec:   %_", exec;
-    FWriteLn(out) "dir:    %_", dir;
-    FWriteLn(out) "env:    %_", env;
-    FWriteLn(out) "args:   %_", args;
-    FWriteLn(out) "batch:  %_", batch;
-    FWriteLn(out) "group:  %_", group;
-    FWriteLn(out) "conc:   %_", conc;
-    FWriteLn(out) "real:   %_", (real == no_timeout) ? String("-") : ((FMT "%t", real));
-    FWriteLn(out) "cpu:    %_", (cpu  == no_timeout) ? String("-") : ((FMT "%t", cpu));
-    FWriteLn(out) "mem:    %_", (mem  == no_memout) ? String("-") : ((FMT "%^DB", mem));
-    FWriteLn(out) "stdin:  %_", stdin;
-    FWriteLn(out) "stdout: %_", stdout;
-    FWriteLn(out) "stderr: %_", stderr;
-    FWriteLn(out) "status: %_", status;
-    FWriteLn(out) "topmon: %_", topmon;
+    if (id != job_NULL)
+        FWriteLn(out) "id     = %_", id;
+    FWriteLn(out) "prio   = %_", prio;
+    FWriteLn(out) "exec   = %_", exec;
+    FWriteLn(out) "dir    = %_", dir;
+    FWriteLn(out) "env    = %_", env;
+    FWriteLn(out) "args   = %_", args;
+    FWriteLn(out) "batch  = %_", batch;
+    FWriteLn(out) "conc   = %_", conc;
+    FWriteLn(out) "real   = %_", (real == no_timeout) ? String("-") : ((FMT "%t", real));
+    FWriteLn(out) "cpu    = %_", (cpu  == no_timeout) ? String("-") : ((FMT "%t", cpu));
+    FWriteLn(out) "mem    = %_", (mem  == no_memout) ? String("-") : ((FMT "%^DB", mem));
+    FWriteLn(out) "stdin  = %_", stdin;
+    FWriteLn(out) "stdout = %_", stdout;
+    FWriteLn(out) "stderr = %_", stderr;
+    FWriteLn(out) "status = %_", status;
+    FWriteLn(out) "topmon = %_", topmon;
+    FWriteLn(out) "ztrig  = %t", ztrig;
+    FWriteLn(out) "zpause = %t", zpause;
+    FWriteLn(out) "zkill  = %t", zkill;
+    FWriteLn(out) "zrest  = %t", zrest;
+    FWriteLn(out) "zclear = %t", zclear;
 }
 
 
@@ -151,8 +167,6 @@ void Job::readConf(String filename)
                 prio = stringToUInt64(val);
             }else if (eq(key, "conc")){
                 conc = stringToUInt64(val);
-            }else if (eq(key, "group")){
-                group = val;
             }else if (eq(key, "batch")){
                 batch = val;
             }else if (eq(key, "exec")){
@@ -167,10 +181,13 @@ void Job::readConf(String filename)
                 env += val;     // <<== break on space and interpret backslash 
             }else if (eq(key, "real")){
                 real = stringToDouble(val);
+                // <<== mn/min/h/s/day/days etc... + '-' for no timeout
             }else if (eq(key, "cpu")){
                 cpu = stringToDouble(val);
+                // <<== mn/min/h/s/day/days etc... + '-' for no timeout
             }else if (eq(key, "mem")){
-                mem = stringToUInt64(val);  // <<== + suffixes MB, GB, kB
+                mem = stringToUInt64(val);
+                // <<== + suffixes MB, GB, kB + '-' for no memout
             }else if (eq(key, "stdin")){
                 stdin = val;
             }else if (eq(key, "stdout")){
@@ -181,6 +198,16 @@ void Job::readConf(String filename)
                 status = val;
             }else if (eq(key, "topmon")){
                 topmon = val;
+            }else if (eq(key, "ztrig")){
+                ztrig = stringToDouble(val);
+            }else if (eq(key, "zpause")){
+                zpause = stringToDouble(val);
+            }else if (eq(key, "zkill")){
+                zkill = stringToDouble(val);
+            }else if (eq(key, "zrest")){
+                zrest = stringToDouble(val);
+            }else if (eq(key, "zclear")){
+                zclear = stringToDouble(val);
             }else{
                 WriteLn "Invalid key '\a/%_\a/' in '\a/%_\a/'.", key, filename;
             }

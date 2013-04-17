@@ -28,9 +28,9 @@ const uint64 no_memout  = UINT64_MAX;
 
 struct Job {
     uint64      id;     // Job ID
+
     uint        prio;   // Job priority (positive): higher runs first, 0 means "put on hold".
     uint        conc;   // Concurrency: number of other jobs that can run in parallel.
-    String      group;  // <<== remove
     String      batch;  // Only processes from the same batch may run concurrently
 
     String      exec;   // Name of executable (full path)
@@ -38,9 +38,9 @@ struct Job {
     String      dir;    // Current working directory
     Vec<String> env;    // Environment: vector of strings "key=value"
 
-    float       real;   // Real time limit
-    float       cpu;    // CPU time limit
-    uint64      mem;    // Memory limit
+    float       real;   // Real time limit (in seconds)
+    float       cpu;    // CPU time limit (in seconds)
+    uint64      mem;    // Memory limit (in bytes)
 
     String      stdin;  // File to read standard input data from
     String      stdout; // File to write standard output data to
@@ -48,15 +48,25 @@ struct Job {
     String      status; // File to write status to
     String      topmon; // File to write "top" data to
 
-    // + behavior when other processes are disturbing this one (after X seconds, pause until no activity for Y seconds (or restart))
+    float       ztrig;  // trigger a pause after this much fuzz (external process CPU-time) 
+    float       zpause; // how long should the process be paused after fuzz has ceased
+    float       zkill;  // kill process after this much fuzz (and restart it later)
+    float       zrest;  // how long should we wait before restarting a killed process after fuzz has ceased
+    float       zclear; // clear accumulated fuzz after this many seconds of undisturbed execution
 
+    // Default values:
     Job() :
         id(job_NULL),
-        prio(0),
+        prio(100),
         conc(1),
         real(no_timeout),
         cpu(no_timeout),
-        mem(no_memout)
+        mem(no_memout),
+        ztrig(1),
+        zpause(5),
+        zkill(30),
+        zrest(300),
+        zclear(60)
     {}
 
     void serialize(Out& out) const;
