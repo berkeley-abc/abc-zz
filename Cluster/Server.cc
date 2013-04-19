@@ -73,6 +73,10 @@ void connectToDrones(String config_file, Vec<int>& out_fds)
     readConfig(config_file, addrs);
 
     //WriteLn "%\r_", addrs;
+
+    /*
+    try to connect
+    */
 }
 
 

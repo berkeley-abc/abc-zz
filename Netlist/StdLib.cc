@@ -30,9 +30,11 @@ void removeUnreach(NetlistRef N, Vec<GLit>* removed_gates, bool keep_sources)
     Vec<Pair<Wire,uint> > Q;
     Vec<uchar> seen(N.size(), false);
     Q.reserve(N.size());
+    /**/Dump(seen.size());
 
     // Compute reachable set:
     For_Gates(N, w0){
+        /**/ if (id(w0) == 18576) Dump(isGlobalSink(w0));
         if (isGlobalSink(w0)){
             assert(Q.size() < N.gateCount());
             Q.pushQ(tuple(w0, 0));
@@ -41,8 +43,9 @@ void removeUnreach(NetlistRef N, Vec<GLit>* removed_gates, bool keep_sources)
             uint i = 0;
             for(;;){
                 if (i == w.size()){
-                    if (!seen[id(w)])
-                        seen[id(w)] = true;
+                    if (!seen[id(w)]){
+                        /**/if (id(w) == 18576) Ping;
+                        seen[id(w)] = true; }
                     Q.pop();
                     if (Q.size() == 0) break;
                     w = Q.last().fst;
@@ -52,12 +55,14 @@ void removeUnreach(NetlistRef N, Vec<GLit>* removed_gates, bool keep_sources)
                     Wire v = +w[i];
                     ++i;
                     if (v && !seen[id(v)]){
-                        if (isFlopType(v))
+                        if (isFlopType(v)){
+                            /**/if (id(v) == 18576) Ping;
                             seen[id(v)] = true;
-                        else{
+                        }else{
                             Q.last().snd = i;
                             assert(Q.size() < N.gateCount());
                             Q.pushQ(tuple(v, 0));
+                            /**/if (id(v) == 18576) Dump(w, v);
                             w = v;
                             i = 0;
                         }
@@ -69,6 +74,7 @@ void removeUnreach(NetlistRef N, Vec<GLit>* removed_gates, bool keep_sources)
 
     // Delete gates:
     For_Gates(N, w){
+        /**/ if (id(w) == 18576) Dump((int)seen[id(w)]);
         if (keep_sources && isGlobalSource(w)) continue;
         if (!seen[id(w)]){
             w.remove();
@@ -193,7 +199,11 @@ void upOrder(NetlistRef N, /*out*/Vec<gate_id>& order, bool flops_last, bool str
 
 #if 1   // DEBUG
     if (order.size() != N.userCount()){
+        WriteLn "Order size: %_   User gate count: %_", order.size(), N.userCount();
         WriteLn "Gates missing from topological order:";
+        /**/nameByCurrentId(N);
+        /**/N.write("debug.gig");
+        /**/WriteLn "Wrote: debug.gig";
         WZet ws;
         for (uintg i = 0; i < order.size(); i++)
             ws.add(N[order[i]]);
@@ -636,7 +646,7 @@ bool removeBuffers(NetlistRef N)
 
 
 // Copy all names for wire 'from' to wire 'into' (possibly from a different netlist). If
-// 'prefix' is given, all names are prefixed by this string. NOTE! Constant gates are 
+// 'prefix' is given, all names are prefixed by this string. NOTE! Constant gates are
 // treated specially: their built in names are skipped over in the migration.
 void migrateNames(Wire from, Wire into, Str prefix)
 {

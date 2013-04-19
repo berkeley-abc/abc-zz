@@ -27,9 +27,9 @@ using namespace std;
 // Prepare netlist for verification:
 
 
-// NOTE! If 'liveness' is set, 'props' is supposed to be fairness constraints. 
+// NOTE! If 'liveness' is set, 'props' is supposed to be fairness constraints.
 // NOTE! Extra flops, numbered beyond the last flop of 'N0', may be introduced.
-// 
+//
 // If 'liveness_monitor' is non-NULL, a 'Buf' gate will be written as a place holder there.
 // The signal should be true for the fairness monitor to be active.
 //
@@ -229,6 +229,7 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
     }
 
     // <<== netlist simplification here?
+    removeAllUnreach(N);
 }
 
 
@@ -302,8 +303,6 @@ void instantiateAbstr(NetlistRef N, const IntSet<uint>& abstr, /*outputs:*/ Netl
         Wire w = properties[i];
         properties_M.push(n2m[w] ^ sign(w));
     }
-
-    removeUnreach(M, NULL, false);
 }
 
 
