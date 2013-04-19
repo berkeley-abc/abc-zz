@@ -30,11 +30,9 @@ void removeUnreach(NetlistRef N, Vec<GLit>* removed_gates, bool keep_sources)
     Vec<Pair<Wire,uint> > Q;
     Vec<uchar> seen(N.size(), false);
     Q.reserve(N.size());
-    /**/Dump(seen.size());
 
     // Compute reachable set:
     For_Gates(N, w0){
-        /**/ if (id(w0) == 18576) Dump(isGlobalSink(w0));
         if (isGlobalSink(w0)){
             assert(Q.size() < N.gateCount());
             Q.pushQ(tuple(w0, 0));
@@ -44,7 +42,6 @@ void removeUnreach(NetlistRef N, Vec<GLit>* removed_gates, bool keep_sources)
             for(;;){
                 if (i == w.size()){
                     if (!seen[id(w)]){
-                        /**/if (id(w) == 18576) Ping;
                         seen[id(w)] = true; }
                     Q.pop();
                     if (Q.size() == 0) break;
@@ -56,13 +53,11 @@ void removeUnreach(NetlistRef N, Vec<GLit>* removed_gates, bool keep_sources)
                     ++i;
                     if (v && !seen[id(v)]){
                         if (isFlopType(v)){
-                            /**/if (id(v) == 18576) Ping;
                             seen[id(v)] = true;
                         }else{
                             Q.last().snd = i;
                             assert(Q.size() < N.gateCount());
                             Q.pushQ(tuple(v, 0));
-                            /**/if (id(v) == 18576) Dump(w, v);
                             w = v;
                             i = 0;
                         }
@@ -74,7 +69,6 @@ void removeUnreach(NetlistRef N, Vec<GLit>* removed_gates, bool keep_sources)
 
     // Delete gates:
     For_Gates(N, w){
-        /**/ if (id(w) == 18576) Dump((int)seen[id(w)]);
         if (keep_sources && isGlobalSource(w)) continue;
         if (!seen[id(w)]){
             w.remove();
