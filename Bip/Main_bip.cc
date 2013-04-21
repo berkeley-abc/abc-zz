@@ -5,7 +5,7 @@
 //| Module      : Bip
 //| Description : Commandline interface for the Bip engine.
 //|
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //|
@@ -1285,7 +1285,7 @@ int main(int argc, char** argv)
     if (show_logo && !quiet){
         WriteLn "\a*_______________________________________________________________________________\a0";
         WriteLn " \a/__  ___ __\a/                                                                    ";
-        WriteLn " \a/|_)  |  |_)\a/             Author: \a*Niklas Een\a*                (C) UC Berkeley 2012";
+        WriteLn " \a/|_)  |  |_)\a/             Author: \a*Niklas Een\a*                (C) UC Berkeley 2013";
         WriteLn " \a/|_) _|_ |\a/               Built:  \a*%<18%_\a*            Licence: \a*MIT/X11\a*", compileDate();
         WriteLn "\a*_______________________________________________________________________________\a0";
         NewLine;
@@ -1574,7 +1574,8 @@ int main(int argc, char** argv)
         P.quiet = quiet;
 
         Netlist M;
-        reparam(N, P, M);
+        bool recons = (cli.get("recons-aig").string_val != "") || (cli.get("recons-gig").string_val != "");
+        reparam(N, P, recons ? M : Netlist_NULL);
 
         String filename = cli.get("aig").string_val;
         if (filename != ""){
