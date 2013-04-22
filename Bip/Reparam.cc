@@ -92,7 +92,7 @@ Wire buildCover(NetlistRef N, const Vec<uint>& cover, const WZet& ext_pi)
 
 
 static
-void analyzeRegion(NetlistRef N, const WZet& area, const WZet& int_pi, const WZet& ext_pi, Wire w_dom, NetlistRef N_recons, /**/bool pivot)
+void analyzeRegion(NetlistRef N, const WZet& area, const WZet& int_pi, const WZet& ext_pi, Wire w_dom, NetlistRef N_recons)
 {
     // Temporary solution; don't even use bit-parallel simulation:
     if (int_pi.size() + ext_pi.size() > 8)
@@ -138,7 +138,7 @@ void analyzeRegion(NetlistRef N, const WZet& area, const WZet& int_pi, const WZe
     if (N_recons)
         N_recons.add(PO_(num), copyFormula(w_dom, N_recons));   // <<== temporary! Must be more efficient about this!
 
-  #if 1
+  #if 0
     if (pivot){
         // Print on/off set and save area to dot file:
         String filename = "area.dot";
@@ -166,14 +166,16 @@ void analyzeRegion(NetlistRef N, const WZet& area, const WZet& int_pi, const WZe
         // Build: '~off & (on | PI)'
         assert(ext_pi.size() <= 6);
 
+#if 0
         /**/if (pivot){
             Write "Internal PIs:"; for (uind i = 0; i < int_pi.size(); i++) Write " %_", int_pi.list()[i]; NewLine;
             Write "External PIs:"; for (uind i = 0; i < ext_pi.size(); i++) Write " %_", ext_pi.list()[i]; NewLine;
         }
+#endif
 
         N.change(w_dom, Buf_());
         Wire acc = N.add(PI_(num));
-        /**/Wire new_pi = acc;
+        //**/Wire new_pi = acc;
 
         Vec<uint> cover;
         Vec<uint> ftb(ext_pi.size() == 6 ? 2 : 1);
@@ -205,7 +207,7 @@ void analyzeRegion(NetlistRef N, const WZet& area, const WZet& int_pi, const WZe
 
 
 static
-void reparamRegion(Wire w_dom, NetlistRef N_recons, /**/bool pivot)
+void reparamRegion(Wire w_dom, NetlistRef N_recons)
 {
     NetlistRef N = netlist(w_dom);
     Get_Pob(N, fanout_count);
@@ -276,7 +278,7 @@ void reparamRegion(Wire w_dom, NetlistRef N_recons, /**/bool pivot)
     // <<== Grow area here to capture more reconvergence
 
     // Analyze and restructure area:
-    analyzeRegion(N, area, int_pi, ext_pi, w_dom, N_recons, /**/pivot);
+    analyzeRegion(N, area, int_pi, ext_pi, w_dom, N_recons);
 }
 
 
@@ -305,9 +307,6 @@ void reparam(NetlistRef N, const Params_Reparam& P, NetlistRef N_recons)
         Wire w = N[up_order[i]];
         if (deleted(w)) continue;
 
-            /**/removeBuffers(N);
-            /**/WMap<gate_id> dom;
-            /**/computeDominators(N, dom);
         if (type(w) == gate_PI){
             gate_id d0 = id(w);
             gate_id d  = dom[N[d0]];
@@ -320,11 +319,8 @@ void reparam(NetlistRef N, const Params_Reparam& P, NetlistRef N_recons)
                     break;
             }
 
-        }else if (cands.has(w)){
-            /**/static int cc = 0; cc++;
-            reparamRegion(w, N_recons, /**/cc == 163);
-            /**/if (cc == 163) break;
-        }
+        }else if (cands.has(w))
+            reparamRegion(w, N_recons);
     }
 
     For_Gatetype(N, gate_PI, w)

@@ -764,7 +764,10 @@ bool verifyCex(NetlistRef N, const Vec<Wire>& props, Cex& cex, /*out*/Vec<uint>*
     }
 
     // Make sure up-order is up to date:
-    Remove_Pob(N, up_order); Add_Pob0(N, up_order);
+    if (Has_Pob(N, up_order)){
+        Remove_Pob(N, up_order);
+        Add_Pob0(N, up_order);
+    }
 
     // Simulate:
     XSimulate xsim(N);
