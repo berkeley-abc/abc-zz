@@ -37,7 +37,7 @@ struct Params_Reparam {
 };
 
 
-void reparam(NetlistRef N, const Params_Reparam& P, NetlistRef N_recons = Netlist_NULL);
+void reparam(NetlistRef N, const Params_Reparam& P);
 void reconstructCex(NetlistRef M, CCex& cex);
 
 

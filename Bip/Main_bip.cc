@@ -49,6 +49,8 @@
 
 using namespace ZZ;
 
+/**/namespace ZZ { void reparamDebug(NetlistRef N); }
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Signal handler:
@@ -156,8 +158,8 @@ uind textToBin(char* text, uind text_sz)
 
 
 // If parsed file was AIGER, get the initial abstraction (if present).
-static
-void getInitialAbstr(NetlistRef N, String filename, /*out*/IntSet<uint>& abstr, bool quiet)
+static void getInitialAbstr(NetlistRef N, String filename, /*out*/IntSet<uint>& abstr, bool quiet) ___unused;
+static void getInitialAbstr(NetlistRef N, String filename, /*out*/IntSet<uint>& abstr, bool quiet)
 {
     if (filename != ""){
         InFile in(filename);
@@ -201,8 +203,8 @@ void getInitialAbstr(NetlistRef N, String filename, /*out*/IntSet<uint>& abstr, 
 }
 
 
-static
-void getReconstructionAig(NetlistRef M, String filename)
+static void getReconstructionAig(NetlistRef M, String filename) ___unused;
+static void getReconstructionAig(NetlistRef M, String filename)
 {
     InFile in(filename);
     if (in.null()){ ShoutLn "Could not open: %_", filename; exit(1); }
@@ -236,8 +238,8 @@ void getReconstructionAig(NetlistRef M, String filename)
 }
 
 
-static
-void getCounterexample(CCex& cex, String filename)
+static void getCounterexample(CCex& cex, String filename) ___unused;
+static void getCounterexample(CCex& cex, String filename)
 {
     InFile in(filename);
     if (in.null()){ ShoutLn "Could not open: %_", filename; exit(1); }
@@ -922,18 +924,10 @@ int main(int argc, char** argv)
 
     // Command line -- reparametrization:
     CLI cli_reparam;
-    cli_reparam.add("width", "uint" , "6", "Maximum cut width (over 10 may be very slow).");
+    cli_reparam.add("width", "uint" , "8", "Maximum cut width (over 10 may be very slow).");
     cli_reparam.add("aig", "string" , "", "Save result as AIGER file.");
     cli_reparam.add("gig", "string" , "", "Save result as GIG file.");
-    cli_reparam.add("recons-aig", "string" , "", "Save reconstruction AIGER.");
-    cli_reparam.add("recons-gig", "string" , "", "Save reconstruction GIG.");
     cli.addCommand("reparam", "Remove inputs through reparametrization. (work in progress)", &cli_reparam);
-
-    // Command line -- counterexample reconstruction:
-    CLI cli_recons;
-    cli_recons.add("recons", "string", arg_REQUIRED, "File containing reconstruction AIG (.aig/.gig/result file).");
-    cli_recons.add("cex"   , "string", arg_REQUIRED, "File containing reparametrized CEX. (e.g. BMC result file).");
-    cli.addCommand("recons", "Reconstruct counterexample after reparametrization.", &cli_recons);
 
     // Command line -- simplify:
     cli.addCommand("simp", "Simplify AIG.");
@@ -1257,7 +1251,7 @@ int main(int argc, char** argv)
         if (!quiet) WriteLn "Cleaned: %_ -- %_", input, info(N);
 
         // Setup properties:
-        getInitialAbstr(N, cli.get("abstr").string_val, abstr, quiet);
+        //getInitialAbstr(N, cli.get("abstr").string_val, abstr, quiet);
 
         // <<== rather check for liveness properties here, and switch default command
         if (cli.cmd != "live")
@@ -1572,10 +1566,11 @@ int main(int argc, char** argv)
         Params_Reparam P;
         P.cut_width = cli.get("width").int_val;
         P.quiet = quiet;
+        //**/reparamDebug(N);
+        //**/exit(0);
 
         Netlist M;
-        bool recons = (cli.get("recons-aig").string_val != "") || (cli.get("recons-gig").string_val != "");
-        reparam(N, P, recons ? M : Netlist_NULL);
+        reparam(N, P);
 
         String filename = cli.get("aig").string_val;
         if (filename != ""){
@@ -1589,19 +1584,6 @@ int main(int argc, char** argv)
         if (filename != ""){
             nameByCurrentId(N);
             N.write(filename);
-            WriteLn "Wrote: \a*%_\a*", filename;
-        }
-
-        filename = cli.get("recons-aig").string_val;
-        if (filename != ""){
-            writeAigerFile(filename, M);
-            WriteLn "Wrote: \a*%_\a*", filename;
-        }
-
-        filename = cli.get("recons-gig").string_val;
-        if (filename != ""){
-            nameByCurrentId(M);
-            M.write(filename);
             WriteLn "Wrote: \a*%_\a*", filename;
         }
 
@@ -1623,17 +1605,6 @@ int main(int argc, char** argv)
             FNewLine(out);
             aiger.clear();
         }
-
-    }else if (cli.cmd == "recons"){
-        Netlist M;
-        CCex    ccex;
-        getCounterexample(ccex, cli.get("cex").string_val);
-        getReconstructionAig(M, cli.get("recons").string_val);
-        reconstructCex(M, ccex);
-
-        Cex cex;
-        translateCex(ccex, N, cex);
-        outputVerificationResult(N, props, l_False, &cex, orig_num_pis, Netlist_NULL, -1, false, output, quiet, T0, Tr0);
 
     }else if (cli.cmd == "check-invar"){
         Netlist N_invar;
