@@ -611,7 +611,7 @@ bool removeBuffers(NetlistRef N)
     Assure_Pob(N, fanout_count);
 
     // Remove buffers:
-    Vec<char> nambuf;
+    Vec<Vec<char> > nambuf;
     For_Gates(N, w){
         For_Inputs(w, v){
             if (type(v) == gate_Buf){
@@ -626,9 +626,12 @@ bool removeBuffers(NetlistRef N)
                 while (type(x) == gate_Buf){
                     Wire new_x = x[0] ^ sign(x);
                     if (fanout_count[x] == 0){
-                        for (uint i = 0; i < N.names().size(x); i++){
-                            N.names().add(u, N.names().get(x, nambuf, i)); }
+                        uint n = N.names().size(x);
+                        for (uint i = 0; i < n; i++)
+                            N.names().get(x, nambuf(i), i);
                         remove(x);
+                        for (uint i = 0; i < n; i++)
+                            N.names().add(u, nambuf[i].base());
                     }
                     x = new_x;
                 }
