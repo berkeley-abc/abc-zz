@@ -46,18 +46,21 @@ Wire buildCover(NetlistRef N, const Vec<uint>& cover, const WZet& ext_pi)
 }
 
 
+/**/static
+/**/uint countBits(uint v)
+/**/{
+/**/    uint sz = 0;
+/**/    while (v != 0){
+/**/        sz++;
+/**/        v &= v - 1;
+/**/    }
+/**/    return sz;
+/**/}
+
+
 static
 void analyzeRegion(NetlistRef N, const WZet& area, const WZet& int_pi, const WZet& ext_pi, Wire w_dom, const Params_Reparam& P, /*temporary*/WMap<uchar>& val)
 {
-    // Temporary solution; don't even use bit-parallel simulation:
-    if (int_pi.size() + ext_pi.size() > P.cut_width)
-        return;
-
-    //**/Dump(int_pi.list());
-    //**/Dump(ext_pi.list());
-    //**/Dump(area.list());
-    //**/Dump(w_dom);
-
     uint n_words = max_(1u, (1u << ext_pi.size()) / 32);
     Vec<uint> on (n_words, 0);
     Vec<uint> off(n_words, 0);
@@ -148,10 +151,8 @@ ZZ_PTimer_Add(reparam_ext_pis);
 
 struct ReparamTmps {
     WZet ext_pi;   // External PIs or nodes to be treated as PIs.
-    WZet ext_pi0;  // External PIs or nodes to be treated as PIs.
     WZet int_pi;   // Dominated PIs.
     WZet area;     // Region to consider. Will be initialized to dominator region.
-    WZet area0;    // Region to consider. Will be initialized to dominator region.
     WTmpMap<uint>  count;
     WMap<uchar> val;
 
@@ -159,10 +160,8 @@ struct ReparamTmps {
 
     void clear() {
         ext_pi.clear();
-        ext_pi0.clear();
         int_pi.clear();
         area.clear();
-        area0.clear();
         count.clear();
         // no need to clear 'val'
     }
@@ -175,12 +174,10 @@ void reparamRegion(Wire w_dom, const Params_Reparam& P, ReparamTmps& tmps)
     NetlistRef N = netlist(w_dom);
     Get_Pob(N, fanout_count);
 
-    WZet& ext_pi  = tmps.ext_pi;
-    WZet& ext_pi0 = tmps.ext_pi0;
-    WZet& int_pi  = tmps.int_pi;
-    WZet& area    = tmps.area;
-    WZet& area0   = tmps.area0;
-    WTmpMap<uint>& count  = tmps.count;
+    WZet& ext_pi = tmps.ext_pi;
+    WZet& int_pi = tmps.int_pi;
+    WZet& area   = tmps.area;
+    WTmpMap<uint>& count = tmps.count;
     tmps.clear();
 
     #define Add(v)                                          \
@@ -213,36 +210,8 @@ void reparamRegion(Wire w_dom, const Params_Reparam& P, ReparamTmps& tmps)
     assert(int_pi.size() > 0);
     ZZ_PTimer_End(reparam_int_pis);
 
-    // Store current external PIs:
-    ZZ_PTimer_Begin(reparam_ext_pis);
-#if 1
-    for (uind i = 0; i < area.size(); i++)
-        area0.add(area.list()[i]);
-
-    for (uind i = 0; i < area.size(); i++){
-        Wire w = area.list()[i];
-        For_Inputs(w, v)
-            if (!area.has(v))
-                ext_pi0.add(+v);
-    }
-#endif
-
-  #if 1
-    // Remove nodes from 'area' not in the fanout cone of an internal PI:
-    for (uind i = area.size(); i > 0;){ i--;
-        Wire w = area.list()[i];
-        if (!int_pi.has(w)){
-            For_Inputs(w, v)
-                if (area.has(v))
-                    goto Keep;
-            area.exclude(w);
-          Keep:;
-        }
-    }
-  #endif
-    area.compact();
-
     // Extract external PIs:
+    ZZ_PTimer_Begin(reparam_ext_pis);
     for (uind i = 0; i < area.size(); i++){
         Wire w = area.list()[i];
         For_Inputs(w, v)
@@ -250,23 +219,44 @@ void reparamRegion(Wire w_dom, const Params_Reparam& P, ReparamTmps& tmps)
                 ext_pi.add(+v);
     }
 
-#if 1
-    if (ext_pi0.size() < ext_pi.size()){      // <<== doesn't work; need to resture area exacly as it was
-        swp(ext_pi0, ext_pi);
-        swp(area0, area);
+    if (ext_pi.size() > P.cut_width){
+        // Remove nodes from 'area' not in the fanout cone of an internal PI:
+        for (uind i = area.size(); i > 0;){ i--;
+            Wire w = area.list()[i];
+            if (!int_pi.has(w)){
+                For_Inputs(w, v)
+                    if (area.has(v))
+                        goto Keep;
+                area.exclude(w);
+              Keep:;
+            }
+        }
+        area.compact();
+
+        // Re-extract external PIs:
+        ext_pi.clear();
+        for (uind i = 0; i < area.size(); i++){
+            Wire w = area.list()[i];
+            For_Inputs(w, v)
+                if (!area.has(v))
+                    ext_pi.add(+v);
+        }
     }
-#endif
     ZZ_PTimer_End(reparam_ext_pis);
 
     // Analyze and restructure area:
-    ZZ_PTimer_Begin(reparam_analyze);
-    analyzeRegion(N, area, int_pi, ext_pi, w_dom, P, tmps.val);
-    ZZ_PTimer_End(reparam_analyze);
+    if (int_pi.size() + ext_pi.size() <= P.cut_width){
+        ZZ_PTimer_Begin(reparam_analyze);
+        analyzeRegion(N, area, int_pi, ext_pi, w_dom, P, tmps.val);
+        ZZ_PTimer_End(reparam_analyze);
+    }
 }
 
 
 void reparam(NetlistRef N, const Params_Reparam& P)
 {
+    double T0 = cpuTime();
+
     //**/N.write("N.gig");
     Auto_Pob(N, up_order);
     Auto_Pob(N, fanout_count);
@@ -281,7 +271,14 @@ void reparam(NetlistRef N, const Params_Reparam& P)
 
     ReparamTmps tmps;
     WZet cands;
+    int percent = -1;
     for (uintg i = 0; i < up_order.size(); i++){
+        int p = floor((i * 100.0 + 0.5) / up_order.size());
+        if (p != percent){
+            percent = p;
+            if (!P.quiet) Write "\rProgress: %_ %%\f", p;
+        }
+
         Wire w = N[up_order[i]];
         if (deleted(w)) continue;
 
@@ -300,6 +297,7 @@ void reparam(NetlistRef N, const Params_Reparam& P)
         }else if (cands.has(w))
             reparamRegion(w, P, tmps);
     }
+    if (!P.quiet) WriteLn "\rPost-processing...";
 
     For_Gatetype(N, gate_PI, w)
         if (fanout_count[w] == 0)
@@ -310,6 +308,7 @@ void reparam(NetlistRef N, const Params_Reparam& P)
     removeAllUnreach(N);
 
     if (!P.quiet){
+        WriteLn "CPU-time: %t", cpuTime() - T0;
         WriteLn "PIs : %_ -> %_", orig_pis , N.typeCount(gate_PI);
         WriteLn "ANDs: %_ -> %_", orig_ands, N.typeCount(gate_And);
     }

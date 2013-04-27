@@ -168,6 +168,8 @@ bool readInvariant(String filename, Vec<Wire>& props, NetlistRef H);
 
 
 Wire copyAndSimplify(Wire w, NetlistRef M);
+void copyAndSimplify(Vec<Wire>& ws, NetlistRef M, Vec<Wire>& new_ws);
+
 Wire copyFormula(Wire w_src, NetlistRef N_dst);
     // 'w_src' should be from another netlist. Attribute 'number' on flops and PIs are used.
 

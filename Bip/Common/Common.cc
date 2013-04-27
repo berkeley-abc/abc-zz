@@ -1232,6 +1232,20 @@ Wire copyAndSimplify(Wire w, NetlistRef M)
 }
 
 
+void copyAndSimplify(Vec<Wire>& ws, NetlistRef M, Vec<Wire>& new_ws)
+{
+    assert(Has_Pob(M, strash));
+    WMap<uint> n_fanouts;
+    for (uint i = 0; i < ws.size(); i++)
+        countFanouts(ws[i], n_fanouts);
+    WZetS seen;
+    WMap<Wire> memo;
+
+    for (uint i = 0; i < ws.size(); i++)
+        new_ws.push(copyAndSimplify(ws[i], M, memo, n_fanouts, seen));
+}
+
+
 // 'w_src' must only contain gate types: Const, And, PI, Flop. (No POs!)
 // 'N_dst' must be strashed. Flops will be copied as such, but their input is dropped.
 Wire copyFormula(Wire w_src, NetlistRef N_dst)
