@@ -783,11 +783,11 @@ def create_MODULE_conf(mod):
     mods = set()
     bins = set()
     for f in files_in_dir("."):
-        if f.endswith(".cc") or f.endswith(".hh") or f.endswith(".icc") or f.endswith(".ihh") or f.endswith(".c") or f.endswith(".h"):
+        if f.endswith(".cc") or f.endswith(".hh") or f.endswith(".icc") or f.endswith(".ihh") or f.endswith(".c") or f.endswith(".h") or f.endswith(".C"):
             grep_mods(f, mods)
         if f.startswith("Main_") and f.endswith(".cc"):
             bins.add(f[5:-3])
-        if f.startswith("Main_") and f.endswith(".c"):
+        if f.startswith("Main_") and (f.endswith(".c") or f.endswith(".C")):
             bins.add(f[5:-2])
 
     with open(conf_file, "w") as out:

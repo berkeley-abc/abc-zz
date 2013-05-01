@@ -40,8 +40,10 @@ endif
 # libraries.
 
 EXE_SRCS   = $(wildcard Main_*.cc)  
+EXE_SRCS  += $(wildcard Main_*.C)  
 EXE_SRCS  += $(wildcard Main_*.c)  
 LIB_SRCS   = $(filter-out $(EXE_SRCS), $(wildcard *.cc))
+LIB_SRCS  += $(filter-out $(EXE_SRCS), $(wildcard *.C))
 LIB_SRCS  += $(filter-out $(EXE_SRCS), $(wildcard *.c))
 LOCAL_PATH = $(CURDIR:$(ROOT_PATH)/%=%)
 MODULE     = $(MODULE_PREFIX)$(subst /,.,$(LOCAL_PATH))
@@ -88,7 +90,10 @@ $(OUT)/%.dep : %.cc
 	g++ -M $(CXXFLAGS) $(INCL) $(CURDIR)/$< | $(BUILD_PATH)/filter_deps $(OUT) > $@
   # NOTE! Dependencies are generated with full absolute paths
 
-INCL = $(addprefix -I,$(SYS_INCL))
+$(OUT)/%.dep : %.C
+	mkdir -p $(dir $@)
+	g++ -M $(CXXFLAGS) $(INCL) $(CURDIR)/$< | $(BUILD_PATH)/filter_deps $(OUT) > $@
+
 $(OUT)/%.dep : %.c 
 	mkdir -p $(dir $@)
 	gcc -M $(CFLAGS) $(INCL) $(CURDIR)/$< | $(BUILD_PATH)/filter_deps $(OUT) > $@
@@ -115,6 +120,12 @@ bindep : $(OUT)/BIN.deps
 
 
 $(OUT)/%.o : %.cc 
+	mkdir -p $(dir $@)
+	echo "\`\` Compiling:" $(LOCAL_PATH)/$<
+	g++ -c $(CXXFLAGS) $(INCL) $< -o $@
+	rm -f $(basename $@).dep      # (remove stale dependency file)
+
+$(OUT)/%.o : %.C
 	mkdir -p $(dir $@)
 	echo "\`\` Compiling:" $(LOCAL_PATH)/$<
 	g++ -c $(CXXFLAGS) $(INCL) $< -o $@
@@ -160,7 +171,7 @@ $(BIN_OUT)/%.exe : $(OUT)/Main_%.o $(LIB_BIN) $(LMOD)
 	echo "\`\` Linking binary:" $@
 	$(LINK) $(LFLAGS) $(LPATHS) -Wl,-whole-archive $^ -Wl,-no-whole-archive $(LSYS) -o $@
 
-bin : $(patsubst Main_%.cc,$(BIN_OUT)/%.exe,$(EXE_SRCS)) $(patsubst Main_%.qcc,$(BIN_OUT)/%.exe,$(EXE_SRCS)) $(patsubst Main_%.c,$(BIN_OUT)/%.exe,$(EXE_SRCS))
+bin : $(patsubst Main_%.cc,$(BIN_OUT)/%.exe,$(EXE_SRCS)) $(patsubst Main_%.qcc,$(BIN_OUT)/%.exe,$(EXE_SRCS)) $(patsubst Main_%.c,$(BIN_OUT)/%.exe,$(EXE_SRCS)) $(patsubst Main_%.C,$(BIN_OUT)/%.exe,$(EXE_SRCS))
 	$(MAKE) NO_DEP_INCLUDES=1 -f $(THIS_MAKEFILE) $(OUT)/BIN.deps   # (remake executable dependencies)
 
 ifndef NO_DEP_INCLUDES

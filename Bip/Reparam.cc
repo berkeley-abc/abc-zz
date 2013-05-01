@@ -46,16 +46,16 @@ Wire buildCover(NetlistRef N, const Vec<uint>& cover, const WZet& ext_pi)
 }
 
 
-/**/static
-/**/uint countBits(uint v)
-/**/{
-/**/    uint sz = 0;
-/**/    while (v != 0){
-/**/        sz++;
-/**/        v &= v - 1;
-/**/    }
-/**/    return sz;
-/**/}
+//**/static
+//**/uint countBits(uint v)
+//**/{
+//**/    uint sz = 0;
+//**/    while (v != 0){
+//**/        sz++;
+//**/        v &= v - 1;
+//**/    }
+//**/    return sz;
+//**/}
 
 
 static
