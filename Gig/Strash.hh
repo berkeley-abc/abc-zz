@@ -1,0 +1,122 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : Strash.hh
+//| Author(s)   : Niklas Een
+//| Module      : Gig
+//| Description : Structural hashing of AIGs, XIGs, Lut4 and Npn4 netlists.
+//| 
+//| (C) Copyright 2010-2012, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//|________________________________________________________________________________________________
+
+#ifndef ZZ__Gig__Strash_hh
+#define ZZ__Gig__Strash_hh
+
+#include "Gig.hh"
+#include "ZZ/Generics/Set.hh"
+
+namespace ZZ {
+using namespace std;
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Support types:
+
+
+enum GateHashType {
+    ght_Bin,        // two inputs
+    ght_Tri,        // three inputs
+    ght_Lut,        // four inputs + argument (FTB or eq-class)
+};
+
+
+template<GateHashType type>
+struct GateHash {
+    const GigObj& obj;
+    GateHash(const GigObj& obj_) : obj(obj_) {}
+
+    uint64 hash(GLit p) const;
+    bool   equal(GLit p, GLit q) const;
+};
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Strash:
+
+
+class GigObj_Strash : public GigObj, public GigLis {
+    Set<GLit,GateHash<ght_Bin> >  and_nodes;
+    Set<GLit,GateHash<ght_Bin> >  xor_nodes;
+    Set<GLit,GateHash<ght_Tri> >  mux_nodes;
+    Set<GLit,GateHash<ght_Tri> >  maj_nodes;
+    Set<GLit,GateHash<ght_Lut> >  npn_nodes;
+
+    bool initializing;      // -- Set during execution of 'strashNetlist()' to modify the behavior of 'removing()'
+
+    void rehashNetlist();   // -- Assumes a strashed netlist with an empty 'strash' object.
+    void strashNetlist();   // -- Rebuilds netlist bottom-up and removes redundant nodes.
+
+public:
+    GigObj_Strash(Gig& N_);
+   ~GigObj_Strash();
+
+  //________________________________________
+  //  Hashed gate creation:
+
+    GLit add_And (GLit u, GLit v);
+    GLit add_Xor (GLit u, GLit v);
+    GLit add_Mux (GLit s, GLit tt, GLit ff);
+    GLit add_Maj (GLit u, GLit v , GLit w );
+    GLit add_Npn4(GLit d0, GLit d1, GLit d2, GLit d3, uchar eq_class);
+
+  //________________________________________
+  //  GigObj interface:
+
+    void init()                         { strashNetlist(); }
+    void load(In&)                      { rehashNetlist(); }
+    void save(Out&) const               {}
+    void copyTo(GigObj& dst) const      { static_cast<GigObj_Strash&>(dst).rehashNetlist(); }
+    void compact(const GigRemap& remap) { rehashNetlist(); }
+
+  //________________________________________
+  //  Listener interface:
+
+    void removing(Wire w, bool);
+};
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Gate creation:
+
+
+// AIG:
+//
+Wire aig_And(Wire x, Wire y);
+
+macro Wire aig_Or   (Wire x, Wire y)           { return ~aig_And(~x, ~y); }
+macro Wire aig_Mux  (Wire s, Wire d1, Wire d0) { return ~aig_And(~aig_And(s, d1), ~aig_And(~s, d0)); }
+macro Wire aig_Xor  (Wire x, Wire y)           { return aig_Mux(x, ~y,  y); }
+macro Wire aig_Equiv(Wire x, Wire y)           { return aig_Mux(x,  y, ~y); }
+
+
+// XIG:
+//
+Wire xig_And(Wire x, Wire y);
+Wire xig_Xor(Wire x, Wire y);
+Wire xig_Mux(Wire s, Wire d1, Wire d0);
+Wire xig_Maj(Wire x, Wire y, Wire z);
+
+macro Wire xig_Or   (Wire x, Wire y) { return ~xig_And(~x, ~y); }
+macro Wire xig_Equiv(Wire x, Wire y) { return ~xig_Xor( x , y); }
+
+
+// NPN:
+//
+Wire npn4_Lut(Wire w0, Wire w1, Wire w2, Wire w3, uchar eq_class);
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+}
+#endif

@@ -1,29 +1,20 @@
 #include "Prelude.hh"
-#include "ZZ_CmdLine.hh"
-#include "Netlist.hh"
-#include "ExportImport.hh"
-#include "StdLib.hh"
-#include "StdPob.hh"
+#include "ZZ_Gig.hh"
+#include "Aiger.hh"
 
 using namespace ZZ;
-
-namespace ZZ { void test(); }
-
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-double testtest(const Netlist& N)
+double testtest(const Gig& N)
 {
     double T0 = cpuTime();
     for (uint n = 0; n < 10; n++){
         For_Gates(N, w)
-            if (type(w) == gate_And){
-                Wire w0 = w[0];
-                w.set(0, w[1]);
-                w.set(1, w0);
-            }
+            if (w == gate_And)
+                w.init(w[1], w[0]);
     }
     double T1 = cpuTime();
 
@@ -35,7 +26,11 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
-    Netlist N;
+    Dump(sizeof(GLit));
+    Dump(sizeof(Wire));
+    Dump(sizeof(Gig_data));
+
+    Gig N;
     //WriteLn "Time: %t", testtest(N);
 
     double T0 = cpuTime();
@@ -48,12 +43,10 @@ int main(int argc, char** argv)
         testtest(N);
     }
 
-#if 0
     upOrderTest(N);
     double T1 = cpuTime();
     N.save("tmp.gnl");
     WriteLn "Save time: %t", cpuTime() - T1;
-#endif
 
     return 0;
 }
