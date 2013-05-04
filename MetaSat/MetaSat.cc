@@ -15,11 +15,13 @@
 #include "MetaSat.hh"
 #include "minisat2.hh"
 #include "abcSat.hh"
+#include "Glucose.hh"
 #include "ZZ_MiniSat.hh"
 #include "ZZ/Generics/Sort.hh"
 
 namespace MS = ::Minisat;
 namespace AS = ::abc_sat;
+namespace GL = ::Glucose;
 
 namespace ZZ {
 using namespace std;
@@ -171,6 +173,13 @@ void ZzSat::getCnf(Vec<Lit>& out_cnf)
 void ZzSat::setVerbosity(int verb_level)
 {
     S->verbosity = verb_level;
+}
+
+
+bool ZzSat::exportCnf(const String& filename)
+{
+    S->exportCnf(filename);
+    return true;
 }
 
 
@@ -359,6 +368,12 @@ void MiniSat2::setVerbosity(int verb_level)
 }
 
 
+bool MiniSat2::exportCnf(const String& filename)
+{
+    return S->exportCnf(filename.c_str());
+}
+
+
 //=================================================================================================
 // -- simplifying version:
 
@@ -533,6 +548,12 @@ void MiniSat2s::getCnf(Vec<Lit>& out_cnf)
 void MiniSat2s::setVerbosity(int verb_level)
 {
     S->verbosity = verb_level;
+}
+
+
+bool MiniSat2s::exportCnf(const String& filename)
+{
+    return S->exportCnf(filename.c_str());
 }
 
 
@@ -738,6 +759,203 @@ void AbcSat::getCnf(Vec<Lit>& out_cnf)
 void AbcSat::setVerbosity(int verb_level)
 {
     AS::sat_solver_set_verbosity(S, verb_level);
+}
+
+
+bool AbcSat::exportCnf(const String& filename)
+{
+    assert(false);
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Glucose wrapper:
+
+
+typedef GL::vec<GL::Lit> GL_litvec;
+
+macro Lit fromGl(GL::Lit p) { Lit ret; ret.id = GL::var(p); ret.sign = GL::sign(p); return ret; }
+macro GL::Lit toGl(Lit p) { return GL::mkLit(p.id, p.sign); }
+
+macro lbool fromGl(GL::lbool v) { return (v == (GL::lbool((uint8_t)0)))  ? l_True : (v == (GL::lbool((uint8_t)1))) ? l_False : l_Undef; }
+
+
+GluSat::GluSat()
+{
+    GL_litvec& tmp  = *(GL_litvec*)(void*)&tmp_lits;
+    new (&tmp) GL_litvec;
+
+    S = new GL::Solver;
+
+    Lit null_lit = addLit(); assert(null_lit.id == 0);
+    true_lit = addLit();
+    MetaSat::addClause(true_lit);
+}
+
+
+GluSat::~GluSat()
+{
+    if (S) delete S;
+}
+
+
+void GluSat::clear(bool dealloc)
+{
+    S->~Solver();
+    new (S) GL::Solver;
+
+    Lit null_lit = addLit(); assert(null_lit.id == 0);
+    Lit true_lit = addLit();
+    MetaSat::addClause(true_lit);
+}
+
+
+Lit GluSat::True() const
+{
+    return true_lit;
+}
+
+
+Lit GluSat::addLit()
+{
+    return fromGl(GL::mkLit(S->newVar()));
+}
+
+
+void GluSat::addClause_(const Vec<Lit>& ps)
+{
+    GL_litvec& tmp = *(GL_litvec*)(void*)&tmp_lits;
+    tmp.clear();
+    for (uint i = 0; i < ps.size(); i++)
+        tmp.push(toGl(ps[i]));
+
+    S->addClause(tmp);
+}
+
+
+void GluSat::recycleLit(Lit p)
+{
+    S->addClause(toGl(p));    // -- not supported, just set 'p' to TRUE.
+}
+
+
+void GluSat::setConflictLim(uint64 n_confl)
+{
+    S->setConfBudget(n_confl);
+}
+
+
+lbool GluSat::solve_(const Vec<Lit>& assumps)
+{
+    GL_litvec& tmp = *(GL_litvec*)(void*)&tmp_lits;
+    tmp.clear();
+    for (uint i = 0; i < assumps.size(); i++)
+        tmp.push(toGl(assumps[i]));
+
+    lbool ret = fromGl(S->solveLimited(tmp));
+    S->budgetOff();
+    return ret;
+}
+
+
+void GluSat::randomizeVarOrder(uint64 seed)
+{
+    /*nothing yet*/
+}
+
+
+bool GluSat::okay() const
+{
+    return S->okay();
+}
+
+
+lbool GluSat::value_(uint x) const
+{
+    return fromGl(S->modelValue(x));
+}
+
+
+void GluSat::getModel(Vec<lbool>& m) const
+{
+    m.setSize(nVars());
+    for (uint i = 0; i < nVars(); i++)
+        m[i] = fromGl(S->modelValue(i));
+}
+
+
+void GluSat::getConflict(Vec<Lit>& confl)
+{
+    confl.clear();
+    for (int i = 0; i < S->conflict.size(); i++)
+        confl.push(~fromGl(S->conflict[i]));
+}
+
+
+double GluSat::getActivity(uint x) const
+{
+    return S->activity[x] / S->var_inc;
+}
+
+
+uint GluSat::nClauses() const
+{
+    return S->nClauses();
+}
+
+
+uint GluSat::nLearnts() const
+{
+    return S->nLearnts();
+}
+
+
+uint GluSat::nConflicts() const
+{
+    return S->conflicts;
+}
+
+
+uint GluSat::nVars() const
+{
+    return S->nVars();
+
+}
+
+
+void GluSat::freeze(uint x)
+{
+    /*nothing*/
+}
+
+
+void GluSat::thaw(uint x)
+{
+    /*nothing*/
+}
+
+
+void GluSat::preprocess(bool /*final_call*/)
+{
+    /*nothing*/
+}
+
+
+void GluSat::getCnf(Vec<Lit>& out_cnf)
+{
+    assert(false);  // <<== later
+}
+
+
+void GluSat::setVerbosity(int verb_level)
+{
+    S->verbosity = verb_level;
+}
+
+
+bool GluSat::exportCnf(const String& filename)
+{
+    assert(false);
 }
 
 

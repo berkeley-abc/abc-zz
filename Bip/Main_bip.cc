@@ -892,6 +892,8 @@ int main(int argc, char** argv)
     cli_bmc.add("st", "bool", "no", "Simple binary Tseitin clausification.");
     cli_bmc.add("la", "int[1:]", "1", "Number of look-ahead frames.");
     cli_bmc.add("la-decay", "ufloat", "0.8", "Smaller numbers mean later frames are given less time. '1' = all frames have equal time.");
+    cli_bmc.add("sat", "{zz, msc, abc, glu}", "msc", "SAT-solver to use.");
+
     cli.addCommand("bmc", "Bounded model checking", &cli_bmc);
 
     // Command line -- ping-pong interpolation:
@@ -1376,6 +1378,11 @@ int main(int argc, char** argv)
         P.la_steps       = cli_bmc.get("la").int_val;
         P.la_decay       = cli_bmc.get("la-decay").float_val;
         P.quiet          = cli.get("quiet").bool_val;
+        P.sat_solver = (cli.get("sat").enum_val == 0) ? sat_Zz :
+                       (cli.get("sat").enum_val == 1) ? sat_Msc :
+                       (cli.get("sat").enum_val == 2) ? sat_Abc :
+                       (cli.get("sat").enum_val == 3) ? sat_Glu : (assert(false), sat_NULL);
+
         EffortCB_Timeout cb(vtimeout, timeout);
         Cex   cex;
         int   bug_free_depth;
@@ -1526,9 +1533,8 @@ int main(int argc, char** argv)
                 NewLine;
                 writeResourceUsage(T0, Tr0);
             }else{
-                /**/WriteLn "TEMPORARY: Cannot export CNF; need to fix. Sorry.";
-                //S.exportCnf(output);
-                //WriteLn "Wrote DIMACS: \a*%_\a*", output;
+                S.exportCnf(output);
+                WriteLn "Wrote DIMACS: \a*%_\a*", output;
             }
 
         }else{

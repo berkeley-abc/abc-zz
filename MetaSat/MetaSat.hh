@@ -34,6 +34,10 @@ namespace abc_sat {
     typedef int lit;
 };
 
+namespace Glucose {
+    struct Solver;
+}
+
 
 namespace ZZ {
 using namespace std;
@@ -86,15 +90,16 @@ struct MetaSat {
   //________________________________________
   //  Preprocessing:
 
-    virtual void  freeze(uint x) = 0;                      // }- Has no effect except for simplifying solver.
-    virtual void  thaw(uint x) = 0;                        // }
-    virtual void  preprocess(bool final_call) = 0;         // -- If 'final_call' is TRUE, internal data will be freed to save memory, but no more preprocessing is possible.
-    virtual void  getCnf(Vec<Lit>& out_cnf) = 0;           // -- Read back CNF as a sequence of clauses separated by 'lit_Undef's.
+    virtual void  freeze(uint x) = 0;                       // }- Has no effect except for simplifying solver.
+    virtual void  thaw(uint x) = 0;                         // }
+    virtual void  preprocess(bool final_call) = 0;          // -- If 'final_call' is TRUE, internal data will be freed to save memory, but no more preprocessing is possible.
+    virtual void  getCnf(Vec<Lit>& out_cnf) = 0;            // -- Read back CNF as a sequence of clauses separated by 'lit_Undef's.
 
   //________________________________________
   //  Debug:
 
-    virtual void  setVerbosity(int verb_level) = 0;        // -- '0' means no output.
+    virtual void  setVerbosity(int verb_level) = 0;         // -- '0' means no output.
+    virtual bool  exportCnf(const String& filename) = 0;    // -- to use with external solver for benchmarking purposes (returns FALSE if file could not be created)
 
   //________________________________________
   //  Convenience:
@@ -140,7 +145,9 @@ protected:
     virtual void  thaw(uint x);                                         \
     virtual void  preprocess(bool final_call);                          \
     virtual void  getCnf(Vec<Lit>& out_cnf);                            \
-    virtual void  setVerbosity(int verb_level);
+    virtual void  setVerbosity(int verb_level);                         \
+    virtual bool  exportCnf(const String& filename);
+
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -218,6 +225,22 @@ private:
 };
 
 
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct GluSat : MetaSat {
+    GluSat();
+    virtual ~GluSat();
+
+    MetaSat_OVERRIDES
+
+private:
+    ::Glucose::Solver* S;
+    Lit true_lit;
+    minisat2_vec_data tmp_lits;
+};
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // 'MultiSat' -- Dynamically become anyone of the wrapped solvers:
 
@@ -228,6 +251,7 @@ enum SolverType {
     sat_Msc,        // MiniSat 2.2, core version
     sat_Mss,        // MiniSat 2.2, simplifying version
     sat_Abc,        // ABC's MiniSat
+    sat_Glu,        // Glucose 2.1
 };
 
 
@@ -262,6 +286,7 @@ struct MultiSat : MetaSat {
     virtual void   preprocess(bool final_call)         { S->preprocess(final_call); }
     virtual void   getCnf(Vec<Lit>& out_cnf)           { S->getCnf(out_cnf); }
     virtual void   setVerbosity(int verb_level)        { S->setVerbosity(verb_level); }
+    virtual bool   exportCnf(const String& filename)   { return S->exportCnf(filename); }
 };
 
 
@@ -275,6 +300,7 @@ inline void MultiSat::selectSolver(SolverType type)
     case sat_Msc:  S = new MiniSat2() ; break;
     case sat_Mss:  S = new MiniSat2s(); break;
     case sat_Abc:  S = new AbcSat()   ; break;
+    case sat_Glu:  S = new GluSat()  ; break;
     default: assert(false); }
 }
 

@@ -1,9 +1,11 @@
 #include "Prelude.hh"
 #include "MetaSat.hh"
+/**/#include "Glucose.hh"
 
 using namespace ZZ;
 
 
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
@@ -59,7 +61,7 @@ int main(int argc, char** argv)
 #endif
 
 #if 1
-    AbcSat S;
+    GluSat S;
     Lit x1 = S.addLit();
     Lit x2 = S.addLit();
 

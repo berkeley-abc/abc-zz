@@ -1,0 +1,155 @@
+#!/usr/bin/env python
+
+import sys
+import os
+import re
+import shutil
+import tempfile
+
+
+module_name = "Glucose"
+
+
+##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+## Helpers:
+
+
+def pr(text):
+    sys.stdout.write(text)
+    sys.stdout.flush()
+
+
+def abort(message):
+    pr("ERROR! %s\n" % message)
+    exit(255)
+
+
+def z(var):
+    return os.environ["ZB_" + var]
+
+
+def up_to_date(src, dst):
+    return os.path.exists(dst) and os.stat(dst).st_mtime + 0.001 > os.stat(src).st_mtime
+
+
+def files_in_dir(dir):
+    return [f for f in os.listdir(dir) if os.path.isfile(dir+"/"+f)]
+
+
+##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+## Build:
+
+
+def build():
+    # Setup makefile variables:
+    flags = []
+    pri   = z("PRI_TYPE")
+    secs  = z("SEC_TYPES")
+
+    flags.append("-D__STDC_LIMIT_MACROS")
+    flags.append("-ffloat-store")
+
+    if pri == "r": flags.append("-O3 -fomit-frame-pointer")
+    if pri == "p": flags.append("-O1 -pg")
+    if pri == "d": flags.append("-O1")
+    if pri == "q": flags.append("-O0")
+
+    if "t" in secs: flags.append("-pthread")
+    if "a" in secs: flags.append("-DNDEBUG")
+    if "s" not in secs: flags.append("-ggdb")
+
+    suffix = "_" + ''.join(sorted(set(pri))) + "_" + ''.join(sorted(set(secs)))
+
+    # Compile (modified) .cc files:
+    obj_files = []
+    changed = False
+    for f in files_in_dir("."):
+        if f.endswith(".cc") and f != "Main.cc":
+            obj = f[:-3] + suffix + ".o"
+            obj_files.append(obj)
+            if not up_to_date(f, obj):
+                cmd = "g++ -c %s %s -o %s" % (" ".join(flags), f, obj)
+                if z("VERBOSE") == "1": print "COMPILE:", cmd
+                if os.system(cmd) != 0: abort("Compilation failed")
+                changed = True
+
+    local_target = "lib" + module_name + suffix + ".a"
+    if changed or not os.path.exists(local_target):
+        # Link:
+        public_target = z("LIB_DIR") + "/lib" + module_name + ".a"
+        local_target = "lib" + module_name + suffix + ".a"
+        cmd = "ar cqs %s %s 2>&1" % (local_target, " ".join(obj_files))
+        if z("VERBOSE") == "1": print "LINK:", cmd
+        if os.system(cmd) != 0: abort("Linking failed")
+
+        # Copy results:
+        if not up_to_date(local_target, public_target):
+            shutil.copy2(local_target, public_target)
+            print "`` Produced library: lib" + module_name + ".a"
+
+
+def skip_line(line, remove_protected):
+    if line.startswith("#include \""): return True
+    if remove_protected and line == "protected:\n": return True   # (remove "protected:" from 'Solver.h')
+    if line.startswith("#define var_Undef (-1)"): return True
+    if line.startswith("#define l_"): return True
+    return False
+
+
+def subst_defines(line):
+    line = re.sub(r"var_Undef", "(-1)", line)
+    line = re.sub(r"l_True", "(lbool((uint8_t)0))", line)
+    line = re.sub(r"l_False", "(lbool((uint8_t)1))", line)
+    line = re.sub(r"l_Undef", "(lbool((uint8_t)2))", line)
+    return line
+
+
+def create_header():
+    order = [
+             "Constants.hh",
+             "XAlloc.hh",
+             "Alloc.hh",
+             "Vec.hh",
+             "Queue.hh",
+             "Int-Types.hh",
+             "Heap.hh",
+             "Map.hh",
+             "Alg.hh",
+             "ParseUtils.hh",
+             "Options.hh",
+             "SolverTypes.hh",
+             "BoundedQueue.hh",
+             "Solver.hh",
+             "SimpSolver.hh"
+            ]
+
+    out_filename = z("INCLUDE_DIR") + "/"+ module_name + ".hh"
+    tmp_filename = z("INCLUDE_DIR") + "/"+ module_name + ".hh.tmp"
+    out = open(tmp_filename, "wt")
+    for filename in order:
+        remove_protected = (filename == "Solver.hh")
+        with open(filename) as f:
+            for line in f:
+                if not skip_line(line, remove_protected):
+                    out.write(subst_defines(line))
+    out.close()
+
+    # Report file creation only if different:
+    if not os.path.exists(out_filename) or os.system("diff " + out_filename + " " + tmp_filename + " >/dev/null") != 0:
+        os.system("mv " + tmp_filename + " " + out_filename)
+        print "`` Created header: " + module_name + ".hh"
+
+
+def clean_up():
+    os.system("rm -rvf lib" + module_name + "*.a *.o")
+
+
+def main():
+    os.chdir(module_name)
+    if   z("CMD") == "build" : build()
+    elif z("CMD") == "header": create_header()
+    elif z("CMD") == "clean" : clean_up()
+    else:
+        abort("Unknown command: " + z("CMD"))
+
+main()
