@@ -1754,8 +1754,8 @@ void addCli_Treb(CLI& cli)
     Params_Treb P;  // -- get default values.
     cchar* weak_type    = "{none,sim,just}";
     cchar* weak_default = (P.weaken == Params_Treb::NONE) ? "none" : (P.weaken == Params_Treb::SIM) ? "sim" : "just";
-    String sat_types   = "{zz, msc, abc, glu}";
-    String sat_default = (P.sat_solver == sat_Zz) ? "zz" : (P.sat_solver == sat_Msc) ? "msc" : (P.sat_solver == sat_Abc) ? "abc" : "glu";
+    String sat_types   = "{zz, msc, abc, glu, glr}";
+    String sat_default = (P.sat_solver == sat_Zz) ? "zz" : (P.sat_solver == sat_Msc) ? "msc" : (P.sat_solver == sat_Abc) ? "abc" : (P.sat_solver == sat_Glu) ? "glu" : "glr";
 
     cli.add("seed"      , "uint"     , (FMT "%_", P.seed)           , "Seed to randomize SAT solver with. 0 means no randomization.");
     cli.add("bwd"       , "bool"     , P.bwd ? "yes" : "no"         , "Perform backward induction/reachability.");
@@ -1813,7 +1813,8 @@ void setParams(const CLI& cli, Params_Treb& P)
     P.sat_solver = (cli.get("sat").enum_val == 0) ? sat_Zz :
                    (cli.get("sat").enum_val == 1) ? sat_Msc :
                    (cli.get("sat").enum_val == 2) ? sat_Abc :
-                   (cli.get("sat").enum_val == 3) ? sat_Glu : (assert(false), sat_NULL);
+                   (cli.get("sat").enum_val == 3) ? sat_Glu :
+                   (cli.get("sat").enum_val == 4) ? sat_Glr : (assert(false), sat_NULL);
 
     P.quiet         = cli.get("quiet")     .bool_val;
 

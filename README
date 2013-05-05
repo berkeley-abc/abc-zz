@@ -3,8 +3,8 @@ Before compiling any files int the ZZ framework, you need to do the following:
   - Set your path to include 'ZZ/BUILD' or, alternatively, make an alias 'zb'
     to point to 'ZZ/BUILD/zb'.
 
-  - In 'ZZ/EXTERN' do 'hg clone https://bitbucket.org/alanmi/abc' to
-    install the latest version of ABC.
+  - In 'ZZ/EXTERN', run 'checkout_abc.sh' to download a compatible version of 
+    ABC.
 
   - Make sure you have Python 2.6 or later installed.
 

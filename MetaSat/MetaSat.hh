@@ -38,6 +38,10 @@ namespace Glucose {
     struct Solver;
 }
 
+namespace GlucoRed {
+    struct Solver;
+}
+
 
 namespace ZZ {
 using namespace std;
@@ -241,6 +245,22 @@ private:
 };
 
 
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct GlrSat : MetaSat {
+    GlrSat();
+    virtual ~GlrSat();
+
+    MetaSat_OVERRIDES
+
+private:
+    ::GlucoRed::Solver* S;
+    Lit true_lit;
+    minisat2_vec_data tmp_lits;
+};
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // 'MultiSat' -- Dynamically become anyone of the wrapped solvers:
 
@@ -252,6 +272,7 @@ enum SolverType {
     sat_Mss,        // MiniSat 2.2, simplifying version
     sat_Abc,        // ABC's MiniSat
     sat_Glu,        // Glucose 2.1
+    sat_Glr,        // GlucoRed by Siert Wieringa
 };
 
 
@@ -300,7 +321,8 @@ inline void MultiSat::selectSolver(SolverType type)
     case sat_Msc:  S = new MiniSat2() ; break;
     case sat_Mss:  S = new MiniSat2s(); break;
     case sat_Abc:  S = new AbcSat()   ; break;
-    case sat_Glu:  S = new GluSat()  ; break;
+    case sat_Glu:  S = new GluSat()   ; break;
+    case sat_Glr:  S = new GlrSat()   ; break;
     default: assert(false); }
 }
 

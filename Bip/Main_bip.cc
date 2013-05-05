@@ -892,7 +892,7 @@ int main(int argc, char** argv)
     cli_bmc.add("st", "bool", "no", "Simple binary Tseitin clausification.");
     cli_bmc.add("la", "int[1:]", "1", "Number of look-ahead frames.");
     cli_bmc.add("la-decay", "ufloat", "0.8", "Smaller numbers mean later frames are given less time. '1' = all frames have equal time.");
-    cli_bmc.add("sat", "{zz, msc, abc, glu}", "msc", "SAT-solver to use.");
+    cli_bmc.add("sat", "{zz, msc, abc, glu, glr}", "msc", "SAT-solver to use.");
 
     cli.addCommand("bmc", "Bounded model checking", &cli_bmc);
 
@@ -927,6 +927,7 @@ int main(int argc, char** argv)
     // Command line -- reparametrization:
     CLI cli_reparam;
     cli_reparam.add("width", "uint" , "8", "Maximum cut width (over 10 may be very slow).");
+    cli_reparam.add("resyn", "bool" , "yes", "Resynthesize logic to remove more inputs'.");
     cli_reparam.add("aig", "string" , "", "Save result as AIGER file.");
     cli_reparam.add("gig", "string" , "", "Save result as GIG file.");
     cli.addCommand("reparam", "Remove inputs through reparametrization. (work in progress)", &cli_reparam);
@@ -1381,7 +1382,8 @@ int main(int argc, char** argv)
         P.sat_solver = (cli.get("sat").enum_val == 0) ? sat_Zz :
                        (cli.get("sat").enum_val == 1) ? sat_Msc :
                        (cli.get("sat").enum_val == 2) ? sat_Abc :
-                       (cli.get("sat").enum_val == 3) ? sat_Glu : (assert(false), sat_NULL);
+                       (cli.get("sat").enum_val == 3) ? sat_Glu :
+                       (cli.get("sat").enum_val == 4) ? sat_Glr : (assert(false), sat_NULL);
 
         EffortCB_Timeout cb(vtimeout, timeout);
         Cex   cex;
@@ -1571,6 +1573,7 @@ int main(int argc, char** argv)
     }else if (cli.cmd == "reparam"){
         Params_Reparam P;
         P.cut_width = cli.get("width").int_val;
+        P.resynth   = cli.get("resyn").bool_val;
         P.quiet = quiet;
         //**/reparamDebug(N);
         //**/exit(0);

@@ -107,38 +107,52 @@ void analyzeRegion(NetlistRef N, const WZet& area, const WZet& int_pi, const WZe
 
     int num = attr_PI(int_pi.list()[0]).number;
 
-    // Collect inputs for 'w_dom' and disconnect them:
-    Vec<GLit> ins;
-    For_Inputs(w_dom, v){
-        ins.push(v);
-        w_dom.set(Iter_Var(v), Wire_NULL);
-    }
+    if (!P.resynth){
+        // Old version, no resynthesis:
+        if (on_empty && off_empty){
+            int num = attr_PI(int_pi.list()[0]).number;
+            For_Inputs(w_dom, v){
+                w_dom.set(Iter_Var(v), Wire_NULL);
+                if (fanout_count[v] == 0)
+                    removeUnreach(v);
+            }
+            N.change(w_dom, PI_(num));
+        }
 
-    if (on_empty && off_empty)    // -- simple case
-        N.change(w_dom, PI_(num));
-    else{
-        // Build: '~off & (on | PI)'
-        N.change(w_dom, Buf_());
-        Wire acc = N.add(PI_(num));
+    }else{
+        // Collect inputs for 'w_dom' and disconnect them:
+        Vec<GLit> ins;
+        For_Inputs(w_dom, v){
+            ins.push(v);
+            w_dom.set(Iter_Var(v), Wire_NULL);
+        }
 
-        Vec<uint> cover;
-        irredSumOfProd(ext_pi.size(), on, cover, false);       // <<== prova "true" och negera resultat om mindre (analogt för off-set)
-        for (uint i = 0; i < cover.size(); i++)
-            acc = mk_Or(acc, buildCover(N, cover, ext_pi));
+        if (on_empty && off_empty)    // -- simple case
+            N.change(w_dom, PI_(num));
+        else{
+            // Build: '~off & (on | PI)'
+            N.change(w_dom, Buf_());
+            Wire acc = N.add(PI_(num));
 
-        cover.clear();
-        irredSumOfProd(ext_pi.size(), off, cover, false);
-        for (uint i = 0; i < cover.size(); i++)
-            acc = mk_And(acc, ~buildCover(N, cover, ext_pi));
+            Vec<uint> cover;
+            irredSumOfProd(ext_pi.size(), on, cover, false);       // <<== prova "true" och negera resultat om mindre (analogt för off-set)
+            for (uint i = 0; i < cover.size(); i++)
+                acc = mk_Or(acc, buildCover(N, cover, ext_pi));
 
-        w_dom.set(0, acc);
-    }
+            cover.clear();
+            irredSumOfProd(ext_pi.size(), off, cover, false);
+            for (uint i = 0; i < cover.size(); i++)
+                acc = mk_And(acc, ~buildCover(N, cover, ext_pi));
 
-    // Remove redundant logic:
-    for (uint i = 0; i < ins.size(); i++){
-        Wire v = ins[i] + N;
-        if (fanout_count[v] == 0)
-            removeUnreach(v, false);
+            w_dom.set(0, acc);
+        }
+
+        // Remove redundant logic:
+        for (uint i = 0; i < ins.size(); i++){
+            Wire v = ins[i] + N;
+            if (fanout_count[v] == 0)
+                removeUnreach(v, false);
+        }
     }
 }
 
