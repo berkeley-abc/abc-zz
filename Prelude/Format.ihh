@@ -98,7 +98,9 @@ template<class T> fts_macro void write_(Out& out, const Array<T>& v, Str flags)
     if (flag == '\n' || flag == '\r' || flag == ' '){
         flags = flags.slice(1);
         for (uind i = 0; i < v.size(); i++){
-            write_(out, v[i], flags);
+            bool no_flags = (flags.size() == 0) || (flags.size() == 1 && flags[0] == '_');
+            if (!no_flags) write_(out, v[i], flags);
+            else           write_(out, v[i]);
             if (flag == '\n' || (flag == '\r' && i+1 != v.size())) out += NL;
         }
 
@@ -108,7 +110,9 @@ template<class T> fts_macro void write_(Out& out, const Array<T>& v, Str flags)
             write_(out, v[0], flags);
             for (uind i = 1; i < v.size(); i++){
                 out += ';', ' ';
-                write_(out, v[i], flags);
+                bool no_flags = (flags.size() == 0) || (flags.size() == 1 && flags[0] == '_');
+                if (!no_flags) write_(out, v[i], flags);
+                else           write_(out, v[i]);
             }
         }
         out += '}';
@@ -223,7 +227,7 @@ template<> fts_macro void write_(Out& out, const void* const& ptr, Str flags) {
     else assert(flags[0] == 'P'), write_uint(out, uintp(ptr), Str(sizeof(uintp) == 4 ? ":.8X" : ":.16X")); }
 
 template<> fts_macro void write_(Out& out, const Array<cchar>& text, Str flags) {
-    assert(flags.size() == 1 && flags[0] == 'n');   // -- only flag supportes so far (suppress '<nil>' printing)
+    assert(flags.size() == 1 && flags[0] == 'n');   // -- only flag supported so far (suppress '<nil>' printing)
     if (text){ operator+=(out, text); } }
 template<> fts_macro void write_(Out& out, const Array<char>&  text, Str flags) {
     assert(flags.size() == 1 && flags[0] == 'n');

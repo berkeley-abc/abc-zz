@@ -6,8 +6,6 @@
 // (c) Aalto University 2012/2013
 //
 //
-#define GLUCORED
-
 #include"ExtSolver.hh"
 using namespace GlucoRed;
 
