@@ -52,7 +52,9 @@ macro uint64 realTimeAbs()  // -- absolute time in nano-seconds
 #else
 
 
+}
 #include <mach/mach_time.h>
+namespace ZZ{
 
 extern double realtime_conversion;
 
