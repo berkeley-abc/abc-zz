@@ -1,7 +1,7 @@
 //
 //     MiniRed/GlucoRed
 //
-//     Siert Wieringa 
+//     Siert Wieringa
 //     siert.wieringa@aalto.fi
 // (c) Aalto University 2012/2013
 //
@@ -43,7 +43,8 @@ MiniRed::MiniRed()
 
     // Create posix thread objects
     pthread_mutex_init(&mutex, NULL);
-    pthread_spin_init(&resultLock, PTHREAD_PROCESS_PRIVATE);
+//    pthread_spin_init(&resultLock, PTHREAD_PROCESS_PRIVATE);
+    pthread_spin_init(&resultLock, 0);
     pthread_cond_init(&cond, NULL);
 }
 
@@ -76,7 +77,7 @@ lbool MiniRed::solve_() {
     if ( !copyProblem(reducer, offset) ) return l_False;
     pthread_create(&posix, NULL, threadEntry, this);
 
-    // Run the solver in this thread normally, 
+    // Run the solver in this thread normally,
     // it will supply clauses to 'work' for the other thread
     lbool sat = Solver::solve_();
     foundResult(sat, true);

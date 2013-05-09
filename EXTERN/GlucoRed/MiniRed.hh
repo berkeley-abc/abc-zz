@@ -13,6 +13,14 @@
 #include"ExtSolver.hh"
 #include<pthread.h>
 
+#if defined(__APPLE__)
+#define pthread_spinlock_t pthread_mutex_t
+#define pthread_spin_lock pthread_mutex_lock
+#define pthread_spin_unlock pthread_mutex_unlock
+#define pthread_spin_init pthread_mutex_init
+#define pthread_spin_destroy pthread_mutex_destroy
+#endif
+
 namespace GlucoRed {
 
 // The extension of the solver that includes the reducer. This class forms the full implementation
