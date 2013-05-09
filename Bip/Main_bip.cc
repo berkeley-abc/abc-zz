@@ -39,6 +39,7 @@
 #include "Saber.hh"
 #include "AbsBmc.hh"
 #include "Live.hh"
+#include "LtlCheck.hh"
 #include "ConstrExtr.hh"
 
 #define NO_BERKELEY_ABC
@@ -977,6 +978,11 @@ int main(int argc, char** argv)
     cli_live.add("eng", "{none, bmc, treb, treb-abs, pdr2, imc}", "none", "Proof-engine to apply to conversion.");
     cli.addCommand("live", "Liveness checking.", &cli_live);
 
+    // Command line -- LTL:
+    CLI cli_ltl;
+    cli_ltl.add("spec", "string", arg_REQUIRED, "LTL specification(s).");
+    cli.addCommand("ltl", "LTL model checking.", &cli_ltl);
+
     // Command line -- constraint extraction:
     CLI cli_constr;
     cli_constr.add("k", "uint", "0", "Temporal decomposition frame.");
@@ -1257,7 +1263,7 @@ int main(int argc, char** argv)
         //getInitialAbstr(N, cli.get("abstr").string_val, abstr, quiet);
 
         // <<== rather check for liveness properties here, and switch default command
-        if (cli.cmd != "live")
+        if (cli.cmd != "live" && cli.cmd != "ltl")
             setupProperties(N, prop_nums, inv_prop, props, quiet || is_aiger);
         setupInitialState(N, quiet || is_aiger);
 
@@ -1678,6 +1684,11 @@ int main(int argc, char** argv)
 
         if (result != l_Undef)
             ;// <<==  outputVerificationResult(N, props, result, &cex, orig_num_pis, NetlistRef(), bug_free_depth, false, output, quiet, T0, Tr0);
+        if (!quiet) writeResourceUsage(T0, Tr0);
+
+    }else if (cli.cmd == "ltl"){
+        String spec_file = cli_ltl.get("spec").string_val;
+        ltlCheck(N, spec_file, (prop_nums.size() == 0) ? 0 : prop_nums[0]);     // -- only check one property
         if (!quiet) writeResourceUsage(T0, Tr0);
 
     }else if (cli.cmd == "constr"){

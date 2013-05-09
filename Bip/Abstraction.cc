@@ -730,7 +730,7 @@ void localAbstr(NetlistRef N0, Vec<Wire>& props, const Params_LocalAbstr& P, /*i
             Write_Progress(false);
 
             if ((par || dwr) && abstr_sent){
-                if (par)sendMsg_AbstrBad();
+                if (par) sendMsg_AbstrBad();
                 abstr_sent = false;
                 sent_size = UINT_MAX;
             }
