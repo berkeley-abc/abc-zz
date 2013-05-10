@@ -23,7 +23,54 @@ using namespace std;
 
 void ltlCheck(NetlistRef N, const LtlExpr* spec)
 {
-    WriteLn "SPEC: %_", *spec;
+    const LtlExpr& s = *spec;
+
+    if (s.atom){
+        GLit p = N.names().lookup(s.atom);
+        if (!p){
+            ShoutLn "ERROR! No such signal: %_", s.atom;
+            exit(1); }
+
+
+    }else{
+        switch (s.op){
+
+        // Unary temporal operators:
+        case 'X':
+        case 'Y':
+        case 'Z':
+        case 'F':
+        case 'G':
+        case 'H':
+        case 'O':
+        case 'P':
+
+        // Until operators:
+        case 'U':
+        case 'V':
+        case 'W':
+        case 'R':
+        case 'S':
+        case 'T':
+
+        // Logic operators:
+        case '!':
+        case '&':
+        case '|':
+        case '>':
+        case '=':
+        case '^':
+
+        defaults: assert(false); }
+    }
+
+    // inputs: z, a, b
+    // outputs: pending, failed, accept
+
+    // FAILED = (failed1 | failed2 | ...)
+    // Liveness: inf_often(accept1, accept2, ...) under constr. ~FAILED
+
+    // Safety: reachable(~FAILED & ~PENDING)
 }
 
 
@@ -56,6 +103,7 @@ void ltlCheck(NetlistRef N, String spec_file, uint prop_no)
         exit(0);
     }
 
+    N.names().enableLookup();
     ltlCheck(N, spec);
     dispose(spec);
 }

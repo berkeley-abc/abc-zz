@@ -54,12 +54,19 @@ Precedence:
     ! F G X Y Z H O P     (50)
     U V W R S T           (40)
     &                     (30)
-    | xor xnor            (20)
+    | xor xnor            (20)   
     <->                   (10)
     ->                     (0)
 
 Operators of equal precedence associate to the left, except -> that associates to the right.
 
+Single charatcter operator substitutions:
+
+   ->     >
+   <->    =
+   xnor   =
+   xor    ^
+   O      P
 
 */
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -78,6 +85,7 @@ struct LtlTokenizer : XP_TokenStream {
         switch (*p){
         case '!': case 'F': case 'G': case 'X': case 'Y': case 'Z': case 'H': case 'O': case 'P':
             op_tag = *p++; prio = 50; type = xop_PREFIX;
+            if (op_tag == 'O') op_tag = 'P';
             return true;
 
         case 'U': case 'V': case 'W': case 'R': case 'S': case 'T':
