@@ -1023,23 +1023,22 @@ lbool Solver::solve_()
     lbool   status        = l_Undef;
     nbclausesbeforereduce = firstReduceDB;
     if(verbosity>=1) {
-      printf("c ========================================[ MAGIC CONSTANTS ]==============================================\n");
-      printf("c | Constants are supposed to work well together :-)                                                      |\n");
-      printf("c | however, if you find better choices, please let us known...                                           |\n");
-      printf("c |-------------------------------------------------------------------------------------------------------|\n");
-    printf("c |                                |                                |                                     |\n");
-    printf("c | - Restarts:                    | - Reduce Clause DB:            | - Minimize Asserting:               |\n");
-    printf("c |   * LBD Queue    : %6d      |   * First     : %6d         |    * size < %3d                     |\n",lbdQueue.maxSize(),firstReduceDB,lbSizeMinimizingClause);
-    printf("c |   * Trail  Queue : %6d      |   * Inc       : %6d         |    * lbd  < %3d                     |\n",trailQueue.maxSize(),incReduceDB,lbLBDMinimizingClause);
-    printf("c |   * K            : %6.2f      |   * Special   : %6d         |                                     |\n",K,specialIncReduceDB);
-    printf("c |   * R            : %6.2f      |   * Protected :  (lbd)< %2d     |                                     |\n",R,lbLBDFrozenClause);
-    printf("c |                                |                                |                                     |\n");
-printf("c ==================================[ Search Statistics (every %6d conflicts) ]=========================\n",verbEveryConflicts);
-      printf("c |                                                                                                       |\n");
-
-      printf("c |          RESTARTS           |          ORIGINAL         |              LEARNT              | Progress |\n");
-      printf("c |       NB   Blocked  Avg Cfc |    Vars  Clauses Literals |   Red   Learnts    LBD2  Removed |          |\n");
-      printf("c =========================================================================================================\n");
+        printf("c ========================================[ MAGIC CONSTANTS ]==============================================\n");
+        printf("c | Constants are supposed to work well together :-)                                                      |\n");
+        printf("c | however, if you find better choices, please let us known...                                           |\n");
+        printf("c |-------------------------------------------------------------------------------------------------------|\n");
+        printf("c |                                |                                |                                     |\n");
+        printf("c | - Restarts:                    | - Reduce Clause DB:            | - Minimize Asserting:               |\n");
+        printf("c |   * LBD Queue    : %6d      |   * First     : %6d         |    * size < %3d                     |\n",lbdQueue.maxSize(),firstReduceDB,lbSizeMinimizingClause);
+        printf("c |   * Trail  Queue : %6d      |   * Inc       : %6d         |    * lbd  < %3d                     |\n",trailQueue.maxSize(),incReduceDB,lbLBDMinimizingClause);
+        printf("c |   * K            : %6.2f      |   * Special   : %6d         |                                     |\n",K,specialIncReduceDB);
+        printf("c |   * R            : %6.2f      |   * Protected :  (lbd)< %2d     |                                     |\n",R,lbLBDFrozenClause);
+        printf("c |                                |                                |                                     |\n");
+        printf("c ==================================[ Search Statistics (every %6d conflicts) ]=========================\n",verbEveryConflicts);
+        printf("c |                                                                                                       |\n");
+        printf("c |          RESTARTS           |          ORIGINAL         |              LEARNT              | Progress |\n");
+        printf("c |       NB   Blocked  Avg Cfc |    Vars  Clauses Literals |   Red   Learnts    LBD2  Removed |          |\n");
+        printf("c =========================================================================================================\n");
     }
 
     // Search:

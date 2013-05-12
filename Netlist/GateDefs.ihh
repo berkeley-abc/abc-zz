@@ -67,7 +67,9 @@
     Macro(MRead)                      \
     Macro(MWrite)                     \
     /* Uninterpreted functions: */    \
-    Macro(Uif)
+    Macro(Uif)                        \
+    /* LTL specification:*/           \
+    Macro(Ltl)
 
 
 #endif
@@ -284,6 +286,40 @@ struct GateAttr_Uif : GateAttr<gate_Uif, DYNAMIC_GATE_INPUTS> {
 
     bool operator==(const GateAttr_Uif& e) const {
         return sym == e.sym; }
+};
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct GateAttr_Ltl : GateAttr<gate_Ltl, 2> {
+    char op;
+    uint scope;
+
+    GateAttr_Ltl(char op_ = 0, uint scope_ = 0) : op(op_), scope(scope_) {}
+
+    void save(Out& out) const { putc(out, op); putu(out, scope); }
+    void load(In&  in ) { op = getc(in); scope = getu(in); }
+    void write(Out& out) const {
+        assert(op == 0 || op > 32);
+        assert(op != 0 || scope == 0);
+        if (op != 0){
+            if (scope == 0) FWrite(out) "%_", op;
+            else            FWrite(out) "%_ %_", op, scope;
+        }
+    }
+    void read(Str in) {
+        in = strip(in);
+        if (in.size() == 0)
+            op = 0, scope = 0;
+        else if (in.size() == 1)
+            op = in[0], scope = 0;
+        else
+            op = in[0], scope = stringToUInt64(strip(in.slice(1)));
+    }
+
+    bool operator==(const GateAttr_Ltl& e) const {
+        return op == e.op && scope == e.scope; }
 };
 
 

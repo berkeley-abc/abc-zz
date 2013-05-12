@@ -4,11 +4,11 @@
 //| Author(s)   : Niklas Een
 //| Module      : Common
 //| Description : LTL expression parser (NuSMV style)
-//| 
+//|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -20,10 +20,12 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-/*
+                                                                                                 /*
+
 expr :: simple_expr     -- a simple boolean expression
     | ( expr )
     | ! expr            -- logical not
+    | ~ expr            -- alt. syntax for "not" (converted to !)
     | expr & expr       -- logical and
     | expr | expr       -- logical or
     | expr xor expr     -- logical exclusive or
@@ -36,23 +38,24 @@ expr :: simple_expr     -- a simple boolean expression
     | G expr            -- globally
     | F expr            -- finally
     | expr U expr       -- until (left assoc.)
-    | expr V expr       -- releases
-    | expr R expr       -- alt. syntax for "releases"
+    | expr R expr       -- releases
+    | expr V expr       -- alt. syntax for "releases" (converted to R)
     | expr W expr       -- weak until
     
     -- PAST
     | Y expr            -- previous state
     | Z expr            -- not previous state not
     | H expr            -- historically
-    | O expr            -- once 
-    | P expr            -- alt. syntax for "once"
+    | P expr            -- once 
+    | O expr            -- alt. syntax for "once" (converted to P)
     | expr S expr       -- since
     | expr T expr       -- triggered
+    | expr M expr       -- weak since (extension)
 
 Precedence:
 
     ! F G X Y Z H O P     (50)
-    U V W R S T           (40)
+    U V W R S T M         (40)
     &                     (30)
     | xor xnor            (20)   
     <->                   (10)
@@ -62,20 +65,23 @@ Operators of equal precedence associate to the left, except -> that associates t
 
 Single charatcter operator substitutions:
 
-   ->     >
-   <->    =
-   xnor   =
-   xor    ^
-   O      P
+   ->      >
+   <->     =
+   xnor    =
+   xor     ^
+   O       P
 
-*/
+Also scope operator '$' is used elsewhere but not yet introduced in this parser.   
+   
+                                                                                                 */
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
 struct LtlTokenizer : XP_TokenStream {
     cchar* p0;
     cchar* p;
-    LtlTokenizer(cchar* p_) : p0(p_), p(p_) {}
+    NetlistRef N;
+    LtlTokenizer(cchar* p_, NetlistRef N_) : p0(p_), p(p_), N(N_) {}
 
     void skipWS() { while (isWS(*p)) p++; }
 
@@ -83,13 +89,15 @@ struct LtlTokenizer : XP_TokenStream {
         skipWS();
         pos = uint(p - p0);
         switch (*p){
-        case '!': case 'F': case 'G': case 'X': case 'Y': case 'Z': case 'H': case 'O': case 'P':
+        case '!': case '~': case 'F': case 'G': case 'X': case 'Y': case 'Z': case 'H': case 'O': case 'P':
             op_tag = *p++; prio = 50; type = xop_PREFIX;
             if (op_tag == 'O') op_tag = 'P';
+            if (op_tag == '~') op_tag = '!';
             return true;
 
-        case 'U': case 'V': case 'W': case 'R': case 'S': case 'T':
+        case 'U': case 'V': case 'W': case 'R': case 'S': case 'T': case 'M':
             op_tag = *p++; prio = 40; type = xop_INFIXL;
+            if (op_tag == 'V') op_tag = 'R';
             return true;
 
         case '&':
@@ -148,6 +156,9 @@ struct LtlTokenizer : XP_TokenStream {
             return false;
     }
 
+    void* toExpr(GLit p)     const { return (void*)p.data(); }
+    Wire  toWire(void* expr) const { return GLit(packed_, (uint)(uintp)expr) + N; }
+
     bool parseAtom(void*& atom_expr, uint& pos){
         skipWS();
         pos = uint(p - p0);
@@ -158,15 +169,20 @@ struct LtlTokenizer : XP_TokenStream {
         if (p == start)
             return false;
         else{
-            atom_expr = new LtlExpr(slice(*start, *p));
+            Str name = slice(*start, *p);
+            GLit p = N.names().lookup(name);
+            if (!p){
+                p = N.add(Ltl_());
+                N.names().add(p, name); }
+            atom_expr = toExpr(p);
             return true;
         }
     }
 
-    void* applyPrefix (uint op_tag, void* expr)               { return new LtlExpr(op_tag, NULL, (LtlExpr*)expr); }
-    void* applyPostfix(uint op_tag, void* expr)               { return new LtlExpr(op_tag, (LtlExpr*)expr, NULL); }
-    void* applyInfix  (uint op_tag, void* expr0, void* expr1) { return new LtlExpr(op_tag, (LtlExpr*)expr0, (LtlExpr*)expr1); }
-    void  disposeExpr (void* expr)                            { dispose((LtlExpr*)expr); }
+    void* applyPrefix (uint op_tag, void* expr)               { return toExpr(N.add(Ltl_(op_tag), Wire_NULL, toWire(expr))); }
+    void* applyPostfix(uint op_tag, void* expr)               { return toExpr(N.add(Ltl_(op_tag), toWire(expr), Wire_NULL)); }
+    void* applyInfix  (uint op_tag, void* expr0, void* expr1) { return toExpr(N.add(Ltl_(op_tag), toWire(expr0), toWire(expr1))); }
+    void  disposeExpr (void* expr)                            {}
 
     String nameLParen(uint paren_tag) { return String("("); }
     String nameRParen(uint paren_tag) { return String(")"); }
@@ -175,21 +191,23 @@ struct LtlTokenizer : XP_TokenStream {
 };
 
 
-LtlExpr* parseLtl(cchar* text, String& err_msg)
+Wire parseLtl(cchar* text, NetlistRef N, String& err_msg)
 {
-    LtlTokenizer tok(text);
-    LtlExpr* expr = (LtlExpr*)tok.parse(err_msg);
+    N.names().enableLookup();
 
-    if (!expr){
+    LtlTokenizer tok(text, N);
+    void* expr = tok.parse(err_msg);
+
+    if (expr == NULL){
         if (err_msg == "")
             err_msg = String("Illegal first character (or empty expression).");
+        return Wire_NULL;
     }else if (*tok.p != '\0'){
         err_msg = (FMT "[char %_] Extra characters after expression.", tok.p - tok.p0);
-        dispose(expr);
-        return NULL;
+        return Wire_NULL;
     }
 
-    return expr;
+    return tok.toWire(expr);
 }
 
 

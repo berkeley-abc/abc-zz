@@ -310,7 +310,7 @@ void instantiateAbstr(NetlistRef N, const IntSet<uint>& abstr, /*outputs:*/ Netl
 // all elements of 'flop_init' 'l_Undef'. One or both of 'flop_num' and 'pi_num' can be
 // specified (use 'num_ERROR' for "unspecified"):
 //
-//   (1) Only 'flop_num' given: 'reset' if a flop that is 1 in the first cycle, then forever 0.
+//   (1) Only 'flop_num' given: 'reset' is a flop that is 1 in the first cycle, then forever 0.
 //   (2) Only 'pi_num' given: 'reset' is just a PI; you must assert its value yourself.
 //   (3) Both are given: 'reset' is 0 in first cycle, then non-deterministic (OR of (1) and (2)).
 //

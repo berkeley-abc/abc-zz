@@ -11,14 +11,17 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
+    Netlist N;
     String msg;
-    LtlExpr* expr = parseLtl("a xnor b <-> c", msg);
-    if (!expr)
+    Wire w = parseLtl("a xnor b <-> c", N, msg);
+    if (!w)
         WriteLn "LTL PARSE ERROR! %_", msg;
-    else
-        WriteLn "Parsed: %_", *expr;
-
-    dispose(expr);
+    else{
+        WriteLn "NETLIST:";
+        N.write(std_out);
+        NewLine;
+        WriteLn "Parsed top-node: %n", w;
+    }
 
     return 0;
 }

@@ -23,7 +23,7 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-void ltlCheck(NetlistRef N, const LtlExpr* spec);
+void ltlCheck(NetlistRef N, Wire spec);
 void ltlCheck(NetlistRef N, String spec_file, uint prop_no);
 
 

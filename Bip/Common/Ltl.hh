@@ -13,55 +13,58 @@
 
 #ifndef ZZ__Bip__Common__Ltl_hh
 #define ZZ__Bip__Common__Ltl_hh
+
+#include "ZZ_Netlist.hh"
+
 namespace ZZ {
 using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Parsing:
 
 
-struct LtlExpr {
-    Str   atom;
-    char  op;           // -- using '^  =  >' for 'xor  xnor/<->  ->' 
-    LtlExpr* left;      // -- NULL for prefix op
-    LtlExpr* right;     // -- NULL for postfix op
-
-    LtlExpr(Str atom_) : atom(atom_), op(0), left(NULL), right(NULL) {}
-    LtlExpr(char op_, LtlExpr* left_, LtlExpr* right_) : atom(Str_NULL), op(op_), left(left_), right(right_) {}
-};
-
-
-macro void dispose(LtlExpr* expr)
-{
-    if (expr){
-        dispose(expr->left);
-        dispose(expr->right);
-        delete expr;
-    }
-}
-
-
-template<> fts_macro void write_(Out& out, const LtlExpr& v)
-{
-    if (v.atom)
-        out += v.atom;
-    else if (v.left){
-        if (v.right)
-            Write "(%_ %_ %_)", *v.left, v.op, *v.right;
-        else
-            Write "(%_ %_)", *v.left, v.op;
-    }else
-        Write "(%_ %_)", v.op, *v.right;
-}
+// Takes a zero-terminated string and returns a wire pointing to LTL expression built inside
+// 'N'. Atoms are stored as operatorless LTL nodes with the name put in the name store of 'N'.
+// Upon parse error, Wire_NULL is returned and 'err_msg' is set to formatted error string.
+//
+Wire parseLtl(cchar* text, NetlistRef N, String& err_msg);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Printing:
 
 
-// Takes a zero-terminated string and returns an 'LtlExpr', or NULL on parse error 
-// together with a formatted error string (through 'err_msg').
-//
-LtlExpr* parseLtl(cchar* text, String& err_msg);
+struct FmtLtl {
+    Wire w;
+    FmtLtl(Wire w_) : w(w_) {}
+};
+
+
+template<> fts_macro void write_(Out& out, const FmtLtl& f)
+{
+    Wire w = f.w;
+
+    if (type(w) == gate_PO){
+        FWrite(out) "%_", FmtLtl(w[0] ^ sign(w));
+        return; }
+
+    assert(type(w) == gate_Ltl);
+    char op = attr_Ltl(w).op;
+    uint scope = attr_Ltl(w).scope;
+
+    if (op == 0)
+        FWrite(out) "%s", w;
+    else{
+        out += '(';
+        if (w[0]) FWrite(out) "%_ ", FmtLtl(w[0]);
+        if (scope == 0) out += op;
+        else            FWrite(out) "%_<%_>", op, scope;
+        if (w[1]) FWrite(out) " %_", FmtLtl(w[1]);
+        out += ')';
+    }
+}
+
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

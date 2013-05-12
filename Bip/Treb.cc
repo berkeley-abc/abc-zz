@@ -454,7 +454,7 @@ lbool Treb::recBlockCube(TCube s0, Cex* cex, uint* restartC)
         //**/WriteLn "NEW PO: %_  (%_)", s, s_orig;
 
 //        if (s.frame == 0 || (P.use_abstr && Z->isInitial(s.cube))){
-        if (s.frame == 0 || Z->isInitial(s.cube)){
+        if (s.frame == 0 || Z->isInitial(s.cube)){      // <<== prova att spara POBs och återköa på rätt plats
             // Found counterexample:
             if (P.use_abstr && P.pdr_refinement && !refining){
                 if (!pdrRefine(po, cex))
