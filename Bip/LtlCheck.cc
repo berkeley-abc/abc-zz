@@ -4,11 +4,11 @@
 //| Author(s)   : Niklas Een
 //| Module      : Bip
 //| Description : LTL checking based on circuit monitor synthesis.
-//| 
+//|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -22,7 +22,7 @@ using namespace std;
 // Ad-hoc LTL strashing:
 
 
-typedef Quad<GLit,GLit,char,uint> LtlKey;
+typedef Quad<GLit,GLit,char,uint> LtlKey;   // -- left, right, op, scope
 typedef Map<LtlKey, GLit> LtlStrash;
 
 
@@ -41,79 +41,154 @@ Wire mkLtl(NetlistRef NS, const LtlKey& key, LtlStrash& strash)
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-struct LtlRet {
-    Wire z;
+
+struct MonRet : Wire {
     Wire done;
+    MonRet(Wire z = Wire_NULL, Wire done_ = Wire_NULL) : Wire(z), done(done_) {}
 };
 
 
-#if 0
-LtlRet ltlCheck(NetlistRef N, Wire w, Wire reset, Wire act, Vec<GLit>& pending, Vec<GLit>& failed, Vec<GLit>& accept)
+Wire delayLookup(NetlistRef M, Wire w, Wire reset, bool init, WWMap& delay)
 {
+    Get_Pob2(M, reset, global_reset);
+    Get_Pob(M, flop_init);
+
+    // <<== memo check goes here
+
+    Wire ret = M.add(Flop_(), w);
+    if (reset == global_reset)
+        flop_init(ret) = lbool_lift(init);
+    else
+        ret = init ? s_Or(reset, ret) : s_And(~reset, ret);
+
+    // <<== memo store goes gere (type of 'delay' must change; also call it delay_memo?)
+
+    return ret;
+}
+
+
+// memo skall nog vara WMap, delay Map<sig, reset, init> -> GLit
+MonRet monitorSynth(NetlistRef M, Wire w, Vec<GLit>& acts, Vec<uint>& resets, WWMap& delay, WWMap& memo,
+                  Vec<GLit>& pending, Vec<GLit>& failed, Vec<GLit>& accept)
+{
+#if 0
+    if (memo[w])
+        return MonRet(memo[w] + M, ~M.True());     // <<== måste ju vara par (z, done)...
+#endif
+
     NetlistRef NS = netlist(w);
     char op = attr_Ltl(w).op;
     uint scope = attr_Ltl(w).scope;
+    /**/Dump(w, (uint)op, scope);
 
-    LtlRet ret;
+    MonRet ret;
+    ret = M.add(PI_());       // -- some of these activation variables will not be used, but we clean them up afterwards
+    ret.done = ~M.True();
+
+    acts.push(ret);
+    On_Scope_Exit(&Vec<GLit>::pop, acts);
+
+    Wire reset = acts[resets[scope]] + M;   // -- must be after 'acts.push()' since '$' will give this ID.
 
     if (op == 0){
-        String name = NS.names().get(w);
-        Wire z = N.names().lookup(name) + N;
-        if (!z){
-            ShoutLn "ERROR! No such signal: %_", name;
-            exit(1); }
-
-        if (act)
-            failed.push(~s_Equiv(z, act));
-
-        ret.z = z;
-        ret.done = ~N.True();
+        memo(+w) = ret ^ sign(w);
+        migrateNames(w, memo[w] + M);
+        return ret;
 
     }else{
-        Get_Pob2(N, reset, global_reset);
+        #define SYN(v) monitorSynth(M, v, acts, resets, delay, memo, pending, failed, accept)
+        #define Y(v) delayLookup(M, v, reset, true, delay)
+        #define Z(v) delayLookup(M, v, reset, false, delay)
 
-        LtlRet lft, rht;
-        if (s.left)
-            lft = ltlCheck(N, s.left);
-        if (s.right)
-            rht = ltlCheck(N, s.right);
+        assert(!sign(w));
+        MonRet a, b;
+        if (op != '$'){
+            /**/Dump(w[0], w[1]);
+            if (w[0])
+                a = SYN(w[0]);
+            if (w[1])
+                b = SYN(w[1]);
 
-        ret.z = N.add(PI_());
-        ret.done = ~N.True();
+            /**/Dump((Wire)a, (Wire)b);
+            if (!a) swp(a, b);    // -- to be consistent with paper, let prefix operators name their input 'a' rather than 'b'
+        }
 
-        switch (s.op){
+        Wire tmp, accp;
+        switch (op){
+        // Scope operator:
+        case '$':
+            resets(scope) = acts.size();
+            ret = SYN(w[0]);
+            break;
 
         // Unary temporal operators:
         case 'X':
-            pending.push(ret.z);
-            failed.push( s_And(~global_reset, // memo med prim?
-    #define PRE(op, arg) NS.add(Ltl_(op, scope), Wire_NULL, arg)
+            pending += ret;
+            failed += s_And(~reset, s_And(Y(ret), ~a));
+            break;
 
         case 'Y':
+            ret = Y(a);
+            break;
+
         case 'Z':
+            ret = Z(a);
+            break;
+
         case 'F':
+            accp = M.add(Buf_());
+            tmp = s_Or(s_And(ret, ~a), Y(~accp));
+            accp.set(0, s_Or(~tmp, a));
+            pending += tmp;
+            accept  += accp;
+            break;
+
         case 'G':
+            tmp = M.add(Buf_());
+            tmp.set(0, s_Or(Y(tmp), ret));
+            pending += tmp;
+            failed += s_And(tmp, ~a);
+            break;
+
         case 'H':
+            assert(false);  // <<== later
         case 'P':
+            assert(false);  // <<== later
 
         // Until operators:
-        case 'U':
-        case 'V':
         case 'W':
+        case 'U':
         case 'R':
         case 'S':
         case 'T':
+            assert(false);    // -- removed by normalization
+
+        case 'M':   // 'a' held since the cycle after 'b' last held OR 'a' held since the first cycle
+            tmp = M.add(Buf_());
+            tmp.set(0, s_Or(b, (s_And(Y(tmp), a))));
+            failed += ~tmp;
+            break;
 
         // Logic operators:
         case '!':
-        case '&':
-        case '|':
         case '>':
         case '=':
         case '^':
+            assert(false);    // -- removed by normalization
 
-        defaults: assert(false); }
+        case '&':
+            failed += ~s_Equiv(ret, s_And(a, b));
+            break;
+
+        case '|':
+            failed += ~s_Equiv(ret, s_Or(a, b));
+            break;
+
+        default: assert(false); }
     }
+
+    memo(+w) = ret ^ sign(w);
+    return ret;
 
     // inputs: z, a, b
     // outputs: pending, failed, accept
@@ -123,7 +198,6 @@ LtlRet ltlCheck(NetlistRef N, Wire w, Wire reset, Wire act, Vec<GLit>& pending, 
 
     // Safety: reachable(~FAILED & ~PENDING)
 }
-#endif
 
 
 Wire ltlNormalize(Wire w, uint scopeC, WMapS<GLit>& memo, LtlStrash& strash)
@@ -203,12 +277,8 @@ Wire ltlNormalize(Wire w, uint scopeC, WMapS<GLit>& memo, LtlStrash& strash)
 void ltlCheck(NetlistRef N, Wire spec)
 {
     NetlistRef NS = netlist(spec);
-    Vec<GLit> pending;
-    Vec<GLit> failed;
-    Vec<GLit> accept;
-
     addReset(N, nextNum_Flop(N), num_ERROR);
-    Get_Pob(N, reset);
+    Get_Pob2(N, reset, global_reset);
     Auto_Pob(N, strash);
 
     WMapS<GLit> memo;
@@ -222,7 +292,20 @@ void ltlCheck(NetlistRef N, Wire spec)
 
     WriteLn "Normalized spec: %_", FmtLtl(nnf);
 
+    Vec<GLit> acts(1, global_reset);
+    Vec<uint> resets(1, 0);
+    Vec<GLit> pending;
+    Vec<GLit> failed;
+    Vec<GLit> accept;
+
+    Netlist M;
+    Add_Pob0(M, reset);
+    Add_Pob0(M, flop_init);
+    Add_Pob0(M, strash);
     // <<== run model checker here
+    WWMap delay;
+    WWMap mmemo;
+    MonRet top = monitorSynth(M, nnf[0], acts, resets, delay, mmemo, pending, failed, accept);
 }
 
 

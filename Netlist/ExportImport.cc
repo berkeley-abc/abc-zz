@@ -291,9 +291,10 @@ void readAiger_(In& in, NetlistRef N, bool store_comment)
     bool                    use_xnums = true;
     while (!in.eof() && *in != 'c'){
         char type  = in++;
-        uind index = (uind)parseUInt64(in); in++;
+        uind index = (uind)parseUInt64(in);
+        while (isWS(*in)) in++;
         gets(in, buf, isWS);
-        in++;
+        while (!in.eof() && isWS(*in)) in++;
         buf.push(0);
 
         GLit p;
@@ -1141,8 +1142,8 @@ char sifGetOp(const Array<char>& text, const Vec<SifToken>& elems, uind& p, char
 /*
 Not yet supported:
 
-   LIVELOCK RWADR0;  // property which fails if the following does not hold AG AF !RWADR0 
-   FAIRNESS signalF; // constrains a LIVELOCK counterexample: signalF must hold at least once in the failing lasso loop 
+   LIVELOCK RWADR0;  // property which fails if the following does not hold AG AF !RWADR0
+   FAIRNESS signalF; // constrains a LIVELOCK counterexample: signalF must hold at least once in the failing lasso loop
    ARRAY {R,W} #address_pins #columns #rows I{0,1,X initial value string of width #columns} {array_name}
    ARRAY_PIN {array_name} {R,W,I} #port_num {E,A,D} #pin_num {signal_name_being_connected};
 
