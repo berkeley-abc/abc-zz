@@ -18,8 +18,8 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
-#ifndef GlucoRed_Vec_h
-#define GlucoRed_Vec_h
+#ifndef Glucose_Vec_h
+#define Glucose_Vec_h
 
 #include <assert.h>
 #include <new>
@@ -27,7 +27,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "Int-Types.hh"
 #include "XAlloc.hh"
 
-namespace GlucoRed {
+namespace Glucose {
 
 //=================================================================================================
 // Automatically resizable arrays
@@ -43,7 +43,7 @@ class vec {
     // Don't allow copying (error prone):
     vec<T>&  operator = (vec<T>& other) { assert(0); return *this; }
              vec        (vec<T>& other) { assert(0); }
-
+             
     // Helpers for calculating next capacity:
     static inline int  imax   (int x, int y) { int mask = (y-x) >> (sizeof(int)*8-1); return (x&mask) + (y&(~mask)); }
     //static inline void nextCap(int& cap){ cap += ((cap >> 1) + 2) & ~1; }

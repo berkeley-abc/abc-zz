@@ -1,6 +1,5 @@
 #include "Prelude.hh"
 #include "MetaSat.hh"
-/**/#include "Glucose.hh"
 
 using namespace ZZ;
 

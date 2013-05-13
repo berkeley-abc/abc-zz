@@ -10,7 +10,11 @@
 #include"Version.hh"
 #include"Options.hh"
 
+#ifdef MINIRED
+using namespace MiniRed;
+#elif defined GLUCORED
 using namespace GlucoRed;
+#endif
 
 static IntOption opt_reducer_work (VERSION_STRING, "work", "Maximum number of clauses in reducer work set", 1000, IntRange(2, INT32_MAX));
 
@@ -35,12 +39,12 @@ vec<Lit>* Work::insert(vec<Lit>* work, int smetric) {
     vec<Lit>* ret = NULL;
     E* w;
     if ( free == 0) {
-    w      = oldest;
-    ret    = w->work;
-    oldest = w->newer;
-    if ( w == best   ) best   = w->worse;
-    if ( w == newest ) newest = w->older;
-    w->remove();
+	w      = oldest;
+	ret    = w->work;
+	oldest = w->newer;
+	if ( w == best   ) best   = w->worse;
+	if ( w == newest ) newest = w->older;
+	w->remove();
     }
     else w = space[--free];
 

@@ -18,12 +18,12 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
-#ifndef GlucoRed_Alg_h
-#define GlucoRed_Alg_h
+#ifndef Glucose_Alg_h
+#define Glucose_Alg_h
 
 #include "Vec.hh"
 
-namespace GlucoRed {
+namespace Glucose {
 
 //=================================================================================================
 // Useful functions on vector-like types:

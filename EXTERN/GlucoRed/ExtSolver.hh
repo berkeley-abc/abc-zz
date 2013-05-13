@@ -6,12 +6,18 @@
 // (c) Aalto University 2012/2013
 //
 //
-#ifndef ext_solver_h
-#define ext_solver_h
-#include "Solver.hh"
-#include "Version.hh"
+#ifndef solver_reducer_ext_solver_h
+#define solver_reducer_ext_solver_h
+#include"Solver.hh"
+#include"Version.hh"
 
+#ifdef MINIRED
+namespace MiniRed {
+using namespace Minisat;
+#elif defined GLUCORED
 namespace GlucoRed {
+using namespace Glucose;
+#endif
 
 // An extension of the 'Solver' class
 class ExtSolver : public Solver {
@@ -35,7 +41,7 @@ protected:
 
 private:
     // Helper function for 'addClauseOnFly'
-    bool litComp (const Lit& p, const Lit& q);
+    bool litComp (const Lit& p, const Lit& q);   
 
 #ifdef GLUCORED
     vec<int> tmp_lbd;

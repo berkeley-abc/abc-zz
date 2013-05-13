@@ -1,7 +1,7 @@
 /****************************************************************************************[Solver.h]
  Glucose -- Copyright (c) 2009, Gilles Audemard, Laurent Simon
-                CRIL - Univ. Artois, France
-                LRI  - Univ. Paris Sud, France
+				CRIL - Univ. Artois, France
+				LRI  - Univ. Paris Sud, France
  
 Glucose sources are based on MiniSat (see below MiniSat copyrights). Permissions and copyrights of
 Glucose are exactly the same as Minisat on which it is based on. (see below).
@@ -26,8 +26,8 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
-#ifndef GlucoRed_Solver_h
-#define GlucoRed_Solver_h
+#ifndef Glucose_Solver_h
+#define Glucose_Solver_h
 
 #include "Vec.hh"
 #include "Heap.hh"
@@ -38,7 +38,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "Constants.hh"
 
 
-namespace GlucoRed {
+namespace Glucose {
 
 //=================================================================================================
 // Solver -- the main class:
@@ -84,7 +84,7 @@ public:
     void    toDimacs     (const char* file, Lit p);
     void    toDimacs     (const char* file, Lit p, Lit q);
     void    toDimacs     (const char* file, Lit p, Lit q, Lit r);
-
+    
     // Variable mode:
     // 
     void    setPolarity    (Var v, bool b); // Declare which polarity the decision heuristic should use for a variable. Requires mode 'polarity_user'.
@@ -152,16 +152,15 @@ public:
     bool      rnd_init_act;       // Initialize variable activities with a small random value.
     double    garbage_frac;       // The fraction of wasted memory allowed before a garbage collection is triggered.
 
-     long conf4stats,cons,curRestart;
 
-
+    
     // Statistics: (read-only member variable)
     //
     uint64_t nbRemovedClauses,nbReducedClauses,nbDL2,nbBin,nbUn,nbReduceDB,solves, starts, decisions, rnd_decisions, propagations, conflicts,nbstopsrestarts,nbstopsrestartssame,lastblockatrestart;
     uint64_t dec_vars, clauses_literals, learnts_literals, max_literals, tot_literals;
 
 protected:
-
+    long curRestart;
     // Helper structures:
     //
     struct VarData { CRef reason; int level; };
@@ -218,16 +217,16 @@ protected:
     double              progress_estimate;// Set by 'search()'.
     bool                remove_satisfied; // Indicates whether possibly inefficient linear scan for satisfied clauses should be performed in 'simplify'.
     vec<unsigned long> permDiff;      // permDiff[var] contains the current conflict number... Used to count the number of  LBD
-
+    
 #ifdef GLUCOSE_UPDATE_VAR_ACTIVITY
     // GLUCOSE_UPDATE_VAR_ACTIVITY trick (see competition'09 companion paper)
-    vec<Lit> lastDecisionLevel;
+    vec<Lit> lastDecisionLevel; 
 #endif
 
     ClauseAllocator     ca;
 
     int nbclausesbeforereduce;            // To know when it is time to reduce clause database
-
+    
     bqueue<unsigned int> trailQueue,lbdQueue; // Bounded queues for restarts.
     float sumLBD; // used to compute the global average of LBD. Restarts...
 
@@ -250,8 +249,7 @@ protected:
     //
     int64_t             conflict_budget;    // -1 means no budget.
     int64_t             propagation_budget; // -1 means no budget.
-
-    bool       asynch_interrupt;
+    bool                asynch_interrupt;
 
     // Main internal methods:
     //
@@ -365,7 +363,14 @@ inline bool     Solver::addEmptyClause  ()                      { add_tmp.clear(
 inline bool     Solver::addClause       (Lit p)                 { add_tmp.clear(); add_tmp.push(p); return addClause_(add_tmp); }
 inline bool     Solver::addClause       (Lit p, Lit q)          { add_tmp.clear(); add_tmp.push(p); add_tmp.push(q); return addClause_(add_tmp); }
 inline bool     Solver::addClause       (Lit p, Lit q, Lit r)   { add_tmp.clear(); add_tmp.push(p); add_tmp.push(q); add_tmp.push(r); return addClause_(add_tmp); }
-inline bool     Solver::locked          (const Clause& c) const { return value(c[0]) == l_True && reason(var(c[0])) != CRef_Undef && ca.lea(reason(var(c[0]))) == &c; }
+ inline bool     Solver::locked          (const Clause& c) const { 
+   if(c.size()>2) 
+     return value(c[0]) == l_True && reason(var(c[0])) != CRef_Undef && ca.lea(reason(var(c[0]))) == &c; 
+   return 
+     (value(c[0]) == l_True && reason(var(c[0])) != CRef_Undef && ca.lea(reason(var(c[0]))) == &c)
+     || 
+     (value(c[1]) == l_True && reason(var(c[1])) != CRef_Undef && ca.lea(reason(var(c[1]))) == &c);
+ }
 inline void     Solver::newDecisionLevel()                      { trail_lim.push(trail.size()); }
 
 inline int      Solver::decisionLevel ()      const   { return trail_lim.size(); }
@@ -380,8 +385,8 @@ inline int      Solver::nLearnts      ()      const   { return learnts.size(); }
 inline int      Solver::nVars         ()      const   { return vardata.size(); }
 inline int      Solver::nFreeVars     ()      const   { return (int)dec_vars - (trail_lim.size() == 0 ? trail.size() : trail_lim[0]); }
 inline void     Solver::setPolarity   (Var v, bool b) { polarity[v] = b; }
-inline void     Solver::setDecisionVar(Var v, bool b)
-{
+inline void     Solver::setDecisionVar(Var v, bool b) 
+{ 
     if      ( b && !decision[v]) dec_vars++;
     else if (!b &&  decision[v]) dec_vars--;
 

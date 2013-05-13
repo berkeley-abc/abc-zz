@@ -130,7 +130,7 @@ def create_header():
              "Version.hh",
              "ExtSolver.hh",
              "Reducer.hh",
-             "MiniRed.hh",
+             "SolRed.hh",
              "SimpSolver.hh"
             ]
 

@@ -15,7 +15,6 @@
 #include "MetaSat.hh"
 #include "minisat2.hh"
 #include "abcSat.hh"
-#include "Glucose.hh"
 #include "GlucoRed.hh"
 #include "ZZ_MiniSat.hh"
 #include "ZZ/Generics/Sort.hh"
@@ -978,7 +977,7 @@ GlrSat::GlrSat()
     GR_litvec& tmp  = *(GR_litvec*)(void*)&tmp_lits;
     new (&tmp) GR_litvec;
 
-    S = new GR::Solver;
+    S = new GR::SolRed;
 
     Lit null_lit = addLit(); assert(null_lit.id == 0);
     true_lit = addLit();
@@ -994,8 +993,8 @@ GlrSat::~GlrSat()
 
 void GlrSat::clear(bool dealloc)
 {
-    S->~Solver();
-    new (S) GR::Solver;
+    S->~SolRed();
+    new (S) GR::SolRed;
 
     Lit null_lit = addLit(); assert(null_lit.id == 0);
     Lit true_lit = addLit();

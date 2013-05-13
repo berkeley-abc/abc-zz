@@ -6,14 +6,19 @@
 // (c) Aalto University 2012/2013
 //
 //
-#ifndef reducer_h
-#define reducer_h
+#ifndef solver_reducer_reducer_h
+#define solver_reducer_reducer_h
 #include"ExtSolver.hh"
 
-namespace GlucoRed {
+#ifdef MINIRED
+namespace MiniRed
+#elif defined GLUCORED
+namespace GlucoRed
+#endif
+{
 
 // Adds a 'reduce' function to the solver. 
-// An instance of this class is created by the 'MiniRed' class
+// An instance of this class is created by the 'SolRed' class
 class Reducer : public ExtSolver {
 public:
     bool reduce (vec<Lit>& lits);

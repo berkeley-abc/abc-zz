@@ -39,7 +39,7 @@ namespace Glucose {
 }
 
 namespace GlucoRed {
-    struct Solver;
+    struct SolRed;
 }
 
 
@@ -255,7 +255,7 @@ struct GlrSat : MetaSat {
     MetaSat_OVERRIDES
 
 private:
-    ::GlucoRed::Solver* S;
+    ::GlucoRed::SolRed* S;
     Lit true_lit;
     minisat2_vec_data tmp_lits;
 };
@@ -271,7 +271,7 @@ enum SolverType {
     sat_Msc,        // MiniSat 2.2, core version
     sat_Mss,        // MiniSat 2.2, simplifying version
     sat_Abc,        // ABC's MiniSat
-    sat_Glu,        // Glucose 2.1
+    sat_Glu,        // Glucose 2.2
     sat_Glr,        // GlucoRed by Siert Wieringa
 };
 

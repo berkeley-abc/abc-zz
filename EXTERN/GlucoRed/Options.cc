@@ -21,9 +21,9 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "Options.hh"
 #include "ParseUtils.hh"
 
-using namespace GlucoRed;
+using namespace Glucose;
 
-void GlucoRed::parseOptions(int& argc, char** argv, bool strict)
+void Glucose::parseOptions(int& argc, char** argv, bool strict)
 {
     int i, j;
     for (i = j = 1; i < argc; i++){
@@ -35,7 +35,7 @@ void GlucoRed::parseOptions(int& argc, char** argv, bool strict)
                 printUsageAndExit(argc, argv, true);
         } else {
             bool parsed_ok = false;
-
+        
             for (int k = 0; !parsed_ok && k < Option::getOptionList().size(); k++){
                 parsed_ok = Option::getOptionList()[k]->parse(argv[i]);
 
@@ -54,9 +54,9 @@ void GlucoRed::parseOptions(int& argc, char** argv, bool strict)
 }
 
 
-void GlucoRed::setUsageHelp      (const char* str){ Option::getUsageString() = str; }
-void GlucoRed::setHelpPrefixStr  (const char* str){ Option::getHelpPrefixString() = str; }
-void GlucoRed::printUsageAndExit (int argc, char** argv, bool verbose)
+void Glucose::setUsageHelp      (const char* str){ Option::getUsageString() = str; }
+void Glucose::setHelpPrefixStr  (const char* str){ Option::getHelpPrefixString() = str; }
+void Glucose::printUsageAndExit (int argc, char** argv, bool verbose)
 {
     const char* usage = Option::getUsageString();
     if (usage != NULL)
@@ -88,3 +88,4 @@ void GlucoRed::printUsageAndExit (int argc, char** argv, bool verbose)
     fprintf(stderr, "\n");
     exit(0);
 }
+

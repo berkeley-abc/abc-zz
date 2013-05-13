@@ -7,7 +7,12 @@
 //
 //
 #include"ExtSolver.hh"
+
+#ifdef MINIRED
+using namespace MiniRed;
+#elif defined GLUCORED
 using namespace GlucoRed;
+#endif
 
 // Copy this solver's problem into 'other'
 // The variables created in 'other' are NOT decision variables
@@ -210,3 +215,4 @@ CRef ExtSolver::addClauseOnFly(vec<Lit>& lits) {
     }
     else return CRef_Undef;
 }
+
