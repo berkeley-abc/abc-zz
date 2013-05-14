@@ -13,6 +13,7 @@
 
 #include "Prelude.hh"
 #include "LtlCheck.hh"
+#include "Live.hh"
 
 namespace ZZ {
 using namespace std;
@@ -92,6 +93,7 @@ MonRet monitorSynth(NetlistRef M, Wire w, Vec<GLit>& acts, Vec<uint>& resets, WW
     if (op == 0){
         memo(+w) = ret ^ sign(w);
         migrateNames(w, memo[w] + M);
+        attr_PI(ret).number = 0;    // -- 'number == 0' marks atomic propositions
         return ret;
 
     }else{
@@ -280,6 +282,7 @@ Wire ltlNormalize(Wire w, uint scopeC, WMapS<GLit>& memo, LtlStrash& strash)
 
 void ltlCheck(NetlistRef N, Wire spec)
 {
+    // Normalize specification:
     NetlistRef NS = netlist(spec);
     addReset(N, nextNum_Flop(N), num_ERROR);
     Get_Pob2(N, reset, global_reset);
@@ -295,8 +298,9 @@ void ltlCheck(NetlistRef N, Wire spec)
     WriteLn "Normalized spec: %_", FmtLtl(nnf);
         // example: G (~x0 | ((~x1 M ((~x2 M ~x3) & (P ~x3))) & (P ((~x2 M ~x3) & (P ~x3)))))
 
+    // Synthesize monitor:
     Netlist M;
-    Add_Pob0(M, flop_init);
+    Add_Pob2(M, flop_init, flop_init2);
     addReset(M, nextNum_Flop(0), num_ERROR);
     Get_Pob2(M, reset, global_reset2);
 
@@ -312,15 +316,87 @@ void ltlCheck(NetlistRef N, Wire spec)
     MonRet top = monitorSynth(M, nnf[0], acts, resets, delay, mmemo, pending, failed, accept);
     M.add(PO_(0), top);  // -- should be set by constraint to 'global_reset2'
 
-    for (uint i = 0; i < pending.size(); i++) M.add(PO_(100 + i), pending[i] + M);
-    for (uint i = 0; i < failed .size(); i++) M.add(PO_(200 + i), failed [i] + M);
-    for (uint i = 0; i < accept .size(); i++) M.add(PO_(300 + i), accept [i] + M);
+    for (uint i = 0; i < pending.size(); i++) M.add(PO_(), pending[i] + M);
+    for (uint i = 0; i < failed .size(); i++) M.add(PO_(), failed [i] + M);
+    for (uint i = 0; i < accept .size(); i++) M.add(PO_(), accept [i] + M);
 
     // <<== deadlock analysis; accept constraint extraction
     // <<== run model checker here
 
     M.write("mon.gig");
     WriteLn "Wrote: \a*mon.gig\a*";
+
+    // Insert monitor and run model checker:
+    {
+        Assure_Pob(N, constraints);
+        Add_Pob(N, fair_properties);
+        fair_properties.push();
+        N.names().enableLookup();
+        Assure_Pob(N, flop_init);
+
+        Vec<char> nam;
+        uint piC = nextNum_PI(N);
+
+        WWMap xlat;
+        xlat(M.True()) = N.True();
+
+        Auto_Pob(M, up_order);
+        For_UpOrder(M, w){
+            switch (type(w)){
+            case gate_PI:{
+                if (attr_PI(w).number == 0){
+                    // Signal from design:
+                    M.names().get(w, nam);
+                    GLit p = N.names().lookup(nam.base());
+                    if (!p){
+                        ShoutLn "ERROR! LTL signal not present in design: %_", nam.base();
+                        exit(1); }
+                    xlat(w) = p + N;
+                }else{
+                    // Pseudo-input introduced by translation:
+                    xlat(w) = N.add(PI_(piC++));
+                }
+                break;}
+
+            case gate_And:
+                xlat(w) = s_And(xlat[w[0]] + N, xlat[w[1]] + N);
+                break;
+
+            case gate_Flop:
+                xlat(w) = N.add(Flop_());
+                flop_init(xlat[w] + N) = flop_init2[w];
+                break;
+
+            case gate_PO:
+            case gate_Buf:
+                xlat(w) = xlat[w[0]];
+                break;
+            default:
+                ShoutLn "INTERNAL ERROR! Unexpected gate type: %_", GateType_name[type(w)];
+                assert(false);
+            }
+        }
+
+        For_Gatetype(M, gate_Flop, w)
+            (xlat[w] + N).set(0, xlat[w[0]]);
+
+
+        uint poC = nextNum_PO(N);
+        constraints += N.add(PO_(poC++), s_Equiv(xlat[top] + N, global_reset));
+        for (uint i = 0; i < failed.size(); i++)
+            constraints += N.add(PO_(poC++), ~xlat[failed[i]]);
+
+        for (uint i = 0; i < accept.size(); i++)
+            fair_properties.last() += N.add(PO_(poC++), xlat[accept[i]]);
+
+        N.write("fair.gig");
+        WriteLn "Wrote: \a*fair.gig\a*";
+    }
+
+    // Run liveness algorithm:
+    Params_Liveness P;
+    lbool result = liveness(N, 0, P);
+    WriteLn "Result: %_", result;
 }
 
 
@@ -356,6 +432,13 @@ void ltlCheck(NetlistRef N, String spec_file, uint prop_no)
     N.names().enableLookup();
     ltlCheck(N, spec);
 }
+
+/*
+Istf. "done", räkna ut största invariant som implicerar !failed  & accept (inf. often OR every cycle)
+Om vi kan nå denna så spelar pending ingen roll.
+
+Lägg också till "may accept" till "avoiding deadlocks" (backward reachable states från accept signal)
+*/
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
