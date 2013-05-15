@@ -289,6 +289,21 @@ void replayTrace(MiniSat<pfl>& S, String input, OutFile* out, uint echo)
                 if (echo >= 2)
                     std_out %= "Result: %_\n", result;
 
+            }else if (hasPrefix(buf, "clearLearnts(")){
+                if (echo == 1) std_out += 'C', FL;
+
+                In in2(&buf[13], buf.size()-13);
+                expect(in2, " ) ");
+                expectEof(in2);
+
+                S.clearLearnts();
+
+            }else if (hasPrefix(buf, "randomizeVarOrder(")){
+                if (echo == 1) std_out += 'R', FL;
+
+                WriteLn "randomizeVarOrder() not implemented in replay yet!";
+                exit(1);
+
             }else
                 Throw(Excp_ParseError) "Unknown API call: %_", buf;
         }

@@ -286,11 +286,7 @@ public:
     void  proofClearVisited() { proof.clearVisited(); }
 
     void  randomizeVarOrder(uint64& seed, bool rnd_polarity = true);
-    void  clearLearnts() {
-        stats.deleted_clauses -= learnts.size();
-        for (uint i = 0; i < learnts.size(); i++) removeClause(learnts[i]);
-        learnts.clear();
-        compactClauses(); }
+    void  clearLearnts();
 
     // Snapshots:
     //

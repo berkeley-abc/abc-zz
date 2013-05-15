@@ -1678,6 +1678,9 @@ void MiniSat<pfl>::removeVars(IntZet<Var>& xs, Vec<Var>& kept)
 template<bool pfl>
 void MiniSat<pfl>::randomizeVarOrder(uint64& seed, bool rnd_polarity)
 {
+    if (debug_api_out)
+        *debug_api_out |= "randomizeVarOrder()";
+
     // Randomize activity:
 #if 0
     for (uint x = 0; x < nVars(); x++){
@@ -1717,6 +1720,26 @@ void MiniSat<pfl>::randomizeVarOrder(uint64& seed, bool rnd_polarity)
             }
         }
     }
+}
+
+
+template<bool pfl>
+void MiniSat<pfl>::clearLearnts()
+{
+    if (debug_api_out)
+        *debug_api_out |= "clearLearnts()";
+
+    undo(0);
+    uint j = 0;
+    for (uint i = 0; i < learnts.size(); i++){
+        if (learnts[i].clause(MEM)->size() > 2 && !locked(learnts[i])){
+            removeClause(learnts[i]);
+            stats.deleted_clauses--;
+        }else
+            learnts[j++] = learnts[i];
+    }
+    learnts.shrinkTo(j);
+    compactClauses();
 }
 
 

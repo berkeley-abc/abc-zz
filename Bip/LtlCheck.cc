@@ -77,7 +77,7 @@ MonRet monitorSynth(NetlistRef M, Wire w, Vec<GLit>& acts, Vec<uint>& resets, WW
         return MonRet(memo[w] + M, ~M.True());     // <<== måste ju vara par (z, done)...
 #endif
 
-    NetlistRef NS = netlist(w);
+    //NetlistRef NS = netlist(w);
     char op = attr_Ltl(w).op;
     uint scope = attr_Ltl(w).scope;
 
