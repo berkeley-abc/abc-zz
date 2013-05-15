@@ -628,7 +628,7 @@ bool removeBuffers(NetlistRef N)
                     if (fanout_count[x] == 0){
                         uint n = N.names().size(x);
                         for (uint i = 0; i < n; i++)
-                            N.names().get(x, nambuf(i), i);
+                            N.names().get(x, nambuf(i), i);  // <<==...
                         remove(x);
                         for (uint i = 0; i < n; i++)
                             N.names().add(u, nambuf[i].base());

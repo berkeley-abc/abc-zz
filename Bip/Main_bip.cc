@@ -1589,9 +1589,8 @@ int main(int argc, char** argv)
 
         String filename = cli.get("aig").string_val;
         if (filename != ""){
-            //*aiger*/For_Gatetype(N, gate_PO, w) w.set(0, ~w[0]);    // -- invert properties
+            removeFlopInit(N);
             writeAigerFile(filename, N);
-            //*aiger*/For_Gatetype(N, gate_PO, w) w.set(0, ~w[0]);    // -- restore properties
             WriteLn "Wrote: \a*%_\a*", filename;
         }
 

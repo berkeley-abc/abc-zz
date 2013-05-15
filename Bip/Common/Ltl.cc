@@ -156,7 +156,7 @@ struct LtlTokenizer : XP_TokenStream {
             return false;
     }
 
-    void* toExpr(GLit p)     const { return (void*)p.data(); }
+    void* toExpr(GLit p)     const { return (void*)(uintp)p.data(); }
     Wire  toWire(void* expr) const { return GLit(packed_, (uint)(uintp)expr) + N; }
 
     bool parseAtom(void*& atom_expr, uint& pos){

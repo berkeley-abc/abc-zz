@@ -51,7 +51,6 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
     for (uind i = 0; i < seen.size(); i++){
         Wire w = seen.list()[i];
         For_Inputs(w, v){
-            /**/WriteLn "  %n = %_[%_] = %_", w, w, Iter_Var(v), v;
             seen.add(+v); }
     }
 
