@@ -74,6 +74,7 @@ MonRet monitorSynth(NetlistRef M, Wire w, Vec<GLit>& acts, Vec<uint>& resets, WW
 {
 #if 1
     if (memo[+w])
+        // <<== vad händer om delat uttryck under olika scope??
         return MonRet(memo[w] + M, ~M.True());     // <<== måste ju vara par (z, done)...
 #endif
 
@@ -84,6 +85,14 @@ MonRet monitorSynth(NetlistRef M, Wire w, Vec<GLit>& acts, Vec<uint>& resets, WW
     MonRet ret;
     ret = M.add(PI_());       // -- some of these activation variables will not be used, but we clean them up afterwards
     ret.done = ~M.True();
+
+    #define SYN(v) monitorSynth(M, v, acts, resets, delay, memo, pending, failed, accept)
+
+    if (op == '$'){
+        // Scope operator:
+        resets(scope) = acts.size();
+        return SYN(w[1]);
+    }
 
     acts.push(ret);
     On_Scope_Exit(&Vec<GLit>::pop, acts);
@@ -97,46 +106,36 @@ MonRet monitorSynth(NetlistRef M, Wire w, Vec<GLit>& acts, Vec<uint>& resets, WW
         return ret;
 
     }else{
-        #define SYN(v) monitorSynth(M, v, acts, resets, delay, memo, pending, failed, accept)
         #define Y(v) delayLookup(M, v, reset, true, delay)
         #define Z(v) delayLookup(M, v, reset, false, delay)
 
         assert(!sign(w));
         MonRet a, b;
-        if (op != '$'){
-            if (w[0])
-                a = SYN(w[0]);
-            if (w[1])
-                b = SYN(w[1]);
-
-            if (!a) swp(a, b);    // -- to be consistent with paper, let prefix operators name their input 'a' rather than 'b'
-        }
+        if (w[0])
+            a = SYN(w[0]);
+        if (w[1])
+            b = SYN(w[1]);
+        if (!a) swp(a, b);    // -- to be consistent with paper, let prefix operators name their input 'a' rather than 'b'
 
         Wire tmp, accp;
         switch (op){
-        // Scope operator:
-        case '$':
-            resets(scope) = acts.size();
-            ret = SYN(w[0]);
-            break;
-
         // Unary temporal operators:
         case 'X':
             pending += ret;
-            failed += mk_And(~reset, mk_And(Y(ret), ~a));
+            failed += mk_And(~reset, mk_And(Z(ret), ~a));
             break;
 
         case 'Y':
-            ret = Y(a);
+            failed += mk_And(ret, Y(~a));
             break;
 
         case 'Z':
-            ret = Z(a);
+            failed += mk_And(ret, Z(~a));
             break;
 
         case 'F':
             accp = M.add(Buf_());
-            tmp = mk_Or(mk_And(ret, ~a), Y(~accp));
+            tmp = mk_Or(mk_And(ret, ~a), Z(~accp));
             accp.set(0, mk_Or(~tmp, a));
             pending += tmp;
             accept  += accp;
@@ -144,7 +143,7 @@ MonRet monitorSynth(NetlistRef M, Wire w, Vec<GLit>& acts, Vec<uint>& resets, WW
 
         case 'G':
             tmp = M.add(Buf_());
-            tmp.set(0, mk_Or(Y(tmp), ret));
+            tmp.set(0, mk_Or(Z(tmp), ret));
             pending += tmp;
             failed += mk_And(tmp, ~a);
             break;
@@ -152,13 +151,13 @@ MonRet monitorSynth(NetlistRef M, Wire w, Vec<GLit>& acts, Vec<uint>& resets, WW
         case 'H':
             tmp = M.add(Buf_());
             tmp.set(0, mk_And(Y(tmp), a));
-            failed += ~tmp;
+            failed += mk_And(ret, ~tmp);
             break;
 
         case 'P':
             tmp = M.add(Buf_());
             tmp.set(0, mk_Or(Z(tmp), a));
-            failed += ~tmp;
+            failed += mk_And(ret, ~tmp);
             break;
 
         // Until operators:
@@ -195,6 +194,10 @@ MonRet monitorSynth(NetlistRef M, Wire w, Vec<GLit>& acts, Vec<uint>& resets, WW
 
     memo(+w) = ret ^ sign(w);
     return ret;
+
+    #undef SYN
+    #undef Y
+    #undef Z
 
     // inputs: z, a, b
     // outputs: pending, failed, accept
@@ -243,7 +246,7 @@ Wire ltlNormalize(Wire w, uint scopeC, WMapS<GLit>& memo, LtlStrash& strash)
     case '!': ret = NORM(~w[1] ^ s); break;
     case '&': ret = INF(s ? '|' : '&', NORM(w[0] ^ s), NORM(w[1] ^ s)); break;
     case '|': ret = INF(s ? '&' : '|', NORM(w[0] ^ s), NORM(w[1] ^ s)); break;
-    case '>': ret = INF(s ? '&' : '|', NORM(~w[0] ^ s), NORM(~w[1] ^ s)); break;
+    case '>': ret = INF(s ? '&' : '|', NORM(~w[0] ^ s), NORM(w[1] ^ s)); break;
     case '=': ret = NORM(INF('|', INF('&', NORM(w[0]), NORM(w[1])), INF('&', NORM(~w[0]), NORM(~w[1])) ) ^ s); break;
     case '^': ret = NORM(INF('|', INF('&', NORM(w[0]), NORM(~w[1])), INF('&', NORM(~w[0]), NORM(w[1])) ) ^ s); break;
 
@@ -280,8 +283,11 @@ Wire ltlNormalize(Wire w, uint scopeC, WMapS<GLit>& memo, LtlStrash& strash)
 }
 
 
-void ltlCheck(NetlistRef N, Wire spec)
+void ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
 {
+    if (P.inv)
+        spec = ~spec;
+
     // Normalize specification:
     NetlistRef NS = netlist(spec);
     addReset(N, nextNum_Flop(N), num_ERROR);
@@ -319,8 +325,9 @@ void ltlCheck(NetlistRef N, Wire spec)
     for (uint i = 0; i < pending.size(); i++) M.add(PO_(), pending[i] + M);
     for (uint i = 0; i < failed .size(); i++) M.add(PO_(), failed [i] + M);
     for (uint i = 0; i < accept .size(); i++) M.add(PO_(), accept [i] + M);
+    removeAllUnreach(M);
 
-    // <<== deadlock analysis; accept constraint extraction
+    // <<== deadlock analysis; accept constraint extraction; done analysis; reach analysis
     // <<== run model checker here
 
     M.write("mon.gig");
@@ -336,6 +343,7 @@ void ltlCheck(NetlistRef N, Wire spec)
 
         Vec<char> nam;
         uint piC = nextNum_PI(N);
+        uint poC = nextNum_PO(N);
 
         WWMap xlat;
         xlat(M.True()) = N.True();
@@ -349,9 +357,17 @@ void ltlCheck(NetlistRef N, Wire spec)
                     M.names().get(w, nam);
                     GLit p = N.names().lookup(nam.base());
                     if (!p){
-                        ShoutLn "ERROR! LTL signal not present in design: %_", nam.base();
-                        exit(1); }
-                    xlat(w) = p + N;
+                        if (P.free_vars){
+                            /**/WriteLn "pi %_ = %_", piC, nam.base();
+                            p = N.add(PO_(poC++), N.add(PI_(piC++)));
+                            N.names().add(p, nam.base());
+                        }else{
+                            ShoutLn "ERROR! LTL signal not present in design: %_", nam.base();
+                            exit(1);
+                        }
+                    }
+                    Wire v = p + N; assert(type(v) == gate_PO);
+                    xlat(w) = v[0] ^ sign(v);
                 }else{
                     // Pseudo-input introduced by translation:
                     xlat(w) = N.add(PI_(piC++));
@@ -380,8 +396,6 @@ void ltlCheck(NetlistRef N, Wire spec)
         For_Gatetype(M, gate_Flop, w)
             (xlat[w] + N).set(0, xlat[w[0]]);
 
-
-        uint poC = nextNum_PO(N);
         constraints += N.add(PO_(poC++), s_Equiv(xlat[top] + N, global_reset));
         for (uint i = 0; i < failed.size(); i++)
             constraints += N.add(PO_(poC++), ~xlat[failed[i]]);
@@ -394,13 +408,47 @@ void ltlCheck(NetlistRef N, Wire spec)
     }
 
     // Run liveness algorithm:
-    Params_Liveness P;
-    lbool result = liveness(N, 0, P);
-    WriteLn "Result: %_", result;
+    Params_Liveness PL;
+    PL.witness_output = P.witness_output;
+
+    switch (P.eng){
+    case Params_LtlCheck::eng_KLive:
+        PL.k = Params_Liveness::INC;
+        break;
+    case Params_LtlCheck::eng_L2sBmc:
+        PL.k = Params_Liveness::L2S;
+        PL.eng = Params_Liveness::eng_Bmc;
+        break;
+    case Params_LtlCheck::eng_L2sPdr:
+        PL.k = Params_Liveness::L2S;
+        PL.eng = Params_Liveness::eng_Treb;
+        break;
+    default: assert(false); }
+
+    lbool result = liveness(N, 0, PL);
+
+    if (result == l_False){
+        // Print trace...
+    }
 }
 
 
-void ltlCheck(NetlistRef N, String spec_file, uint prop_no)
+void ltlCheck(NetlistRef N, String spec_text, const Params_LtlCheck& P)
+{
+    String err_msg;
+    Netlist NS;
+    Wire spec = parseLtl(spec_text.c_str(), NS, err_msg);
+
+    if (!spec){
+        ShoutLn "Error parsing LTL specification:\n  -- %_", err_msg;
+        exit(0); }
+
+    N.names().enableLookup();
+    ltlCheck(N, spec, P);
+}
+
+
+void ltlCheck(NetlistRef N, String spec_file, uint prop_no, const Params_LtlCheck& P)
 {
     // Parse property:
     Array<char> text = readFile(spec_file, true);
@@ -421,17 +469,9 @@ void ltlCheck(NetlistRef N, String spec_file, uint prop_no)
             text[i] = ' ';
     }
 
-    String err_msg;
-    Netlist NS;
-    Wire spec = parseLtl(text.base(), NS, err_msg);
-
-    if (!spec){
-        ShoutLn "Error parsing LTL specification %_:\n  -- %_", prop_no, err_msg;
-        exit(0); }
-
-    N.names().enableLookup();
-    ltlCheck(N, spec);
+    ltlCheck(N, text, P);
 }
+
 
 /*
 Istf. "done", räkna ut största invariant som implicerar !failed  & accept (inf. often OR every cycle)

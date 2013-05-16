@@ -171,6 +171,7 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
         //     toggle = (f0 | s0) & (f1 | s1)      <= this is the PO created for 'init_bad[1]'
 
         *fairness_monitor = N.add(Buf_());
+        N.add(PO_(), *fairness_monitor);    // -- keep this signal
 
         Add_Pob(N, fair_properties);
         fair_properties.push();

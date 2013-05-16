@@ -980,7 +980,11 @@ int main(int argc, char** argv)
 
     // Command line -- LTL:
     CLI cli_ltl;
-    cli_ltl.add("spec", "string", arg_REQUIRED, "LTL specification(s).");
+    cli_ltl.add("spec", "string", arg_REQUIRED, "File containing LTL specification(s).");
+    cli_ltl.add("inv", "bool", "no", "Negate LTL formula.");
+    cli_ltl.add("eng", "{klive, bmc, pdr}", "pdr", "Which liveness engine to use.");
+    cli_ltl.add("fv", "bool", "no", "Allow free-variables in specification (will introduce pseudo-inputs).");
+    cli_ltl.add("wit", "string", "", "Output AIGER 1.9 witness.");
     cli.addCommand("ltl", "LTL model checking.", &cli_ltl);
 
     // Command line -- constraint extraction:
@@ -1687,7 +1691,16 @@ int main(int argc, char** argv)
 
     }else if (cli.cmd == "ltl"){
         String spec_file = cli_ltl.get("spec").string_val;
-        ltlCheck(N, spec_file, (prop_nums.size() == 0) ? 0 : prop_nums[0]);     // -- only check one property
+        Params_LtlCheck P;
+        String eng = cli_ltl.get("eng").string_val;
+        P.free_vars = cli_ltl.get("fv").bool_val;
+        P.eng = (eng == "klive") ? Params_LtlCheck::eng_KLive :
+                (eng == "bmc")   ? Params_LtlCheck::eng_L2sBmc:
+                /*otherwise*/      Params_LtlCheck::eng_L2sPdr;
+        P.witness_output = cli.get("wit").string_val;
+        P.inv = cli.get("inv").bool_val;
+
+        ltlCheck(N, spec_file, (prop_nums.size() == 0) ? 0 : prop_nums[0], P);     // -- only check one property
         if (!quiet) writeResourceUsage(T0, Tr0);
 
     }else if (cli.cmd == "constr"){

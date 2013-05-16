@@ -36,7 +36,7 @@ struct Params_Liveness {
     enum { L2S = UINT_MAX, INC = UINT_MAX-1, };
         // -- special values for 'k'
 
-    uint   k;
+    uint   k;       // k-liveness is default unless 'k == L2S'
     Engine eng;
 
     String aig_output;

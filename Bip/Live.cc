@@ -4,28 +4,28 @@
 //| Author(s)   : Niklas Een
 //| Module      : Bip
 //| Description : Simple liveness checker based on the Biere and Claessen/Sorensson methods.
-//| 
+//|
 //| (C) Copyright 2012, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
-//| A liveness counterexample is a lasso-shaped trace 's[0], s[1], ..., s[k], s[k+1], ..., s[n]' 
-//| where 's[k] == s[n]' and every fairness constraint 'f[0], ..., f[m-1]' holds at least once 
+//|
+//| A liveness counterexample is a lasso-shaped trace 's[0], s[1], ..., s[k], s[k+1], ..., s[n]'
+//| where 's[k] == s[n]' and every fairness constraint 'f[0], ..., f[m-1]' holds at least once
 //| along the lasso-part.
-//| 
+//|
 //| We first reduce the fairness constraints to a single constraint by adding a flop for each
 //| constraint to remember if we have seen it yet, starting to monitor this when 'fair_mon' goes
 //| high:
-//| 
+//|
 //|    init(seen_f_already[i]) = 0
-//|    seen_f[i] = (seen_f_already[i] | f[i]) & fair_mon 
-//|    
+//|    seen_f[i] = (seen_f_already[i] | f[i]) & fair_mon
+//|
 //|    next(seen_f_already[i]) = seen_f[i] & ~seen_all
-//|    
+//|
 //|    seen_all = seen_f[0] & seen_f[1] & ... & seen_f[m-1]
-//|    
-//| (this is done in 'initBmcNetlist()' in 'ZZ/Bip/Common/Common.cc'). 
-//|                                                                                  
+//|
+//| (this is done in 'initBmcNetlist()' in 'ZZ/Bip/Common/Common.cc').
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -247,7 +247,9 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
     bool toggle_bad = (P.k != Params_Liveness::L2S);
     initBmcNetlist(N0, fairs, N, true, &fair_mon, toggle_bad);
 #else
+    /**/Dump(fairs);
     initBmcNetlist(N0, fairs, N, true, &fair_mon, true);
+    /**/Dump(fair_mon);
 #endif
 
     if (P.k == Params_Liveness::L2S){
@@ -338,7 +340,7 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
         if (!ok)
             WriteLn "INTERNAL ERROR! Liveness CEX did not verify.";
         else
-            WriteLn "Liveness CEX verifies correctly: length %_, loop %_", cex.depth(), loop_frame;
+            WriteLn "Liveness CEX verifies correctly: CEX states %_, loop length %_", cex.size(), cex.size() - loop_frame;
 
         // Write AIGER witness:
         if (P.witness_output != ""){
@@ -418,10 +420,10 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
 
 /*
   - AIGER 1.9 skrivare
-  - SIF parser 
+  - SIF parser
   - Stöd i PAR
   - Parametrar till live
-  - Direkt anrop till pdr, treb, pdr2, imc, bmc (eller mix därav) efter kLive eller liveToSafe översättning  
+  - Direkt anrop till pdr, treb, pdr2, imc, bmc (eller mix därav) efter kLive eller liveToSafe översättning
 
 injecera invarianta kuber vid inkrementel (kan jag räkna till 20?)
 benchmarka liveness / propagate fas
