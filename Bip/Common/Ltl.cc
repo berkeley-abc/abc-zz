@@ -29,7 +29,7 @@ expr :: simple_expr     -- a simple boolean expression
     | expr & expr       -- logical and
     | expr | expr       -- logical or
     | expr xor expr     -- logical exclusive or
-    | expr xnor expr    -- logical NOT exclusive or (same as <->)
+    | expr xnor expr    -- logical NOT exclusive or (same as <-> but different precedence)
     | expr <-> expr     -- logical equivalence
     | expr -> expr      -- logical implies (right associative)
     

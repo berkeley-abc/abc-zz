@@ -45,9 +45,9 @@ struct Params_LtlCheck {
 };
 
 
-void ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P);
-void ltlCheck(NetlistRef N, String spec_text, const Params_LtlCheck& P);
-void ltlCheck(NetlistRef N, String spec_file, uint prop_no, const Params_LtlCheck& P);
+lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P);
+lbool ltlCheck(NetlistRef N, String spec_text, const Params_LtlCheck& P);
+lbool ltlCheck(NetlistRef N, String spec_file, uint prop_no, const Params_LtlCheck& P);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
