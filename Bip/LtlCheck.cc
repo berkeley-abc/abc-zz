@@ -16,6 +16,7 @@
 #include "Live.hh"
 
 #define DEBUG_NAMES
+#define FUZZ_OUTPUT
 
 namespace ZZ {
 using namespace std;
@@ -119,7 +120,7 @@ Wire monitorSynth(NetlistRef M, Wire w, WMapS<GLit>& delay_memo, WWMap& memo,
             break;
 
         case 'Z':
-            failed = z & Y(~a);
+            failed = z & ~Z(a);
             break;
 
         case 'F':
@@ -154,10 +155,37 @@ Wire monitorSynth(NetlistRef M, Wire w, WMapS<GLit>& delay_memo, WWMap& memo,
             break;
 
         case 'U':
+            pending = BUF;
+            pending <<= (z | Y(pending)) & ~b;
+            failed = pending & ~a;
+            accept = ~pending;
+            break;
+
         case 'R':
+            pending = BUF;
+            pending <<= (z | Y(pending)) & ~a;
+            failed = (z & ~b) | (Y(pending) & ~b);
+            break;
+
         case 'S':
+            tmp = BUF;
+            tmp <<= (Y(tmp) & a) | b;
+            failed = z & ~tmp;
+            break;
+/*
+    def make_S(self, z, a, b):
+        ff = self.N.add_Flop()
+        ff[0] = ff.ite( a | b, a )
+        self.add_failed( z & ~b & ( ~ff | ~a ) )
+        
+        
+    a S b:   true iff 'b' held in the past and 'a' has been true since the cycle after
+*/
         case 'T':
-            assert(false);    // -- removed by normalization
+            tmp = BUF;
+            tmp <<= b & (Z(tmp) | a);
+            failed = z & ~tmp;
+            break;
 
         case 'M':   // 'a' held since the cycle after 'b' last held OR 'a' held since the first cycle
             assert(false);  // <<== LATER
@@ -240,7 +268,7 @@ Wire ltlNormalize(Wire w, WMapS<GLit>& memo, LtlStrash& strash)
     case '|': ret = INF(s ? '&' : '|', N( a ^ s), N(b ^ s)); break;
     case '>': ret = INF(s ? '&' : '|', N(~a ^ s), N(b ^ s)); break;
     case '=': ret = N(INF('|', INF('&', N(a), N( b)), INF('&', N(~a), N(~b)) ) ^ s); break;
-    case '^': ret = N(INF('|', INF('&', N(a), N(~b)), INF('&', N( a), N(~b)) ) ^ s); break;
+    case '^': ret = N(INF('|', INF('&', N(a), N(~b)), INF('&', N(~a), N( b)) ) ^ s); break;
 
     // Unary temporal operators:
     case 'X': ret = PRE('X', N(a ^ s)); break;
@@ -252,11 +280,11 @@ Wire ltlNormalize(Wire w, WMapS<GLit>& memo, LtlStrash& strash)
     case 'P': ret = PRE(s ? 'H' : 'P', N(a ^ s)); break;
 
     // Until operators:
-    case 'W': assert(false);    // <<== later   
+    case 'W': assert(false);    // <<== later
     case 'U': ret = !s ? INF('U', N(a), N(b)) : INF('R', N(~a), N(~b)); break;
     case 'R': ret = !s ? INF('R', N(a), N(b)) : INF('U', N(~a), N(~b)); break;
 
-    case 'M': assert(false);    // <<== later  
+    case 'M': assert(false);    // <<== later
     case 'S': ret = !s ? INF('S', N(a), N(b)) : INF('T', N(~a), N(~b)); break;
     case 'T': ret = !s ? INF('T', N(a), N(b)) : INF('S', N(~a), N(~b)); break;
 
@@ -441,10 +469,19 @@ lbool ltlCheck(NetlistRef N, String spec_text, const Params_LtlCheck& P)
         ShoutLn "Error parsing LTL specification:\n  -- %_", err_msg;
         exit(1); }
 
+#ifdef FUZZ_OUTPUT
+    while(spec_text.size() > 0 && (spec_text.last() == ' ' || spec_text.last() == '\n' || spec_text.last() == 0)) spec_text.pop();
+    if (has(spec_text, 'W')){ ShoutLn "%_  :  ???", strip(spec_text.slice()); exit(0); }
+    if (has(spec_text, 'M')){ ShoutLn "%_  :  ???", strip(spec_text.slice()); exit(0); }
+#endif
+
     N.names().enableLookup();
     lbool result = ltlCheck(N, spec, P);
-    /**/while(spec_text.size() > 0 && (spec_text.last() == ' ' || spec_text.last() == '\n' || spec_text.last() == 0)) spec_text.pop();
-    /**/ShoutLn "%_  :  %_", strip(spec_text.slice()), (result == l_True) ? "unsat" : (result == l_False) ? "SAT" : "--";
+
+#ifdef FUZZ_OUTPUT
+    ShoutLn "%_  :  %_", strip(spec_text.slice()), (result == l_True) ? "unsat" : (result == l_False) ? "SAT" : "--";
+#endif
+
     return result;
 }
 

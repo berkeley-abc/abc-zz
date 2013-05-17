@@ -247,9 +247,7 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
     bool toggle_bad = (P.k != Params_Liveness::L2S);
     initBmcNetlist(N0, fairs, N, true, &fair_mon, toggle_bad);
 #else
-    /**/Dump(fairs);
     initBmcNetlist(N0, fairs, N, true, &fair_mon, true);
-    /**/Dump(fair_mon);
 #endif
 
     if (P.k == Params_Liveness::L2S){
