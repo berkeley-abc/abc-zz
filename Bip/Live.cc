@@ -394,6 +394,9 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P, Cex* 
             sendMsg_Result_fails(par_props, depths, cex, N, true, loop_frame);
         }
 
+        if (out_cex)
+            translateCex(cex, N0, *out_cex, xlat);
+
     }else if (ret == l_False && loop_start == Wire_ERROR){
         // Inconclusive k-liveness call:
         WriteLn "LIVENESS: \a*Inconclusive.\a*";
@@ -410,9 +413,6 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P, Cex* 
         if (P.gig_output == "" && P.aig_output == "")
             WriteLn "No output file specified and no engine specified. Nothing done.";
     }
-
-    if (out_cex)
-        translateCex(cex, N0, *out_cex, xlat);
 
     return ret;
 }
