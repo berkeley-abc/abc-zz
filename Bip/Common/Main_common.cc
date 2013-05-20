@@ -13,10 +13,13 @@ int main(int argc, char** argv)
 
     Netlist N;
     String msg;
-    Wire w = parseLtl("a xnor b <-> c", N, msg);
+    Wire w = parseLtl("a xnor b ->FREE", N, msg);
     if (!w)
         WriteLn "LTL PARSE ERROR! %_", msg;
     else{
+        WriteLn "Formula: %_", FmtLtl(w);
+        NewLine;
+
         WriteLn "NETLIST:";
         N.write(std_out);
         NewLine;

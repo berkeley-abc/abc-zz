@@ -52,6 +52,10 @@ expr :: simple_expr     -- a simple boolean expression
     | expr T expr       -- triggered
     | expr M expr       -- weak since (extension)
 
+    -- CONSTANTS
+    0                   -- FALSE
+    1                   -- TRUE
+
 Precedence:
 
     ! F G X Y Z H O P     (50)
@@ -88,6 +92,23 @@ struct LtlTokenizer : XP_TokenStream {
     bool parseOp(uint& op_tag, uint& pos, XP_OpType& type, int& prio){
         skipWS();
         pos = uint(p - p0);
+
+        // 'xor/xnor' has identifier syntax:
+        if (p[0] == 'x'){
+            if (p[1] == 'o' && p[2] == 'r' && !isIdentChar(p[3])){
+                p += 3; op_tag = '^'; prio = 20; type = xop_INFIXL;
+                return true;
+            }else if (p[1] == 'n' && p[2] == 'o' && p[3] == 'r' && !isIdentChar(p[4])){
+                p += 4; op_tag = '='; prio = 20; type = xop_INFIXL;
+                return true;
+            }else
+                return false;
+        }
+
+        // No operator has two identifier-characters:
+        if (isIdentChar(p[0]) && isIdentChar(p[1]))
+            return false;
+
         switch (*p){
         case '!': case '~': case 'F': case 'G': case 'X': case 'Y': case 'Z': case 'H': case 'O': case 'P':
             op_tag = *p++; prio = 50; type = xop_PREFIX;
@@ -108,25 +129,15 @@ struct LtlTokenizer : XP_TokenStream {
             op_tag = *p++; prio = 20; type = xop_INFIXL;
             return true;
 
-        case 'x':
-            if (p[1] == 'o' && p[2] == 'r' && !isIdentChar(p[3])){
-                p += 3; op_tag = '^'; prio = 20; type = xop_INFIXL;
-                return true;
-            }else if (p[1] == 'n' && p[2] == 'o' && p[3] == 'r' && !isIdentChar(p[4])){
-                p += 4; op_tag = '='; prio = 20; type = xop_INFIXL;
-                return true;
-            }else
-                return false;
-
         case '<':
-            if (p[1] == '-' && p[2] == '>' && !isIdentChar(p[3])){
+            if (p[1] == '-' && p[2] == '>'){
                 p += 3; op_tag = '='; prio = 10; type = xop_INFIXL;
                 return true;
             }else
                 return false;
 
         case '-':
-            if (p[1] == '>' && !isIdentChar(p[2])){
+            if (p[1] == '>'){
                 p += 2; op_tag = '>'; prio = 0; type = xop_INFIXR;
                 return true;
             }else
@@ -170,10 +181,18 @@ struct LtlTokenizer : XP_TokenStream {
             return false;
         else{
             Str name = slice(*start, *p);
-            GLit p = N.names().lookup(name);
-            if (!p){
-                p = N.add(Ltl_());
-                N.names().add(p, name); }
+
+            GLit p;
+            if (eq(name, "TRUE"))
+                p = N.add(Ltl_('1'));
+            else if (eq(name, "FALSE"))
+                p = N.add(Ltl_('0'));
+            else{
+                p = N.names().lookup(name);
+                if (!p){
+                    p = N.add(Ltl_());
+                    N.names().add(p, name); }
+            }
             atom_expr = toExpr(p);
             return true;
         }

@@ -15,8 +15,9 @@
 #include "LtlCheck.hh"
 #include "Live.hh"
 
-#define DEBUG_NAMES
-#define FUZZ_OUTPUT
+//#define DEBUG_NAMES
+//#define DEBUG_GIGS
+//#define FUZZ_OUTPUT
 
 namespace ZZ {
 using namespace std;
@@ -204,6 +205,13 @@ Wire monitorSynth(NetlistRef M, Wire w, WMapS<GLit>& delay_memo, WWMap& memo,
             failed = z & ~(a | b);
             break;
 
+        case '0':
+            failed = z;
+            break;
+
+        case '1':
+            break;
+
         default: assert(false); }
 
         #undef BUF
@@ -239,6 +247,8 @@ TODO:
     XZ f = f
     YX f = reset | f    (reset taken from 'scope' somehow...)
     ZX f = !reset & f
+
++ simple rules (constant propagation; "a & a = a" etc.)
 */
 Wire ltlNormalize(Wire w, WMapS<GLit>& memo, LtlStrash& strash)
 {
@@ -255,8 +265,9 @@ Wire ltlNormalize(Wire w, WMapS<GLit>& memo, LtlStrash& strash)
     if (!a) swp(a, b);  // -- to be consistent with paper, let prefix operators name their input 'a' rather than 'b'
 
     #define N(w) ltlNormalize(w, memo, strash)
+    #define INF(op, arg0, arg1) mkLtl(NS, tuple(arg0.lit(), arg1.lit(), op), strash)
     #define PRE(op, arg) mkLtl(NS, tuple(glit_NULL, arg.lit(), op), strash)
-    #define INF(op, arg0, arg1) mkLtl(NS, tuple(arg0, arg1, op), strash)
+    #define CNS(op) mkLtl(NS, tuple(glit_NULL, glit_NULL, op), strash)
 
     Wire ret;
     bool s = sign(w);
@@ -288,6 +299,10 @@ Wire ltlNormalize(Wire w, WMapS<GLit>& memo, LtlStrash& strash)
     case 'S': ret = !s ? INF('S', N(a), N(b)) : INF('T', N(~a), N(~b)); break;
     case 'T': ret = !s ? INF('T', N(a), N(b)) : INF('S', N(~a), N(~b)); break;
 
+    // Constants:
+    case '0': ret = CNS(s ? '1' : '0'); break;
+    case '1': ret = CNS(s ? '0' : '1'); break;
+
     default:
         WriteLn "INTERNAL ERROR! Unhandled LTL operator: %_", op;
         assert(false); }
@@ -314,8 +329,10 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
         removeAllUnreach(NS);
     }
 
+  #ifdef DEBUG_GIGS
     NS.write("spec.gig");
     WriteLn "Wrote: \a*spec.gig\a*";
+  #endif
     WriteLn "Normalized spec: %_", FmtLtl(nnf);
 
     // Synthesize monitor:
@@ -347,10 +364,11 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
     }
 
     // <<== deadlock analysis; accept constraint extraction; done analysis; reach analysis
-    // <<== run model checker here
 
+  #ifdef DEBUG_GIGS
     M.write("mon.gig");
     WriteLn "Wrote: \a*mon.gig\a*";
+  #endif
 
     // Insert monitor and run model checker:
     WWMap xlat;
@@ -441,8 +459,10 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
         for (uint i = 0; i < accept.size(); i++)
             fair_properties.last() += N.add(PO_(poC++), xlat[accept[i]]);
 
+      #ifdef DEBUG_GIGS
         N.write("fair.gig");
         WriteLn "Wrote: \a*fair.gig\a*";
+      #endif
     }
 
     renumberFlops(N);
@@ -473,7 +493,9 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
         XSimulate xsim(N);
         xsim.simulate(cex);
 
-        // Print model:        
+        // Print model:    
+        WriteLn "Witness projected onto specification variables:";
+        NewLine;
         Vec<char> nam;
         For_Gatetype(M, gate_PI, w){
             if (attr_PI(w).number == 0){
@@ -484,18 +506,18 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
                 bool inv  = false;
                 if (nam[0] == M.names().invert_prefix){
                     inv = true;
-                    Write "\a*%_\a*:", nam.slice(1);
+                    Write "  \a*%_\a*: ", nam.slice(1);
                 }else
-                    Write "\a*%_\a*:", nam;
+                    Write "  \a*%_\a*: ", nam;
 
                 for (uint d = 0; d < cex.size(); d++){
                     if (d == loop_frame) Write " \a/|\a/";
-//                    Write " %_", cex.inputs[d][xlat[w] + N] ^ inv;
                     Write " %_", xsim[d][xlat[w] + N] ^ inv;
                 }
                 NewLine;
             }
         }
+        NewLine;
     }
 
     return result;
