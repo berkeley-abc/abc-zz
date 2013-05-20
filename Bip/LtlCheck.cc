@@ -475,6 +475,8 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
             if (attr_PI(w).number == 0){
                 // Signal from design:
                 M.names().get(w, nam);
+                if (nam[LAST] == 0) nam.pop();
+
                 bool inv  = false;
                 if (nam[0] == M.names().invert_prefix){
                     inv = true;
