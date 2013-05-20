@@ -469,6 +469,10 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
     uint loop_frame;
     lbool result = liveness(N, 0, PL, &cex, &loop_frame);
     if (result == l_False){
+        // Simulate CEX:
+        XSimulate xsim(N);
+        xsim.simulate(cex);
+
         // Print model:        
         Vec<char> nam;
         For_Gatetype(M, gate_PI, w){
@@ -486,7 +490,8 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
 
                 for (uint d = 0; d < cex.size(); d++){
                     if (d == loop_frame) Write " \a/|\a/";
-                    Write " %_", cex.inputs[d][xlat[w] + N] ^ inv;
+//                    Write " %_", cex.inputs[d][xlat[w] + N] ^ inv;
+                    Write " %_", xsim[d][xlat[w] + N] ^ inv;
                 }
                 NewLine;
             }

@@ -980,7 +980,7 @@ int main(int argc, char** argv)
 
     // Command line -- LTL:
     CLI cli_ltl;
-    cli_ltl.add("spec", "string", arg_REQUIRED, "File containing LTL specification(s).");
+    cli_ltl.add("spec", "string", "", "File containing LTL specification(s).");
     cli_ltl.add("inv", "bool", "no", "Negate LTL formula.");
     cli_ltl.add("eng", "{klive, bmc, pdr}", "pdr", "Which liveness engine to use.");
     cli_ltl.add("fv", "bool", "no", "Allow free-variables in specification (will introduce pseudo-inputs).");
@@ -1691,6 +1691,14 @@ int main(int argc, char** argv)
 
     }else if (cli.cmd == "ltl"){
         String spec_file = cli_ltl.get("spec").string_val;
+        if (spec_file == ""){
+            String nam = setExtension(input, "ltl");
+            if (fileExists(nam))
+                spec_file = nam;
+            else
+                spec_file = input + ".ltl";
+        }
+
         Params_LtlCheck P;
         String eng = cli_ltl.get("eng").string_val;
         P.free_vars = cli_ltl.get("fv").bool_val;

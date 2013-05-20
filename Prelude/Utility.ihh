@@ -74,6 +74,7 @@ extern Out          std_err;
 
 
 uint64      fileSize(String filename);
+macro bool  fileExists(String filename) { return fileSize(filename) != UINT64_MAX; }
 void        readFile(File& in, Vec<char>& out, bool close_stream = false, size_t initial_reserve = 0, bool add_null = false);
 Array<char> readFile(File& in, bool close_stream = false, size_t initial_reserve = 0, bool add_null = false);
 bool        readFile(String filename, Vec<char>& out, bool add_null = false);   // -- returns FALSE if file did not exist
