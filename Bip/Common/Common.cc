@@ -321,7 +321,7 @@ void addReset(NetlistRef N, int flop_num, int pi_num)
 
     Get_Pob(N, flop_init);
     Add_Pob(N, reset);
-    Assure_Pob(N, strash);
+    Auto_Pob(N, strash);
     WMap<Wire> xlat;
 
     // Add 'reset' signal:

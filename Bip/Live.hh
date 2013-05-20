@@ -15,6 +15,7 @@
 #define ZZ__Bip__Live_hh
 
 #include "ZZ_Netlist.hh"
+#include "ZZ_Bip.Common.hh"
 
 namespace ZZ {
 using namespace std;
@@ -50,7 +51,7 @@ struct Params_Liveness {
 };
 
 
-lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P = Params_Liveness());
+lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P = Params_Liveness(), Cex* out_cex = NULL, uint* out_loop = NULL);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

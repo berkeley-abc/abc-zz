@@ -645,7 +645,7 @@ bool removeBuffers(NetlistRef N)
 // Copy all names for wire 'from' to wire 'into' (possibly from a different netlist). If
 // 'prefix' is given, all names are prefixed by this string. NOTE! Constant gates are
 // treated specially: their built in names are skipped over in the migration.
-void migrateNames(Wire from, Wire into, Str prefix)
+void migrateNames(Wire from, Wire into, Str prefix, bool skip_auto_generated)
 {
     NetlistRef N = netlist(from);
     NetlistRef M = netlist(into);
@@ -653,6 +653,9 @@ void migrateNames(Wire from, Wire into, Str prefix)
     uint start = (type(from) == gate_Const) ? 1 : 0;
     for (uint i = start; i < N.names().size(from); i++){
         N.names().get(from, tmp, i);
+        if (skip_auto_generated && tmp.size() > 2 && tmp[0] == '_' && tmp[1] == '_')
+            continue;
+
         if (prefix){
             bool sign = (tmp[0] == N.names().invert_prefix);
 
@@ -664,6 +667,8 @@ void migrateNames(Wire from, Wire into, Str prefix)
             if (sign)
                 tmp[0] = M.names().invert_prefix;
         }
+
+        if (M.names().hasLookup()) assert(!M.names().lookup(tmp.base()));
         M.names().add(into, tmp.base());
     }
 }

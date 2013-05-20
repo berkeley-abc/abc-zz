@@ -228,7 +228,7 @@ lbool kLive(NetlistRef N, const Params_Liveness& P, Wire fair_mon, uint k, bool 
 }
 
 
-lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
+lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P, Cex* out_cex, uint* out_loop)
 {
     Get_Pob(N0, fair_properties);
     Auto_Pob(N0, fair_constraints);
@@ -238,6 +238,7 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
     append(fairs, fair_properties[fair_prop_no]);
     append(fairs, fair_constraints);
 
+    WMap<Wire> xlat;
     Netlist N;
     int     n_orig_flops ___unused = nextNum_Flop(N0); // -- don't introduce shadow registers for liveness monitor flops
     Wire    fair_mon;
@@ -245,9 +246,9 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
 
 #if 0
     bool toggle_bad = (P.k != Params_Liveness::L2S);
-    initBmcNetlist(N0, fairs, N, true, &fair_mon, toggle_bad);
+    initBmcNetlist(N0, fairs, N, true, xlat, &fair_mon, toggle_bad);
 #else
-    initBmcNetlist(N0, fairs, N, true, &fair_mon, true);
+    initBmcNetlist(N0, fairs, N, true, xlat, &fair_mon, true);
 #endif
 
     if (P.k == Params_Liveness::L2S){
@@ -328,6 +329,7 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
     default: assert(false); }
 
     // Report result:
+    if (out_loop) *out_loop = UINT_MAX;
     if (ret == l_False && loop_start != Wire_ERROR){
         WriteLn "LIVENESS: \a*Witness found.\a*";
 
@@ -335,6 +337,7 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
         cex.inputs.pop();   // -- got one extra state because of match detection
         uint loop_frame;
         bool ok = verifyInfCex(N, cex, loop_start, &loop_frame);
+        if (out_loop) *out_loop = loop_frame;
         if (!ok)
             WriteLn "INTERNAL ERROR! Liveness CEX did not verify.";
         else
@@ -407,6 +410,9 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P)
         if (P.gig_output == "" && P.aig_output == "")
             WriteLn "No output file specified and no engine specified. Nothing done.";
     }
+
+    if (out_cex)
+        translateCex(cex, N0, *out_cex, xlat);
 
     return ret;
 }

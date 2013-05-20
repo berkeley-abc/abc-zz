@@ -76,10 +76,17 @@ Wire monitorSynth(NetlistRef M, Wire w, WMapS<GLit>& delay_memo, WWMap& memo,
     Wire z = M.add(PI_());      // -- some of these activation variables will not be used, but we clean them up afterwards
 
     if (op == 0){
+#if 0
         memo(+w) = z ^ sign(w);
         migrateNames(w, memo[w] + M);
         attr_PI(z).number = 0;    // -- 'number == 0' marks atomic propositions
         return z;
+#else
+        memo(+w) = z;
+        migrateNames(+w, memo[+w] + M);
+        attr_PI(z).number = 0;    // -- 'number == 0' marks atomic propositions
+        return z ^ sign(w);
+#endif
 
     }else{
       #ifdef DEBUG_NAMES
@@ -172,15 +179,7 @@ Wire monitorSynth(NetlistRef M, Wire w, WMapS<GLit>& delay_memo, WWMap& memo,
             tmp <<= (Y(tmp) & a) | b;
             failed = z & ~tmp;
             break;
-/*
-    def make_S(self, z, a, b):
-        ff = self.N.add_Flop()
-        ff[0] = ff.ite( a | b, a )
-        self.add_failed( z & ~b & ( ~ff | ~a ) )
-        
-        
-    a S b:   true iff 'b' held in the past and 'a' has been true since the cycle after
-*/
+
         case 'T':
             tmp = BUF;
             tmp <<= b & (Z(tmp) | a);
@@ -223,7 +222,8 @@ Wire monitorSynth(NetlistRef M, Wire w, WMapS<GLit>& delay_memo, WWMap& memo,
         if (accept)  all_accept  += accept;
     }
 
-    memo(w) = z ^ sign(w);
+    assert(!sign(w));
+    memo(w) = z;
     return z;
 }
 
@@ -297,12 +297,6 @@ Wire ltlNormalize(Wire w, WMapS<GLit>& memo, LtlStrash& strash)
 }
 
 
-//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-
 lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
 {
     if (P.inv)
@@ -312,7 +306,6 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
     NetlistRef NS = netlist(spec);
     Wire nnf;
     {
-        addReset(N, nextNum_Flop(N), num_ERROR);
         Auto_Pob(N, strash);
 
         WMapS<GLit> memo;
@@ -348,6 +341,9 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
         for (uint i = 0; i < failed .size(); i++) M.add(PO_(), failed [i] + M);
         for (uint i = 0; i < accept .size(); i++) M.add(PO_(), accept [i] + M);
         removeAllUnreach(M);
+
+        //Add_Pob(M, strash);   // <<== crashes below when writing "mon.gig"
+            // <<== strash here?
     }
 
     // <<== deadlock analysis; accept constraint extraction; done analysis; reach analysis
@@ -357,6 +353,12 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
     WriteLn "Wrote: \a*mon.gig\a*";
 
     // Insert monitor and run model checker:
+    WWMap xlat;
+    xlat(M.True()) = N.True();
+
+  #ifdef DEBUG_NAMES
+    N.names().enableLookup();
+  #endif
     {
         Assure_Pob(N, constraints);
         Add_Pob(N, fair_properties);
@@ -368,9 +370,6 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
         Vec<char> nam;
         uint piC = nextNum_PI(N);
         uint poC = nextNum_PO(N);
-
-        WWMap xlat;
-        xlat(M.True()) = N.True();
 
         Auto_Pob(M, up_order);
         For_UpOrder(M, w){
@@ -394,21 +393,33 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
                 }else{
                     // Pseudo-input introduced by translation:
                     xlat(w) = N.add(PI_(piC++));
+                  #ifdef DEBUG_NAMES
+                    migrateNames(w, xlat[w] + N, Str_NULL, true);
+                  #endif
                 }
                 break;}
 
             case gate_And:
                 xlat(w) = s_And(xlat[w[0]] + N, xlat[w[1]] + N);
+              #ifdef DEBUG_NAMES
+                migrateNames(w, xlat[w] + N, Str_NULL, true);
+              #endif
                 break;
 
             case gate_Flop:
                 xlat(w) = N.add(Flop_());
                 flop_init(xlat[w] + N) = flop_init_M[w];
+              #ifdef DEBUG_NAMES
+                migrateNames(w, xlat[w] + N, Str_NULL, true);
+              #endif
                 break;
 
             case gate_PO:
             case gate_Buf:
                 xlat(w) = xlat[w[0]];
+              #ifdef DEBUG_NAMES
+                migrateNames(w, xlat[w] + N, Str_NULL, true);
+              #endif
                 break;
             default:
                 ShoutLn "INTERNAL ERROR! Unexpected gate type: %_", GateType_name[type(w)];
@@ -419,8 +430,11 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
         For_Gatetype(M, gate_Flop, w)
             (xlat[w] + N).set(0, xlat[w[0]]);
 
-        Get_Pob(N, reset);
-        constraints += N.add(PO_(poC++), s_Equiv(xlat[top] + N, reset));
+        Get_Pob(M, reset);
+        constraints += N.add(PO_(poC++), s_Equiv(xlat[top] + N, xlat[reset] + N));
+      #ifdef DEBUG_NAMES
+        N.names().add(constraints[LAST], "z0_constraint");
+      #endif
         for (uint i = 0; i < failed.size(); i++)
             constraints += N.add(PO_(poC++), ~xlat[failed[i]]);
 
@@ -430,6 +444,8 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
         N.write("fair.gig");
         WriteLn "Wrote: \a*fair.gig\a*";
     }
+
+    renumberFlops(N);
 
     // Run liveness algorithm:
     Params_Liveness PL;
@@ -449,7 +465,32 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
         break;
     default: assert(false); }
 
-    lbool result = liveness(N, 0, PL);
+    Cex cex;
+    uint loop_frame;
+    lbool result = liveness(N, 0, PL, &cex, &loop_frame);
+    if (result == l_False){
+        // Print model:        
+        Vec<char> nam;
+        For_Gatetype(M, gate_PI, w){
+            if (attr_PI(w).number == 0){
+                // Signal from design:
+                M.names().get(w, nam);
+                bool inv  = false;
+                if (nam[0] == M.names().invert_prefix){
+                    inv = true;
+                    Write "\a*%_\a*:", nam.slice(1);
+                }else
+                    Write "\a*%_\a*:", nam;
+
+                for (uint d = 0; d < cex.size(); d++){
+                    if (d == loop_frame) Write " \a/|\a/";
+                    Write " %_", cex.inputs[d][xlat[w] + N] ^ inv;
+                }
+                NewLine;
+            }
+        }
+    }
+
     return result;
 }
 

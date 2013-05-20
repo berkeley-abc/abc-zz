@@ -125,7 +125,7 @@ bool removeBuffers(NetlistRef N);
     // -- Eliminates all gate of type 'gate_Buf', forwarding names to the remaining gates.
     // Returns FALSE if an infinite loop was detected among the buffers.
 
-void migrateNames(Wire from, Wire into, Str prefix = Str());
+void migrateNames(Wire from, Wire into, Str prefix = Str(), bool skip_auto_generated = false);
     // -- Copy all names for wire 'from' to wire 'into' (possibly from a different netlist). If
     // 'prefix' is given, all names are prefixed by this string.
 
