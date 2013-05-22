@@ -25,7 +25,7 @@ using namespace std;
 
 struct Params_LtlCheck {
     enum Engine {
-        eng_NULL,   // -- just transform; output file (or PAR mode) must be specified
+        eng_NULL,   // -- just transform
         eng_KLive,
         eng_L2sBmc,
         eng_L2sPdr
@@ -36,11 +36,22 @@ struct Params_LtlCheck {
     Engine  eng;
     String  witness_output;
 
+    bool    debug_names;
+    String  spec_gig;
+    String  monitor_gig;
+    String  final_gig;
+    bool    fuzz_output;
+
     Params_LtlCheck() :
         inv(false),
         free_vars(false),
         eng(eng_L2sPdr),
-        witness_output("")
+        witness_output(""),
+        debug_names(false),
+        spec_gig(""),
+        monitor_gig(""),
+        final_gig(""),
+        fuzz_output(false)
     {}
 };
 

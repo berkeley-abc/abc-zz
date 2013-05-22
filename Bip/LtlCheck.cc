@@ -15,9 +15,7 @@
 #include "LtlCheck.hh"
 #include "Live.hh"
 
-//#define DEBUG_NAMES
-//#define DEBUG_GIGS
-//#define FUZZ_OUTPUT
+//#define DEBUG_OUTPUT
 
 namespace ZZ {
 using namespace std;
@@ -68,7 +66,8 @@ macro Wire operator^(Wire u, Wire v) { return mk_Xor(u, v); }
 
 // memo skall nog vara WMap, delay Map<sig, reset, init> -> GLit
 Wire monitorSynth(NetlistRef M, Wire w, WMapS<GLit>& delay_memo, WWMap& memo,
-                  Vec<GLit>& all_pending, Vec<GLit>& all_failed, Vec<GLit>& all_accept)
+                  Vec<GLit>& all_pending, Vec<GLit>& all_failed, Vec<GLit>& all_accept,
+                  bool debug_names)
 {
     if (memo[+w])
         return memo[w] + M;
@@ -77,33 +76,26 @@ Wire monitorSynth(NetlistRef M, Wire w, WMapS<GLit>& delay_memo, WWMap& memo,
     Wire z = M.add(PI_());      // -- some of these activation variables will not be used, but we clean them up afterwards
 
     if (op == 0){
-#if 0
-        memo(+w) = z ^ sign(w);
-        migrateNames(w, memo[w] + M);
-        attr_PI(z).number = 0;    // -- 'number == 0' marks atomic propositions
-        return z;
-#else
         memo(+w) = z;
         migrateNames(+w, memo[+w] + M);
         attr_PI(z).number = 0;    // -- 'number == 0' marks atomic propositions
         return z ^ sign(w);
-#endif
 
     }else{
-      #ifdef DEBUG_NAMES
-        String nam;
-        FWrite(nam) "%_", FmtLtl(w);
-        for (uint i = 0; i < nam.size(); i++){
-            if (nam[i] == '(') nam[i] = '{';
-            else if (nam[i] == ')') nam[i] = '}';
-            else if (nam[i] == ' ') nam[i] = '_';
+        if (debug_names){
+            String nam;
+            FWrite(nam) "%_", FmtLtl(w);
+            for (uint i = 0; i < nam.size(); i++){
+                if (nam[i] == '(') nam[i] = '{';
+                else if (nam[i] == ')') nam[i] = '}';
+                else if (nam[i] == ' ') nam[i] = '_';
+            }
+            M.names().add(z, nam.c_str());
         }
-        M.names().add(z, nam.c_str());
-      #endif
 
         assert(!sign(w));
-        Wire a = w[0] ? monitorSynth(M, w[0], delay_memo, memo, all_pending, all_failed, all_accept) : Wire_NULL;
-        Wire b = w[1] ? monitorSynth(M, w[1], delay_memo, memo, all_pending, all_failed, all_accept) : Wire_NULL;
+        Wire a = w[0] ? monitorSynth(M, w[0], delay_memo, memo, all_pending, all_failed, all_accept, debug_names) : Wire_NULL;
+        Wire b = w[1] ? monitorSynth(M, w[1], delay_memo, memo, all_pending, all_failed, all_accept, debug_names) : Wire_NULL;
         if (!a) swp(a, b);  // -- to be consistent with paper, let prefix operators name their input 'a' rather than 'b'
 
         Wire pending = Wire_NULL;
@@ -218,7 +210,7 @@ Wire monitorSynth(NetlistRef M, Wire w, WMapS<GLit>& delay_memo, WWMap& memo,
         #undef Y
         #undef Z
 
-      #ifdef DEBUG_NAMES
+      #ifdef DEBUG_OUTPUT
         WriteLn "OUTPUTS FOR \"%_\":", FmtLtl(w);
         if (pending){ String nam; FWrite(nam) "pend%_", all_pending.size(); M.names().add(pending, nam.c_str()); WriteLn "  %_", nam; }
         if (failed) { String nam; FWrite(nam) "fail%_", all_failed .size(); M.names().add(failed , nam.c_str()); WriteLn "  %_", nam; }
@@ -329,10 +321,10 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
         removeAllUnreach(NS);
     }
 
-  #ifdef DEBUG_GIGS
-    NS.write("spec.gig");
-    WriteLn "Wrote: \a*spec.gig\a*";
-  #endif
+    if (P.spec_gig != ""){
+        NS.write(P.spec_gig);
+        WriteLn "Wrote: \a*%_\a*", P.spec_gig;
+    }
     WriteLn "Normalized spec: %_", FmtLtl(nnf);
 
     // Synthesize monitor:
@@ -345,13 +337,12 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
         Add_Pob0(M, flop_init);
         addReset(M, nextNum_Flop(0), num_ERROR);
         Get_Pob(M, reset);
-      #ifdef DEBUG_NAMES
-        M.names().add(reset, "global_reset");
-      #endif
+        if (P.debug_names)
+            M.names().add(reset, "global_reset");
 
         WMapS<GLit> delay_memo;
         WWMap memo;
-        top = monitorSynth(M, nnf[0], delay_memo, memo, pending, failed, accept);
+        top = monitorSynth(M, nnf[0], delay_memo, memo, pending, failed, accept, P.debug_names);
         M.add(PO_(0), top);  // -- will be set by constraint to 'global_reset'
 
         for (uint i = 0; i < pending.size(); i++) M.add(PO_(), pending[i] + M);
@@ -365,18 +356,18 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
 
     // <<== deadlock analysis; accept constraint extraction; done analysis; reach analysis
 
-  #ifdef DEBUG_GIGS
-    M.write("mon.gig");
-    WriteLn "Wrote: \a*mon.gig\a*";
-  #endif
+    if (P.monitor_gig != ""){
+        M.write(P.monitor_gig);
+        WriteLn "Wrote: \a*%_\a*", P.monitor_gig;
+    }
 
     // Insert monitor and run model checker:
     WWMap xlat;
     xlat(M.True()) = N.True();
 
-  #ifdef DEBUG_NAMES
-    N.names().enableLookup();
-  #endif
+    if (P.debug_names)
+        N.names().enableLookup();
+
     {
         Assure_Pob(N, constraints);
         Add_Pob(N, fair_properties);
@@ -411,33 +402,29 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
                 }else{
                     // Pseudo-input introduced by translation:
                     xlat(w) = N.add(PI_(piC++));
-                  #ifdef DEBUG_NAMES
-                    migrateNames(w, xlat[w] + N, Str_NULL, true);
-                  #endif
+                    if (P.debug_names)
+                        migrateNames(w, xlat[w] + N, Str_NULL, true);
                 }
                 break;}
 
             case gate_And:
                 xlat(w) = s_And(xlat[w[0]] + N, xlat[w[1]] + N);
-              #ifdef DEBUG_NAMES
-                migrateNames(w, xlat[w] + N, Str_NULL, true);
-              #endif
+                if (P.debug_names)
+                    migrateNames(w, xlat[w] + N, Str_NULL, true);
                 break;
 
             case gate_Flop:
                 xlat(w) = N.add(Flop_());
                 flop_init(xlat[w] + N) = flop_init_M[w];
-              #ifdef DEBUG_NAMES
-                migrateNames(w, xlat[w] + N, Str_NULL, true);
-              #endif
+                if (P.debug_names)
+                    migrateNames(w, xlat[w] + N, Str_NULL, true);
                 break;
 
             case gate_PO:
             case gate_Buf:
                 xlat(w) = xlat[w[0]];
-              #ifdef DEBUG_NAMES
-                migrateNames(w, xlat[w] + N, Str_NULL, true);
-              #endif
+                if (P.debug_names)
+                    migrateNames(w, xlat[w] + N, Str_NULL, true);
                 break;
             default:
                 ShoutLn "INTERNAL ERROR! Unexpected gate type: %_", GateType_name[type(w)];
@@ -450,19 +437,18 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
 
         Get_Pob(M, reset);
         constraints += N.add(PO_(poC++), s_Equiv(xlat[top] + N, xlat[reset] + N));
-      #ifdef DEBUG_NAMES
-        N.names().add(constraints[LAST], "z0_constraint");
-      #endif
+        if (P.debug_names)
+            N.names().add(constraints[LAST], "z0_constraint");
         for (uint i = 0; i < failed.size(); i++)
             constraints += N.add(PO_(poC++), ~xlat[failed[i]]);
 
         for (uint i = 0; i < accept.size(); i++)
             fair_properties.last() += N.add(PO_(poC++), xlat[accept[i]]);
 
-      #ifdef DEBUG_GIGS
-        N.write("fair.gig");
-        WriteLn "Wrote: \a*fair.gig\a*";
-      #endif
+        if (P.final_gig != ""){
+            N.write(P.final_gig);
+            WriteLn "Wrote: \a*%_\a*", P.final_gig;
+        }
     }
 
     renumberFlops(N);
@@ -483,6 +469,8 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
         PL.k = Params_Liveness::L2S;
         PL.eng = Params_Liveness::eng_Treb;
         break;
+    case Params_LtlCheck::eng_NULL:
+        return l_Undef;     // -- EXIT
     default: assert(false); }
 
     Cex cex;
@@ -493,7 +481,7 @@ lbool ltlCheck(NetlistRef N, Wire spec, const Params_LtlCheck& P)
         XSimulate xsim(N);
         xsim.simulate(cex);
 
-        // Print model:    
+        // Print model:
         WriteLn "Witness projected onto specification variables:";
         NewLine;
         Vec<char> nam;
@@ -539,18 +527,17 @@ lbool ltlCheck(NetlistRef N, String spec_text, const Params_LtlCheck& P)
         ShoutLn "Error parsing LTL specification:\n  -- %_", err_msg;
         exit(1); }
 
-#ifdef FUZZ_OUTPUT
-    while(spec_text.size() > 0 && (spec_text.last() == ' ' || spec_text.last() == '\n' || spec_text.last() == 0)) spec_text.pop();
-    if (has(spec_text, 'W')){ ShoutLn "%_  :  ???", strip(spec_text.slice()); exit(0); }
-    if (has(spec_text, 'M')){ ShoutLn "%_  :  ???", strip(spec_text.slice()); exit(0); }
-#endif
+    if (P.fuzz_output){
+        while(spec_text.size() > 0 && (spec_text.last() == ' ' || spec_text.last() == '\n' || spec_text.last() == 0)) spec_text.pop();
+        if (has(spec_text, 'W')){ ShoutLn "%_  :  ???", strip(spec_text.slice()); exit(0); }
+        if (has(spec_text, 'M')){ ShoutLn "%_  :  ???", strip(spec_text.slice()); exit(0); }
+    }
 
     N.names().enableLookup();
     lbool result = ltlCheck(N, spec, P);
 
-#ifdef FUZZ_OUTPUT
-    ShoutLn "%_  :  %_", strip(spec_text.slice()), (result == l_True) ? "unsat" : (result == l_False) ? "SAT" : "--";
-#endif
+    if (P.fuzz_output)
+        ShoutLn "%_  :  %_", strip(spec_text.slice()), (result == l_True) ? "unsat" : (result == l_False) ? "SAT" : "--";
 
     return result;
 }

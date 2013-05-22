@@ -983,7 +983,12 @@ int main(int argc, char** argv)
     CLI cli_ltl;
     cli_ltl.add("spec", "string", "", "File containing LTL specification(s).");
     cli_ltl.add("inv", "bool", "no", "Negate LTL formula.");
-    cli_ltl.add("eng", "{klive, bmc, pdr}", "pdr", "Which liveness engine to use.");
+    cli_ltl.add("eng", "{klive, bmc, pdr, auto}", "auto", "Which liveness engine to use. 'auto == pdr' unless '-final-gig' is given.");
+    cli_ltl.add("names", "bool | {auto}", "auto", "Migrate names through transformation for debugging.");
+    cli_ltl.add("spec-gig", "string", "", "Save internal representation of spec.");
+    cli_ltl.add("mon-gig", "string", "", "Save synthesized monitor.");
+    cli_ltl.add("final-gig", "string", "", "Save monitor + design.");
+    cli_ltl.add("fuzz", "bool", "no", "Produce output for fuzzer.");
     cli_ltl.add("fv", "bool", "no", "Allow free-variables in specification (will introduce pseudo-inputs).");
     cli_ltl.add("wit", "string", "", "Output AIGER 1.9 witness.");
     cli.addCommand("ltl", "LTL model checking.", &cli_ltl);
@@ -1702,11 +1707,23 @@ int main(int argc, char** argv)
         }
 
         Params_LtlCheck P;
-        String eng = cli_ltl.get("eng").string_val;
-        P.free_vars = cli_ltl.get("fv").bool_val;
-        P.eng = (eng == "klive") ? Params_LtlCheck::eng_KLive :
-                (eng == "bmc")   ? Params_LtlCheck::eng_L2sBmc:
-                /*otherwise*/      Params_LtlCheck::eng_L2sPdr;
+        P.spec_gig    = cli.get("spec-gig").string_val;
+        P.monitor_gig = cli.get("mon-gig").string_val;
+        P.final_gig   = cli.get("final-gig").string_val;
+        bool some_output = (P.spec_gig != "" || P.monitor_gig != "" || P.final_gig != "");
+
+        P.free_vars = cli.get("fv").bool_val;
+        P.fuzz_output = cli.get("fuzz").bool_val;
+        P.debug_names = (cli.get("names").choice == 0) ? cli.get("names").bool_val :
+                        /*otherwise*/some_output;
+
+        String eng = cli.get("eng").string_val;
+        P.eng = (eng == "klive") ? Params_LtlCheck::eng_KLive  :
+                (eng == "bmc")   ? Params_LtlCheck::eng_L2sBmc :
+                (eng == "pdr")   ? Params_LtlCheck::eng_L2sPdr :
+                !some_output     ? Params_LtlCheck::eng_L2sPdr :
+                /*otherwise*/      Params_LtlCheck::eng_NULL;
+
         P.witness_output = cli.get("wit").string_val;
         P.inv = cli.get("inv").bool_val;
 

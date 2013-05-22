@@ -13,6 +13,13 @@
 #include"ExtSolver.hh"
 #include<pthread.h>
 
+#if defined(__APPLE__)
+#define pthread_spinlock_t pthread_mutex_t
+#define pthread_spin_lock pthread_mutex_lock
+#define pthread_spin_unlock pthread_mutex_unlock
+#define pthread_spin_destroy pthread_mutex_destroy
+#endif
+
 #ifdef MINIRED
 namespace MiniRed
 #elif defined GLUCORED
@@ -26,28 +33,28 @@ class SolRed : public ExtSolver {
 public:
     SolRed ();
     ~SolRed ();
-  
+
     // Overloaded 'search' and 'solve_' functions. 
     // Unfortunately these require a modification in the original solver sources to make them virtual
     virtual lbool search (int nof_conflicts);
     virtual lbool solve_ ();
 
     // Statistics (counted in 'search')
-    uint64_t reducer_backtracks, 
-	     reducer_backtracks_tozero, 
-	     reducer_backtrack_levels, 
-   	     reducer_backtrack_level_before;
+    uint64_t reducer_backtracks,
+         reducer_backtracks_tozero,
+         reducer_backtrack_levels,
+         reducer_backtrack_level_before;
 
     // Other statistics
     uint64_t reducer_in,
- 	     reducer_in_lits,
- 	     reducer_out,
- 	     reducer_out_lits,
- 	     reducer_notout_lits,	
-	     workset_in,
-	     workset_in_lits,
-	     workset_deleted,
-	     workset_deleted_lits;
+         reducer_in_lits,
+         reducer_out,
+         reducer_out_lits,
+         reducer_notout_lits,
+         workset_in,
+         workset_in_lits,
+         workset_deleted,
+         workset_deleted_lits;
 
     // Entry point for the second thread, should not be called directly by owner of a 'SolRed' instance
     void threadGo ();

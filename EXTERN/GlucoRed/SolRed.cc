@@ -17,14 +17,14 @@ using namespace GlucoRed;
 static IntOption opt_solver_ccmin_mode (VERSION_STRING, "solver-ccmin",  "Conflict clause minimization mode for solver (original -ccmin-mode applies to reducer)", 2, IntRange(0, 2));
 
 // Second thread entry helper
-static void* threadEntry(void *t) {  
+static void* threadEntry(void *t) {
     ((SolRed*) t)->threadGo();
     return NULL;
 }
 
-SolRed::SolRed() 
-    : reducer_backtracks             (0) 
-    , reducer_backtracks_tozero      (0) 
+SolRed::SolRed()
+    : reducer_backtracks             (0)
+    , reducer_backtracks_tozero      (0)
     , reducer_backtrack_levels       (0)
     , reducer_backtrack_level_before (0)
 
@@ -48,7 +48,11 @@ SolRed::SolRed()
 
     // Create posix thread objects
     pthread_mutex_init(&mutex, NULL);
+#if defined(__APPLE__)
+    pthread_mutex_init(&resultLock, 0);
+#else
     pthread_spin_init(&resultLock, PTHREAD_PROCESS_PRIVATE);
+#endif
     pthread_cond_init(&cond, NULL);
 }
 
@@ -56,16 +60,16 @@ SolRed::~SolRed() {
     pthread_mutex_destroy(&mutex);
     pthread_spin_destroy(&resultLock);
     pthread_cond_destroy(&cond);
-    
+
     // Delete left over work
-    while( work.available() ) 
-	delete work.get();
+    while( work.available() )
+    delete work.get();
 
     // Delete left over reduced clauses
     for ( int i = nhead; i < newReduced.size(); i++ )
-	delete newReduced[i];    
+    delete newReduced[i];
     for ( int i = 0; i < reduced.size(); i++ )
-	delete reduced[i];
+    delete reduced[i];
 }
 
 
@@ -76,7 +80,7 @@ lbool SolRed::solve_() {
 
     stop   = false;
     result = l_Undef;
-   
+
     // 'copyProblem' can only return 'false' if solver is used incrementally
     if ( !copyProblem(reducer, offset) ) return l_False;
     pthread_create(&posix, NULL, threadEntry, this);
@@ -85,17 +89,17 @@ lbool SolRed::solve_() {
     // it will supply clauses to 'work' for the other thread
     lbool sat = Solver::solve_();
     foundResult(sat, true);
-    
+
     // Wait for the other thread to exit
     pthread_join(posix, NULL);
 
     if ( sat == l_Undef && result != l_Undef  ) {
-	assert(result!=l_Undef);
+    assert(result!=l_Undef);
 
-	if ( result == l_True )
-	    reducer.model.copyTo(model);
-	else
-	    reducer.conflict.copyTo(conflict);
+    if ( result == l_True )
+        reducer.model.copyTo(model);
+    else
+        reducer.conflict.copyTo(conflict);
     }
 
     if ( result == l_False && !conflict.size() ) ok = false;
@@ -122,21 +126,21 @@ bool SolRed::submitToReducer(const vec<Lit>& c, int metric) {
     //// MUTEX PROTECTED ////
     pthread_mutex_lock(&mutex);
     tmp = work.insert(tmp, metric);
-    
+
     newReduced.capacity(newReduced.size() + reduced.size());
     for( int i = 0; i < reduced.size(); i++ )
-	newReduced.push_(reduced[i]);
+    newReduced.push_(reduced[i]);
     reduced.clear();
-   
+
     pthread_cond_signal(&cond);
     pthread_mutex_unlock(&mutex);
     //// MUTEX PROTECTED ////
     /////////////////////////
 
-    if ( tmp ) { 
-	workset_deleted++; 
-	workset_deleted_lits+=tmp->size(); 
-	delete tmp; 
+    if ( tmp ) {
+    workset_deleted++;
+    workset_deleted_lits+=tmp->size();
+    delete tmp;
     }
 
     return ok;
@@ -148,46 +152,46 @@ void SolRed::threadGo() {
 
     // Reducer thread main loop
     while(!stop && reducer.okay()) {
-	/////////////////////////
-	//// MUTEX PROTECTED ////
-	pthread_mutex_lock(&mutex);
-	// Add result of previous iteration to set 'reduced'
-	if ( lits ) reduced.push(lits);	
+    /////////////////////////
+    //// MUTEX PROTECTED ////
+    pthread_mutex_lock(&mutex);
+    // Add result of previous iteration to set 'reduced'
+    if ( lits ) reduced.push(lits);
 
-	// Wait for work
-	while( !stop && !work.available() )
-	    pthread_cond_wait(&cond, &mutex);
+    // Wait for work
+    while( !stop && !work.available() )
+        pthread_cond_wait(&cond, &mutex);
 
-	// Get work if available
-	if (stop || !work.available()) {
-	    lits = NULL;
-	    reducer.clearInterrupt();
-	}
-	else lits = work.get();	
-       
-	pthread_mutex_unlock(&mutex);
-	//// MUTEX PROTECTED ////
-	/////////////////////////
-	
-	if ( lits ) {
-	    const int sz = lits->size();
-	    reducer_in++;
-	    reducer_in_lits+= sz;
+    // Get work if available
+    if (stop || !work.available()) {
+        lits = NULL;
+        reducer.clearInterrupt();
+    }
+    else lits = work.get();
 
-	    if ( reducer.reduce(*lits) ) {
-		reducer_out++;
-		reducer_out_lits+= lits->size();
-	    }
-	    else {
-		reducer_notout_lits+= sz;
-		delete lits;
-		lits = NULL;
-	    }
-	}
+    pthread_mutex_unlock(&mutex);
+    //// MUTEX PROTECTED ////
+    /////////////////////////
+
+    if ( lits ) {
+        const int sz = lits->size();
+        reducer_in++;
+        reducer_in_lits+= sz;
+
+        if ( reducer.reduce(*lits) ) {
+        reducer_out++;
+        reducer_out_lits+= lits->size();
+        }
+        else {
+        reducer_notout_lits+= sz;
+        delete lits;
+        lits = NULL;
+        }
+    }
     }
 
     if ( !reducer.okay() )
-	foundResult(l_False, false);
+    foundResult(l_False, false);
 }
 
 // Report result 'sat', interrupts further solving/reducing
@@ -200,17 +204,17 @@ void SolRed::foundResult(lbool sat, bool signal) {
 
     pthread_spin_lock(&resultLock);
     old = result;
-    if (result == l_Undef) result = sat; 
+    if (result == l_Undef) result = sat;
     pthread_spin_unlock(&resultLock);
 
     if ( signal && old == l_Undef ) {
-	/////////////////////////
-	//// MUTEX PROTECTED ////
-	pthread_mutex_lock(&mutex);
-	pthread_cond_signal(&cond);
-	pthread_mutex_unlock(&mutex);
-	//// MUTEX PROTECTED ////
-	/////////////////////////
+    /////////////////////////
+    //// MUTEX PROTECTED ////
+    pthread_mutex_lock(&mutex);
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&mutex);
+    //// MUTEX PROTECTED ////
+    /////////////////////////
     }
 
     assert(old == l_Undef || sat == l_Undef || old == sat);
