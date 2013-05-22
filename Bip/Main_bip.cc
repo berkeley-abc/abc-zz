@@ -976,6 +976,7 @@ int main(int argc, char** argv)
     cli_live.add("gig", "string", "", "Output GIG file after conversion.");
     cli_live.add("wit", "string", "", "Output AIGER 1.9 witness.");
     cli_live.add("eng", "{none, bmc, treb, treb-abs, pdr2, imc}", "none", "Proof-engine to apply to conversion.");
+    cli_live.add("bmc-depth", "uint | {inf}", "inf", "For '-eng=bmc' only; bound the depth.");
     cli.addCommand("live", "Liveness checking.", &cli_live);
 
     // Command line -- LTL:
@@ -1682,6 +1683,7 @@ int main(int argc, char** argv)
         P.gig_output = cli.get("gig").string_val;
         P.witness_output = cli.get("wit").string_val;
         P.eng = (Params_Liveness::Engine)cli.get("eng").enum_val;
+        P.bmc_max_depth = (cli.get("bmc-depth").choice == 0) ? (uint)cli.get("bmc-depth").int_val : UINT_MAX;
 
         lbool result = liveness(N, prop_no, P);
 

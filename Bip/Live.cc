@@ -304,7 +304,7 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P, Cex* 
         break;
 
     case Params_Liveness::eng_Bmc:
-        ret = bmc(N, props, P_bmc, &cex, &bug_free_depth);
+        ret = bmc(N, props, P_bmc, &cex, &bug_free_depth, NULL, P.bmc_max_depth);
         break;
 
     case Params_Liveness::eng_Treb:

@@ -39,6 +39,7 @@ struct Params_Liveness {
 
     uint   k;       // k-liveness is default unless 'k == L2S'
     Engine eng;
+    uint   bmc_max_depth;
 
     String aig_output;
     String gig_output;
@@ -46,7 +47,8 @@ struct Params_Liveness {
 
     Params_Liveness() :
         k(L2S),
-        eng(eng_Treb)
+        eng(eng_Treb),
+        bmc_max_depth(UINT_MAX)
     {}
 };
 
