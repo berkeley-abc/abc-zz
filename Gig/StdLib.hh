@@ -30,6 +30,8 @@ macro bool isCI(Wire w) { return combInput (w.type()); }
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+String info(const Gig& N);
+
 void upOrder(const Gig& N, /*out*/Vec<GLit>& order);
 void upOrder(const Gig& N, const Vec<GLit>& sinks, /*out*/Vec<GLit>& order);
     // -- Provides a topological order, starting from the CIs (or sinks) and ending with the COs.

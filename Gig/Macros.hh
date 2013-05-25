@@ -164,6 +164,17 @@ struct MacroVecGLit {
     for (uint i__##w = 0; i__##w < order__##w.v.size(); i__##w++)   \
         if ((w = order__##w.v[i__##w] + *N__##w), false); else
 
+#define For_DownOrder(netlist, w)                                   \
+    if (const Gig* N__##w = NULL); else                             \
+    if (N__##w = &(netlist), false); else                           \
+                                                                    \
+    if (MacroVecGLit order__##w = 0); else                          \
+    if (upOrder(*N__##w, order__##w.v), false); else                \
+                                                                    \
+    if (Wire w = Wire_NULL); else                                   \
+    for (uint i__##w = order__##w.v.size(); i__##w > 0;)            \
+        if ((w = order__##w.v[--i__##w] + *N__##w), false); else
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Convenience macros for adding/removing Gig-objects:

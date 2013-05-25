@@ -21,8 +21,8 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-// If 'verif_prob' is TRUE and input is in original AIGER format, POs are converted to SafeProps
-void readAiger_(In& in, Gig& N, bool verif_prob)
+// If 'verif_problem' is TRUE and file is in AIGER 1.0, POs are converted to SafeProps
+void readAiger_(In& in, Gig& N, bool verif_problem)
 {
     assert(N.isEmpty());
     N.setMode(gig_Aig);
@@ -212,7 +212,7 @@ void readAiger_(In& in, Gig& N, bool verif_prob)
     }
 #endif
 
-    if (!new_aiger && verif_prob){
+    if (!new_aiger && verif_problem){
         For_Gatetype(N, gate_PO, w){
             Wire w_in = w[0];
             change(w, gate_SafeProp, w.num()).init(~w_in);
@@ -223,10 +223,10 @@ void readAiger_(In& in, Gig& N, bool verif_prob)
 
 
 // Wrapper to catch some more exceptions.
-void readAiger(In& in, Gig& N, bool verif_prob)
+void readAiger(In& in, Gig& N, bool verif_problem)
 {
     try{
-        readAiger_(in, N, verif_prob);
+        readAiger_(in, N, verif_problem);
     }catch (Excp_EOF){
         throw Excp_AigerParseError(String("Unexpected end-of-file."));
     }catch (Excp_ParseNum err){
@@ -235,13 +235,13 @@ void readAiger(In& in, Gig& N, bool verif_prob)
 }
 
 
-void readAigerFile(String filename, Gig& N, bool verif_prob)
+void readAigerFile(String filename, Gig& N, bool verif_problem)
 {
     InFile in(filename);
     if (in.null())
         throw Excp_AigerParseError(String("Could not open: ") + filename);
 
-    readAiger(in, N, verif_prob);
+    readAiger(in, N, verif_problem);
 }
 
 

@@ -27,6 +27,7 @@ Declare_Exception(Excp_AigerParseError);
 
 void readAiger    (In& in         , Gig& N, bool verif_prob);
 void readAigerFile(String filename, Gig& N, bool verif_prob);
+    // -- if 'verif_problem' is TRUE and file is in AIGER 1.0, POs are converted to SafeProps
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

@@ -144,14 +144,14 @@ DEF( Even     , INF  , NULL )
 DEF( Odd      , INF  , NULL )
 
 // LUTs:
-DEF( Lut4     , 4    , Arg  )  // Argument stores the 16-bit FTB
-DEF( Npn4     , 4    , Arg  )  // Argument stores the NPN class number (0..221)
-DEF( Lut6     , 6    , Num  )  // 64-bit FTB too big, stored in side-table
-DEF( WLut     , INF  , Num  )  // FTB also stored in side-table
+DEF( Lut4     , 4    , Arg  )   // Argument stores the 16-bit FTB
+DEF( Npn4     , 4    , Arg  )   // Argument stores the NPN class number (0..221)
+DEF( Lut6     , 6    , Num  )   // 64-bit FTB too big, stored in side-table
+DEF( WLut     , INF  , Num  )   // FTB also stored in side-table
 
 // Black-boxes:
-DEF( Uif      , INF  , Arg  )  // combinational box
-DEF( Box      , INF  , Arg  )  // sequential box
+DEF( Uif      , INF  , Arg  )   // combinational box
+DEF( Box      , INF  , Arg  )   // sequential box
 
 // Memories:
 DEF( MFlop    , 1    , Enum )

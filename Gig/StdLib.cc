@@ -21,6 +21,26 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+String info(const Gig& N)
+{
+    Out out;
+
+    for (uint t = (uint)gate_Const + 1; t < GateType_size; t++){
+        GateType type = GateType(t);
+        if (N.typeCount(type) > 0)
+            out += '#', GateType_name[type], '=', N.typeCount(type), "  ";
+    }
+    if (N.nRemoved() > 0)
+        out += "Deleted=", N.nRemoved(), "  ";
+    out += "TOTAL=", N.size();
+
+    return String(out.vec());
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+
+
 void upOrder_helper(Vec<Pair<GLit,uint> >& Q, Vec<uchar>& seen, Vec<GLit>& order, Wire w0)
 {
     if (seen[w0.id]) return;

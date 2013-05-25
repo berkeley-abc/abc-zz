@@ -53,6 +53,39 @@ int main(int argc, char** argv)
     ZZ_Init;
 
     Gig N;
+    {
+        WMap <String> m1(N);
+        WMapS<String> m2(N);
+        WMapX<String> m3(N);
+        WMapN<String> m4(N);
+
+        Wire x = N.add(gate_PI, 2);
+        Wire y = N.add(gate_PI, 0);
+        Wire z = N.add(gate_PI, 1);
+
+        m1(x) = "x";
+        m1(y) = "y";
+        m1(z) = "z";
+
+        m2(x) = "x";
+        m2(y) = "y";
+        m2(z) = "z";
+
+        m3(x) = "x";
+        m3(y) = "y";
+        m3(z) = "z";
+
+        m4(x) = "x";
+        m4(y) = "y";
+        m4(z) = "z";
+
+        Dump(m1.base());
+        Dump(m2.base());
+        Dump(m3.base());
+        Dump(m4.base());
+
+        return 0;
+    }
 
 #if 0
     Vec<Wire> xs;
@@ -173,10 +206,10 @@ int main(int argc, char** argv)
 #endif
     /*
     Dags att skriva simulator och verifiera att alla MUXar reduceras korrekt...:
-    
+
       1, ~1, a, b, c, ~a, ~b, ~c
-      
-    och att om vi lägger dem i samma XIG så är antalet unika noder rätt...  
+
+    och att om vi lägger dem i samma XIG så är antalet unika noder rätt...
     */
 
     return 0;

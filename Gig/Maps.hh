@@ -55,10 +55,10 @@ public:
 
     Gig* N;
 
-    WMap()               : N(NULL)            {}
-    WMap(V nil)          : N(NULL), map(nil)  {}
-    WMap(Gig& N_)        : N(&N_)             { map.reserve(N->size()); }
-    WMap(Gig& N_, V nil) : N(&N_), map(nil)   { map.reserve(N->size()); }
+    WMap()               :           N(NULL) {}
+    WMap(V nil)          : map(nil), N(NULL) {}
+    WMap(Gig& N_)        :           N(&N_)  { map.reserve(N->size()); }
+    WMap(Gig& N_, V nil) : map(nil), N(&N_)  { map.reserve(N->size()); }
 
     V  operator[](GLit p) const { return map[p]; }
     V& operator()(GLit p)       { return map(p); }
@@ -70,6 +70,9 @@ public:
 
     void copyTo(WMap& dst) const { map.copyTo(dst.map); dst.N = N; }
     void moveTo(WMap& dst)       { map.moveTo(dst.map); dst.N = N; }
+
+    Vec<V>&       base()       { return map.base(); }   // -- low-level
+    const Vec<V>& base() const { return map.base(); }
 };
 
 
@@ -90,10 +93,10 @@ public:
 
     Gig* N;
 
-    WMapS()               : N(NULL)            {}
-    WMapS(V nil)          : N(NULL), map(nil)  {}
-    WMapS(Gig& N_)        : N(&N_)             { map.reserve(N->size() * 2); }
-    WMapS(Gig& N_, V nil) : N(&N_), map(nil)   { map.reserve(N->size() * 2); }
+    WMapS()               :           N(NULL) {}
+    WMapS(V nil)          : map(nil), N(NULL) {}
+    WMapS(Gig& N_)        :           N(&N_)  { map.reserve(N->size() * 2); }
+    WMapS(Gig& N_, V nil) : map(nil), N(&N_)  { map.reserve(N->size() * 2); }
 
     V  operator[](GLit p) const { return map[p]; }
     V& operator()(GLit p)       { return map(p); }
@@ -105,6 +108,9 @@ public:
 
     void copyTo(WMapS& dst) const { map.copyTo(dst.map); dst.N = N; }
     void moveTo(WMapS& dst)       { map.moveTo(dst.map); dst.N = N; }
+
+    Vec<V>&       base()       { return map.base(); }   // -- low-level
+    const Vec<V>& base() const { return map.base(); }
 };
 
 
@@ -125,10 +131,10 @@ public:
 
     Gig* N;
 
-    WMapX()               : N(NULL)            {}
-    WMapX(V nil)          : N(NULL), map(nil)  {}
-    WMapX(Gig& N_)        : N(&N_)             { map.reserve(N->size()); }
-    WMapX(Gig& N_, V nil) : N(&N_), map(nil)   { map.reserve(N->size()); }
+    WMapX()               :           N(NULL) {}
+    WMapX(V nil)          : map(nil), N(NULL) {}
+    WMapX(Gig& N_)        :           N(&N_)  { map.reserve(N->size()); }
+    WMapX(Gig& N_, V nil) : map(nil), N(&N_)  { map.reserve(N->size()); }
 
     void initBuiltins() { for (uint i = 0; i < gid_FirstUser; i++) map(GLit(i)) = GLit(i); }
 
@@ -145,6 +151,9 @@ public:
 
     // Special move-to:
     void moveTo(GigRemap& dst) { map.base().moveTo(dst.new_lit); }
+
+    Vec<V>&       base()       { return map.base(); }   // -- low-level
+    const Vec<V>& base() const { return map.base(); }
 };
 
 
@@ -189,6 +198,9 @@ public:
 
     void copyTo(WMapN& dst) const { data.copyTo(dst.data); dst.nil = nil; dst.N = N; }
     void moveTo(WMapN& dst)       { data.moveTo(dst.data); dst.nil = nil; dst.N = N; }
+
+    Vec<V>&       base()       { return data; }   // -- low-level
+    const Vec<V>& base() const { return data; }
 };
 
 
