@@ -56,6 +56,7 @@ int main(int argc, char** argv)
         ShoutLn "ERROR! Unknown file extension: %_", input;
         exit(1);
     }
+    N.compact();
 
     double T1 = cpuTime();
     WriteLn "Parsing: %t", T1-T0;

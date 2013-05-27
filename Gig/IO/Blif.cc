@@ -101,12 +101,20 @@ void writeBlif(Out& out, Gig& N)
                 FWrite(out) " %_", nam[w[i]];
             FWriteLn(out) " %_", nam[w];
 
+            bool wrote_something = false;
             for (uint v = 0; v < (1u << n_inputs); v++){
                 if (ftb(w) & (1ull << v)){
                     for (uint i = 0; i < n_inputs; i++)
                         out += (v & (1u << i)) ? '1' : '0';
                     FWriteLn(out) " 1";
+                    wrote_something = true;
                 }
+            }
+
+            if (!wrote_something){
+                for (uint i = 0; i < n_inputs; i++)
+                    out += '-';
+                FWriteLn(out) " 0";    // -- degenerate case (constant zero)
             }
 
             break;}

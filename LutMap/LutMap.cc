@@ -692,3 +692,8 @@ void lutMap(Gig& N, Params_LutMap P) {
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
+
+/*
+Prova att spara 'depart' från iteration till iteration så att omappade noder har en bättre gissning.
+Markera omappade noder på annat sätt.
+*/
