@@ -75,6 +75,16 @@ struct Gig_Iter {
 #define For_All_Gates(netlist, w) For_Gates_((netlist), w, gid_FirstLegal)
 
 
+#define For_Gates_Rev_(netlist, w, end)                                                             \
+    if (Gig_Iter<const Gig> i__##w = Gig_Iter<const Gig>((netlist), ((netlist).size() - 1))); else  \
+    if (Wire w = Wire_NULL); else                                                                   \
+    for (; i__##w.idx >= (end); i__##w.idx--)                                                       \
+        if ((w = i__##w.N[i__##w.idx]), w.isRemoved()); else
+
+#define For_Gates_Rev(netlist, w)     For_Gates_Rev_((netlist), w, gid_FirstUser)
+#define For_All_Gates_Rev(netlist, w) For_Gates_Rev_((netlist), w, gid_FirstLegal)
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // All gates of a particular type (must be of type 'attr_Enum'):
 

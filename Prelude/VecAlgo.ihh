@@ -32,6 +32,24 @@ macro uind find(const V& v, const T& x) {   // -- element MUST exist
             return i;
     assert(false); /*please compiler:*/return 0; }
 
+template<class V>
+macro uind findMin(const V& v) {       // -- v must not be empty
+    assert(v.size() > 0);
+    uind best = 0;
+    for (uind i = 1; i < v.size(); i++)
+        if (v[i] < v[best])
+            best = i;
+    return best; }
+
+template<class V>
+macro uind findMax(const V& v) {       // -- v must not be empty
+    assert(v.size() > 0);
+    uind best = 0;
+    for (uind i = 1; i < v.size(); i++)
+        if (v[i] > v[best])
+            best = i;
+    return best; }
+
 template<class V, class T>
 macro bool has(const V& v, const T& x) {
     return search(v, x) != UIND_MAX; }

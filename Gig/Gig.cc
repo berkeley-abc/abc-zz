@@ -46,6 +46,7 @@ cchar* GigMode_name[GigMode_size] = {
     "Xig",
     "Npn4",
     "Lut4",
+    "Lut6",
 };
 
 
@@ -330,6 +331,18 @@ void Gig::assertMode() const
             }
         }
     }
+
+    if (mode_ == gig_Lut6){
+        // In LUT mode, inputs must not be negated (for LUTs):
+        For_Gates(*this, w){
+            if (w.type() != gate_Lut6) continue;
+            For_Inputs(w, v){
+                if (v.sign){
+                    ShoutLn "INTERNAL ERROR! 'Lut6's are not allowed to have inverted inputs: %_[%_] = %_", w, Input_Pin(v), v;
+                    assert(false); }
+            }
+        }
+    }
 }
 
 
@@ -372,6 +385,13 @@ void Gig::setMode(GigMode m)
                 mode_mask = 0ull;
                 for (uint i = 0; i < GateType_size; i++)
                     if (lut4Gate(GateType(i)))
+                        mode_mask |= 1ull << i;
+                break;
+
+            case gig_Lut6:
+                mode_mask = 0ull;
+                for (uint i = 0; i < GateType_size; i++)
+                    if (lut6Gate(GateType(i)))
                         mode_mask |= 1ull << i;
                 break;
 

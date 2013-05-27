@@ -15,15 +15,21 @@ int main(int argc, char** argv)
 
     cli.add("input" , "string", arg_REQUIRED, "Input AIGER.", 0);
     cli.add("output", "string", ""          , "Output GNL file (optional).", 1);
+    cli.add("blif"  , "string", ""          , "Save original input in BLIF format (for debugging only).");
     cli.add("N"     , "uint"  , "10"        , "Cuts to keep per node.");
-    cli.add("iters" , "uint"  , "3"         , "Number of mapping phases.");
+    cli.add("iters" , "uint"  , "4"         , "Number of mapping phases.");
+    cli.add("delay" , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
+    cli.add("speed" , "bool"  , "no"        , "Optimize for delay (defaul is area).");
     cli.parseCmdLine(argc, argv);
 
     String input  = cli.get("input").string_val;
     String output = cli.get("output").string_val;
+    String blif   = cli.get("blif").string_val;
     Params_LutMap P;
     P.cuts_per_node = cli.get("N").int_val;
     P.n_rounds      = cli.get("iters").int_val;
+    P.delay_factor  = cli.get("delay").float_val;
+    P.map_for_area  = !cli.get("speed").bool_val;
 
     // Read input file:
     double  T0 = cpuTime();
@@ -54,13 +60,28 @@ int main(int argc, char** argv)
     double T1 = cpuTime();
     WriteLn "Parsing: %t", T1-T0;
 
+    if (blif != ""){
+        writeBlifFile(blif, N);
+        WriteLn "Wrote: \a*%_\a*", blif;
+    }
+
     lutMap(N, P);
 
     double T2 = cpuTime();
     WriteLn "Mapping: %t", T2-T1;
 
-    if (output != "")
-        ;   // M.save(output);
+    if (output != ""){
+        if (hasExtension(output, "blif")){
+            writeBlifFile(output, N);
+            WriteLn "Wrote: \a*%_\a*", output;
+        }else if (hasExtension(output, "gnl")){
+            N.save(output);
+            WriteLn "Wrote: \a*%_\a*", output;
+        }else{
+            ShoutLn "ERROR! Unknown file extension: %_", output;
+            exit(1);
+        }
+    }
 
     return 0;
 }

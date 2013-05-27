@@ -34,6 +34,13 @@
 //| 
 //|     sob ( V<T>& t,  [optional:] LessThan lt ,  [optional:] Disposer disposer )
 //|     
+//| A less-than object should implement:    
+//| 
+//|     struct MyLessThan {
+//|         typedef T Key;
+//|         bool operator()(const Key& x, const Key& y) const { return "my x < y expression"; } };
+//|     };    
+//| 
 //| Objects can then be combined using combinators:
 //| 
 //|     ordReverse  (s)

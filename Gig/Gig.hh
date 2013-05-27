@@ -95,6 +95,7 @@ enum GigMode {
     gig_Xig,        // Seq, CI, CO, And, Xor, Mux, Maj
     gig_Npn4,       // Seq, CI, CO, Npn4
     gig_Lut4,       // Seq, CI, CO, Lut4 (which must not have negated inputs)
+    gig_Lut6,       // Seq, CI, CO, Lut6 (which must not have negated inputs)
 
     GigMode_size
 };

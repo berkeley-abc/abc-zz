@@ -210,6 +210,7 @@ macro bool aigGate (GateType t) { return t <= gate_And; }
 macro bool xigGate (GateType t) { return t <= gate_Maj; }
 macro bool npn4Gate(GateType t) { return t <= gate_Seq || t == gate_Npn4; }
 macro bool lut4Gate(GateType t) { return t <= gate_Seq || t == gate_Lut4; }
+macro bool lut6Gate(GateType t) { return t <= gate_Seq || t == gate_Lut6; }
     // -- for efficiency, we allow 'gate_NULL' here.
 
 

@@ -93,6 +93,19 @@ LessThan_proj<Proj> proj_lt(const Proj& p) {
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Flipping lexicographical order for pair type 'K':
+
+
+template<class K>
+struct RevPair_lt {
+    typedef K Key;
+    bool operator()(const Key& x, const Key& y) const {
+        return x.snd < y.snd || (x.snd <= y.snd && x.fst < y.fst);
+    }
+};
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Min/Max:
 
 
@@ -177,7 +190,7 @@ struct MkIndex_default {
 //         typedef ... Key;
 //         typedef ... Value;
 //         typedef ... RetValue;
-//         Value get(Key key, Value val) const;   
+//         Value get(Key key, Value val) const;
 //         bool  isNormal(Key key)
 //     };
 //
@@ -192,7 +205,7 @@ struct MapNorm_default {
 
     RetValue get(Key, RetValue val) const { return val; }
         // -- the default normalizer uses 'const Value&' to allow for 'Vec<T>' and other
-        // non-copyable datatypes. For most other definitions of 'get()', references 
+        // non-copyable datatypes. For most other definitions of 'get()', references
         // doesn't make sense since the value is modified.
 
     bool isNormal(Key) const { return true; }
