@@ -219,6 +219,51 @@ gate_id Gig::addInternal(GateType type, uint sz, uint attr, bool strash_normaliz
 }
 
 
+// Used to create gates in 'load()' method.
+void Gig::loadGate(GateType type, uint sz)
+{
+    // Determine gate id:
+    gate_id id;
+    id = size_++;
+  #if defined(ZZ_GIG_PAGED)
+    if ((id & (ZZ_GIG_PAGE_SIZE - 1)) == 0)    // -- alloc new page
+        pages.push(xmalloc<Gate>(ZZ_GIG_PAGE_SIZE));
+  #else
+    gates.push();
+  #endif
+
+    // If NULL gate, add to free list:
+    if (type == gate_NULL && use_freelist)
+        freelist.push(id);
+
+    // Initialize gate:
+    Gate& g = getGate(*this, id);
+    assert((uint)type <= Gate::MAX_TYPE);
+    assert(sz <= Gate::MAX_SIZE);
+
+    g.type = type;
+    g.size = sz;
+    g.inl[0] = 0;
+    g.inl[1] = 0;
+    g.inl[2] = 0;
+
+    uint* inputs;
+    if (sz + (uint)(gatetype_attr[type] != attr_NULL) > 3){
+        // External inputs:
+        g.is_ext = true;
+        g.ext = mem.alloc(sz);
+        inputs = g.ext;
+    }else{
+        // Inlined inputs:
+        g.is_ext = false;
+        inputs = g.inl;
+    }
+
+    for (uint i = 0; i < sz; i++)
+        inputs[i] = 0;      // -- here we are assuming that 'GLit_NULL' has the underlying representation of '0'
+}
+
+
 void Gig::remove(gate_id id, bool recreated)
 {
     Vec<GigLis*>& lis = listeners[msgidx_Remove];
@@ -598,7 +643,27 @@ void Gig::compact(bool remove_unreach, bool set_canonical) {
 
 
 static const uchar gig_file_tag[] = {0xAC, 0x1D, 0x0FF, 0x1C, 0xEC, 0x0FF, 0xEE, 0x61, 0x60 };
-static const uchar gig_format_version = 1;
+static const uchar gig_format_version = 2;
+
+
+void Gig::flushRle(Out& out, uchar type, uint count, uint end)
+{
+    assert(count != 0);
+    assert(type < 64);
+
+    /**/Dump(GateType(type), count, end);
+    if (count <= 3)
+        putb(out, type | (count << 6));
+    else{
+        putb(out, type);
+        putu(out, count);
+    }
+
+    if (gatetype_size[type] == DYNAMIC_GATE_SIZE){
+        for (uint i = end - count; i < end; i++)
+            putu(out, operator[](i).size());
+    }
+}
 
 
 // Saving and reloading a netlist will NOT put the netlist in the exact same state. In particular:
@@ -617,49 +682,56 @@ void Gig::save(Out& out)
 
     // Write state:
     putu(out, frozen);
+    putu(out, (uint)mode_);
+    putu(out, mode_mask);
+    putu(out, strash_mask);
+    putb(out, use_freelist);
 
     // Establish mapping between "gate-type name" and "enum value":
     putu(out, GateType_size);
     for (uint i = 0; i < GateType_size; i++){
-        puts(out, GateType_name[i]);
+        putz(out, GateType_name[i]);
         putu(out, gatetype_size[i]);        // }- Store this data for validation
         putu(out, (uint)gatetype_attr[i]);  // }
     }
 
     // Write gate types in RLE:
-    putu(out, size_);
-    uchar t0 = (uchar)(*this)[gid_FirstUser].type();
-    uint  tC = 0;
-    for (gate_id i = gid_FirstUser; i < size_; i++){
-        uchar t = (uchar)(*this)[i].type();
-
-        if (t == t0)
-            tC++;
-        else{
-            // Use upper two bits of type to store: many, 1, 2, 3
-            assert(tC != 0);
-            if (tC <= 3) putb(out, t0 | (tC << 6));
-            else         putb(out, t0), putu(out, tC);
-            tC = 1;
-            t0 = t;
+    putu(out, size());
+    if (size() > gid_FirstUser){
+        uchar t0 = (uchar)(*this)[gid_FirstUser].type();
+        uint  tC = 1;
+        for (gate_id i = gid_FirstUser+1; i < size(); i++){
+            uchar t = (uchar)(*this)[i].type();
+            if (t == t0)
+                tC++;
+            else{
+                // Use upper two bits of type to store: many, 1, 2, 3
+                flushRle(out, t0, tC, i);
+                tC = 1;
+                t0 = t;
+            }
         }
+        flushRle(out, t0, tC, size());
     }
-    if (tC <= 3) putb(out, t0 | (tC << 6));
-    else         putb(out, t0), putu(out, tC);
 
     // Write gate fanins:
-    for (gate_id i = gid_FirstUser; i < size_; i++){
+    for (gate_id i = gid_FirstUser; i < size(); i++){
         Wire  w = (*this)[i];
         uchar t = (uint)w.type();
 
         if (t != gate_NULL){
             Array<const GLit> inputs = w.fanins();
 
-            if (gatetype_size[t] == DYNAMIC_GATE_SIZE)
-                putu(out, inputs.size());
+#if 1   /*DEBUG*/
+            for (uint j = 0; j < inputs.size(); j++)
+                WriteLn "puti %_ : %_", (int64)(2*i) - (int64)inputs[j].data(), inputs[j].data();
+
+            if (gatetype_attr[t] != attr_NULL)
+                WriteLn "putu %_", w.gate().inl[2];
+#endif  /*END DEBUG*/
 
             for (uint j = 0; j < inputs.size(); j++)
-                puti(out, 2*i - inputs[j].data());
+                puti(out, int64(2*i) - (int64)inputs[j].data());
 
             if (gatetype_attr[t] != attr_NULL)
                 putu(out, w.gate().inl[2]);     // -- low-level access to attribute
@@ -674,16 +746,140 @@ void Gig::save(Out& out)
     // Write Gig objects:
     for (uint i = 0; i < GigObjType_size; i++){
         if (objs[i]){
-            puts(out, GigObjType_name[i]);
+            putz(out, GigObjType_name[i]);
             objs[i]->save(out);
         }
     }
+    putz(out, ".");     // -- marks end of objects
 }
 
 
+// Throws a 'Excp_Msg' on parse error.
 void Gig::load(In& in)
 {
     assert(isEmpty());
+
+    // Read header:
+    for (uint i = 0; i < elemsof(gig_file_tag); i++)
+        if (getb(in) != gig_file_tag[i])
+            Throw(Excp_Msg) "Not a .gnl file.";
+
+    uchar version = getc(in);
+    if (version != gig_format_version)
+        Throw(Excp_Msg) "Unsupported version of format: %_ (expected %_)", version, gig_format_version;
+
+    // Read state:
+    frozen = getu(in);
+    mode_ = (GigMode)getu(in);
+    mode_mask = getu(in);
+    strash_mask = getu(in);
+    use_freelist = getb(in);
+
+    // Establish mapping between "gate-type name" and "enum value":
+    Vec<uint> type_map;
+    uint n_types = getu(in);
+    Vec<char> buf;
+    for (uint i = 0; i < n_types; i++){
+        getz(in, buf);
+        uint size = getu(in);
+        GateAttrType attr = (GateAttrType)getu(in);
+
+        uint j;
+        for (j = 0; j < GateType_size; j++)
+            if (eq(GateType_name[j], buf))
+                break;
+
+        if (j == GateType_size){
+            if (!getenv("ZZ_GIG_IGNORE_UNKNOWN_TYPES"))
+                Throw (Excp_Msg) "Unknown gate type: %_\n(set environment variable ZZ_GIG_IGNORE_UNKNOWN_TYPES to ignore)", buf;
+            j = UINT_MAX;
+
+        }else{
+            if (gatetype_size[j] != size) Throw (Excp_Msg) "Size has changed for gate: %_", buf;
+            if (gatetype_attr[j] != attr) Throw (Excp_Msg) "Attribute has changed for gate: %_", buf;
+        }
+        type_map(i, UINT_MAX) = j;
+    }
+
+    // Read gate types and create gates:
+    uint n_gates = getu(in);
+    while (size() != n_gates){
+        uchar d = getb(in);
+        GateType type = GateType(d & 63);
+        uint n = d >> 6;
+        if (n == 0)
+            n = getu(in);
+        /**/Dump(type, n);
+
+        if (gatetype_size[type] == DYNAMIC_GATE_SIZE){
+            for (uint i = 0; i < n; i++)
+                loadGate(type, getu(in));
+        }else{
+            for (uint i = 0; i < n; i++)
+                loadGate(type, gatetype_size[type]);
+        }
+    }
+
+    // Read and connect gate fanins:
+    for (gate_id i = gid_FirstUser; i < size(); i++){
+        Wire  w = (*this)[i];
+        uchar t = (uint)w.type();
+
+        if (t != gate_NULL){
+            Array<GLit> inputs = w.fanins();
+
+            for (uint j = 0; j < inputs.size(); j++){
+                /**/int64 v = geti(in);
+                uint data = uint(int64(2*i) - v);
+                /**/WriteLn "geti %_ : %_", v, data;
+                inputs[j] = GLit(packed_, data);
+            }
+
+            if (gatetype_attr[t] != attr_NULL){
+                /**/uint v = getu(in);
+                w.gate().inl[2] = v;     // -- low-level access to attribute
+                /**/WriteLn "getu %_", v;
+
+                if (gatetype_attr[t] == attr_Enum)
+                    type_list[t](v, gid_NULL) = i;
+            }
+        }
+    }
+
+    // Read side tables:
+    lut6_ftb.setSize(getu(in));
+    for (uint i = 0; i < lut6_ftb.size(); i++)
+        lut6_ftb[i] = getu(in);
+
+    // Read Gig objects:
+    for(;;){
+        getz(in, buf);
+        if (eq(buf, ".")) break;
+
+        uint j;
+        for (j = 0; j < GigObjType_size; j++)
+            if (eq(GigObjType_name[j], buf))
+                break;
+
+        if (j == GigObjType_size)
+            Throw(Excp_Msg) "Unknown Gig object: %_", buf;
+
+        gigobj_factory_funcs[j](*this, objs[j], false);
+        objs[j]->load(in);
+    }
+
+#if 1   /*DEBUG*/
+    WriteLn "%_", info(*this);
+    For_Gates(*this, w){
+        WriteLn "%_:", w;
+        For_Inputs(w, v)
+            WriteLn "  %_", v;
+        NewLine;
+    }
+#endif  /*END DEBUG*/
+
+#if 0
+#endif
 }
 
 

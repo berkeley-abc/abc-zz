@@ -92,6 +92,7 @@ template<> fts_macro void write_(Out& out, const GateAttrType& v){
     Macro(WLut) \
     Macro(Uif) \
     Macro(Box) \
+    Macro(Delay) \
     Macro(MFlop) \
     Macro(MemR) \
     Macro(MemW) \
@@ -150,8 +151,9 @@ DEF( Lut6     , 6    , Num  )   // 64-bit FTB too big, stored in side-table
 DEF( WLut     , INF  , Num  )   // FTB also stored in side-table
 
 // Black-boxes:
-DEF( Uif      , INF  , Arg  )   // combinational box
-DEF( Box      , INF  , Arg  )   // sequential box
+DEF( Uif      , INF  , Arg  )   // combinational box, arg should identify the logic inside the box
+DEF( Box      , INF  , Arg  )   // sequential box, all inputs should go to 'Seq' gates
+DEF( Delay    , INF  , Arg  )   // combinational box, logic is lost, arg gives delay of box 
 
 // Memories:
 DEF( MFlop    , 1    , Enum )

@@ -29,7 +29,7 @@ GigObj_Factory gigobj_factory_funcs[GigObjType_size] = {
     NULL,
     GigObj_Fanouts_new,
     GigObj_FanoutCount_new,
-    NULL,   // <<== dynamic fanouts
+    NULL,   // <<== dynamic fanouts, not done yet
     GigObj_Strash_new,
 };
 

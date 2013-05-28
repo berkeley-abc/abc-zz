@@ -307,9 +307,9 @@ struct GigObj : NonCopyable {
 
     virtual ~GigObj() {}
     virtual void init() { assert(false); }                     // -- called after construction when an object is added to a netlist
-    virtual void load(In& in) { assert(false); };              // -- object is constructed but not initialized
-    virtual void save(Out& out) const { assert(false); };
-    virtual void copyTo(GigObj& dst) const { assert(false); }; // -- 'dst' is constructed but not initialized
+    virtual void load(In& in) { assert(false); };              // -- called after construction when a netlist is loaded
+    virtual void save(Out& out) const { assert(false); };      // -- called when saving a netlist
+    virtual void copyTo(GigObj& dst) const { assert(false); }; // -- 'dst' is constructed but not initialized (same state as for 'load()')
     virtual void compact(const GigRemap& remap) {}             // -- If you have no 'Wire's in your attribute, this should be left undefined.
 
     // Note that 'compact' may delete a gate (old gate is mapped to 'GLit_NULL') or map
@@ -400,6 +400,8 @@ template<> fts_macro void write_(Out& out, const Wire& v, Str flags) {
 
 struct Gig : Gig_data, NonCopyable {
     gate_id addInternal(GateType type, uint sz, uint attr, bool strash_normalized = false);
+    void    loadGate(GateType type, uint sz);
+    void    flushRle(Out& out, uchar type, uint count, uint end);
 
   //________________________________________
   //  Constructor:
@@ -446,7 +448,7 @@ struct Gig : Gig_data, NonCopyable {
         // NOTE! In strashed mode, gates controlled by strashing (e.g. AND-gates) should be
         // constructed by functions in 'Strash.hh' ('aig_And()', 'xig_Mux()' etc.).
 
-    void  remove(gate_id id, bool recreate = false);    // -- 'recreate' is for internal use, don't set directly
+    void  remove(gate_id id, bool recreate = false);    // -- 'recreate' is for internal use, don't set 
 
   //________________________________________
   //  Gate access:
@@ -541,7 +543,7 @@ inline Gig::Gig()
     mode_mask    = 0;
     strash_mask  = 0;
     size_        = 0;
-    use_freelist = false;
+    use_freelist = true;
     objs         = NULL;
 
     clear(true);

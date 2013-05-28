@@ -52,7 +52,99 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
-    Gig N;
+    {
+        Gig N;
+
+        Wire so = N.add(gate_Seq);
+        Wire si = N.add(gate_FF, 0).init(so);
+        Wire x  = N.add(gate_PI, 0);
+        Wire y  = N.add(gate_PI, 1);
+
+        Wire dummy = N.add(gate_PI);
+        remove(dummy);
+
+        Wire red = N.add(gate_Mux).init(~x, ~y, ~si);
+//        Wire f  = N.add(gate_Lut6).init(N.True(), x); ftb(f) = 0xDEADBEEF;
+        Wire f  = N.add(gate_Maj).init(N.True(), x, y);
+//        Wire g  = N.addDyn(gate_Conj, 2).init(f, si);
+        Wire g  = N.add(gate_And, 2).init(f, si);
+        so.set(0, g);
+
+        Dump(so, si, x, y, red, f, g);
+        Dump(N.count());
+
+        //N.compact();
+        N.setMode(gig_Xig);
+        Add_Gob(N, Strash);
+        N.save("tmp.gnl");
+
+        WriteLn "%_", info(N);
+        For_Gates(N, w){
+            WriteLn "%_:", w;
+            For_Inputs(w, v)
+                WriteLn "  %_", v;
+            NewLine;
+        }
+
+        WriteLn "===============================================================================";
+    }
+
+    {
+        Gig N;
+        try{
+            //N.load("/home/een/et5cbl/pnl/pan.st.gnl");
+            N.load("tmp.gnl");
+        }catch (Excp_Msg msg){
+            ShoutLn "PARSE ERROR! %_", msg;
+            exit(1);
+        }
+
+        Dump(N.isCanonical());
+
+        WriteLn "PIs:";
+        For_Gatetype(N, gate_PI, w)
+            WriteLn "  %_", w;
+
+        WriteLn "Lut6s:";
+        For_Gates(N, w){
+            if (w == gate_Lut6)
+                WriteLn "  %_ : %X", w, ftb(w);
+        }
+
+        WriteLn "Has Strash: %_", (bool)Has_Gob(N, Strash);
+
+        return 0;
+    }
+
+
+#if 0
+    N.setMode(gig_Xig);
+    Add_Gob(N, Strash);
+
+    Wire t = N.True();
+    Wire x = N.add(gate_PI, 0);
+    Wire y = N.add(gate_PI, 1);
+    Wire z = N.add(gate_PI, 2);
+    Wire f = xig_Mux(x, y, z);
+    remove(f);
+    Wire g = xig_And(x, y);
+    Wire top = N.add(gate_PO, 0);
+
+    Dump(f, g);
+    Gig M;
+    mov(N, M);
+
+    Remove_Gob(M, Strash);
+    (g + M).set(0, z);
+
+    M.clear();
+    M.setMode(gig_Aig);
+    Wire err = M.add(gate_And).init(M.False());
+    Dump(err);
+    M.assertMode();
+#endif
+
+#if 0
     {
         WMap <String> m1(N);
         WMapS<String> m2(N);
@@ -86,6 +178,7 @@ int main(int argc, char** argv)
 
         return 0;
     }
+#endif
 
 #if 0
     Vec<Wire> xs;
@@ -98,6 +191,8 @@ int main(int argc, char** argv)
             N.add(gate_PO, i).init(f);
     }
 #endif
+
+#if 0
     MyLis lis;
     N.listen(lis, msg_All);
     N.setMode(gig_Xig);
@@ -136,50 +231,7 @@ int main(int argc, char** argv)
     WriteLn "hh    = %f", hh;
 
     M.save("tmp.gnl");
-
-#if 0
-    Wire so = N.add(gate_Seq);
-    Wire si = N.add(gate_FF, 0).init(so);
-    Wire x  = N.add(gate_PI, 0);
-    Wire y  = N.add(gate_PI, 1);
-    Wire red = N.add(gate_Mux).init(~x, ~y, ~si);
-    Wire f  = N.add(gate_And).init(N.True(), x);
-    Wire g  = N.add(gate_And).init(f, si);
-    so.set(0, g);
-
-    Dump(so, si, x, y, red, f, g);
-    Dump(N.count());
-
-    N.compact();
 #endif
-
-#if 0
-    N.setMode(gig_Xig);
-    Add_Gob(N, Strash);
-
-    Wire t = N.True();
-    Wire x = N.add(gate_PI, 0);
-    Wire y = N.add(gate_PI, 1);
-    Wire z = N.add(gate_PI, 2);
-    Wire f = xig_Mux(x, y, z);
-    remove(f);
-    Wire g = xig_And(x, y);
-    Wire top = N.add(gate_PO, 0);
-
-    Dump(f, g);
-    Gig M;
-    mov(N, M);
-
-    Remove_Gob(M, Strash);
-    (g + M).set(0, z);
-
-    M.clear();
-    M.setMode(gig_Aig);
-    Wire err = M.add(gate_And).init(M.False());
-    Dump(err);
-    M.assertMode();
-#endif
-
 
 #if 0
     Vec<Wire> inputs;

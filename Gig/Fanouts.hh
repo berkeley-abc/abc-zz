@@ -207,7 +207,7 @@ public:
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Dynamic fanout count:
+// Fanout count (dynamic):
 
 
 struct GigObj_FanoutCount : GigObj, GigLis {

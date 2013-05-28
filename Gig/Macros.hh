@@ -108,6 +108,7 @@ struct Gig_IterType {
 #define For_Gatetype(netlist, gate_type, w)                                                        \
     if (Gig_IterType<const Gig> i__##w = Gig_IterType<const Gig>((netlist), (gate_type))); else    \
     if (Wire w = Wire_NULL); else                                                                  \
+    if (assert(gatetype_attr[gate_type] == attr_Enum), false); else                                \
     for (; i__##w.idx < i__##w.N.type_list[i__##w.type].size(); i__##w.idx++)                      \
         if (i__##w.id = i__##w.N.type_list[i__##w.type][i__##w.idx], i__##w.id == gid_NULL); else  \
         if (w = i__##w.N[i__##w.id], assert_debug(!w.isRemoved()), false); else

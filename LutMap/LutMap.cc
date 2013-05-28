@@ -3,12 +3,12 @@
 //| Name        : LutMap.cc
 //| Author(s)   : Niklas Een
 //| Module      : LutMap
-//| Description : 
-//| 
+//| Description :
+//|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -119,7 +119,7 @@ macro bool moreThanSixBits(uint a)
 
 
 // PRE-CONDITION: Inputs of 'cut1' and 'cut2' are sorted.
-// Output: A cut representing AND of 'cut1' and 'cut2' with signs 'inv1' and 'inv2' respectively; 
+// Output: A cut representing AND of 'cut1' and 'cut2' with signs 'inv1' and 'inv2' respectively;
 // or 'Cut_NULL' if more than 6 inputs would be required.
 static
 Cut combineCuts_And(const Cut& cut1, const Cut& cut2)

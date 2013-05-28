@@ -570,12 +570,18 @@ macro uint64 geti(In& in) { return getInt(in); }
 macro char   getc(In& in) { return in.scan(); }
 macro uchar  getb(In& in) { return (uchar)in.scan(); }
 
-macro void puts(Out& out, cchar* s) { while (*s != 0) out.push(*s++); out.push(0); }
-macro void puts(Out& out, String s) { puts(out, s.c_str()); }
-macro void puts(Out& out, Str    s) {
+// Zero-terminated strings:
+macro void putz(Out& out, cchar* s) { while (*s != 0) out.push(*s++); out.push(0); }
+macro void putz(Out& out, String s) { putz(out, s.c_str()); }
+macro void putz(Out& out, Str    s) {
     if (!s) out.push(0);    // -- will be parsed back as an empty string rather than 'Str_NULL'
     else{ for (uind i = 0; i < s.size(); i++){ assert_debug(s[i] != 0); out.push(s[i]); } out.push(0); } }
 
+macro void getz(In& in, Vec<char>& result) {
+    result.clear();
+    for(;;){
+        if (*in == 0){ in++; return; }
+        result.push(in++); } }
 
 macro void putF(Out& out, float f) {
     union { float num; uchar data[4]; } tmp;
