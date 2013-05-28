@@ -4,15 +4,15 @@
 //| Author(s)   : Niklas Een
 //| Module      : Gig
 //| Description : Second version of the generic netlist.
-//| 
+//|
 //| (C) Copyright 2010-2012, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| Rules of a Gig:
-//| 
+//|
 //|   - All cycles in the graph must contain (be broken by) a gate of type 'Seq', typically placed
-//|     on the input side of a 'FF' (flip-flop). For that reason, 'Seq' counts as a 'CO' 
-//|     (combinational output) and 'FF' as a 'CI' (combinational input). 
+//|     on the input side of a 'FF' (flip-flop). For that reason, 'Seq' counts as a 'CO'
+//|     (combinational output) and 'FF' as a 'CI' (combinational input).
 //|   - A 'Seq' can not feed itself. Self-loops cause problems.
 //|   - It is illegal to delete a gate who is currently in the fanin of another gate.
 //|   - The Gig starts in "free form" mode, but can be restricted to AIG mode or other modes.
@@ -651,7 +651,6 @@ void Gig::flushRle(Out& out, uchar type, uint count, uint end)
     assert(count != 0);
     assert(type < 64);
 
-    /**/Dump(GateType(type), count, end);
     if (count <= 3)
         putb(out, type | (count << 6));
     else{
@@ -721,14 +720,6 @@ void Gig::save(Out& out)
 
         if (t != gate_NULL){
             Array<const GLit> inputs = w.fanins();
-
-#if 1   /*DEBUG*/
-            for (uint j = 0; j < inputs.size(); j++)
-                WriteLn "puti %_ : %_", (int64)(2*i) - (int64)inputs[j].data(), inputs[j].data();
-
-            if (gatetype_attr[t] != attr_NULL)
-                WriteLn "putu %_", w.gate().inl[2];
-#endif  /*END DEBUG*/
 
             for (uint j = 0; j < inputs.size(); j++)
                 puti(out, int64(2*i) - (int64)inputs[j].data());
@@ -809,7 +800,6 @@ void Gig::load(In& in)
         uint n = d >> 6;
         if (n == 0)
             n = getu(in);
-        /**/Dump(type, n);
 
         if (gatetype_size[type] == DYNAMIC_GATE_SIZE){
             for (uint i = 0; i < n; i++)
@@ -829,16 +819,13 @@ void Gig::load(In& in)
             Array<GLit> inputs = w.fanins();
 
             for (uint j = 0; j < inputs.size(); j++){
-                /**/int64 v = geti(in);
-                uint data = uint(int64(2*i) - v);
-                /**/WriteLn "geti %_ : %_", v, data;
+                uint data = uint(int64(2*i) - geti(in));
                 inputs[j] = GLit(packed_, data);
             }
 
             if (gatetype_attr[t] != attr_NULL){
-                /**/uint v = getu(in);
+                uint v = getu(in);
                 w.gate().inl[2] = v;     // -- low-level access to attribute
-                /**/WriteLn "getu %_", v;
 
                 if (gatetype_attr[t] == attr_Enum)
                     type_list[t](v, gid_NULL) = i;
@@ -867,19 +854,6 @@ void Gig::load(In& in)
         gigobj_factory_funcs[j](*this, objs[j], false);
         objs[j]->load(in);
     }
-
-#if 1   /*DEBUG*/
-    WriteLn "%_", info(*this);
-    For_Gates(*this, w){
-        WriteLn "%_:", w;
-        For_Inputs(w, v)
-            WriteLn "  %_", v;
-        NewLine;
-    }
-#endif  /*END DEBUG*/
-
-#if 0
-#endif
 }
 
 

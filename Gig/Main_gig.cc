@@ -52,6 +52,7 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
+#if 0
     {
         Gig N;
 
@@ -88,7 +89,9 @@ int main(int argc, char** argv)
 
         WriteLn "===============================================================================";
     }
+#endif
 
+#if 0
     {
         Gig N;
         try{
@@ -115,7 +118,7 @@ int main(int argc, char** argv)
 
         return 0;
     }
-
+#endif
 
 #if 0
     N.setMode(gig_Xig);
