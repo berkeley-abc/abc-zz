@@ -111,7 +111,7 @@ template<> fts_macro void write_(Out& out, const GigMode& v) { out += GigMode_na
 struct Gig_data {
     SlimAlloc<uint>     mem;
 
-    uint                frozen;         // -- if non-zero, netlist is read-only (1=constant, 2=canonical)
+    uint                frozen;         // -- if non-zero, netlist is read-only (1=constant, 2=canonical, 3=canonical + no unreach)
     GigMode             mode_;          // }- restriction on which gate types are allowed (mode
     uint64              mode_mask;      // }  mask will always exlude 'gate_NULL' and 'gate_Const')
     uint64              strash_mask;    // -- Subset of 'mode_mask' that is allowed in strashed mode (excluding strashed gate types)
@@ -274,6 +274,8 @@ template<> fts_macro uint64 hash_<Wire>(const Wire& w) { return hash_(w.lit()); 
 
 macro bool operator==(Wire w, GateType t) { return w.type() == t; }
 macro bool operator==(GateType t, Wire w) { return w.type() == t; }
+macro bool operator!=(Wire w, GateType t) { return w.type() != t; }
+macro bool operator!=(GateType t, Wire w) { return w.type() != t; }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

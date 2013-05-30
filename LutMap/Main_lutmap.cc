@@ -2,6 +2,8 @@
 #include "ZZ_CmdLine.hh"
 #include "ZZ_Gig.IO.hh"
 #include "LutMap.hh"
+#include "GigReader.hh"
+
 
 using namespace ZZ;
 
@@ -34,28 +36,22 @@ int main(int argc, char** argv)
     // Read input file:
     double  T0 = cpuTime();
     Gig N;
-    if (hasExtension(input, "aig")){
-        try{
+    try{
+        if (hasExtension(input, "aig"))
             readAigerFile(input, N, false);
-            For_Gatetype(N, gate_PO, w)     // -- invert properties
-                w.set(0, ~w[0]);
-        }catch (Excp_AigerParseError err){
-            ShoutLn "PARSE ERROR! %_", err.msg;
-            exit(1);
-        }
-
-    }else if (hasExtension(input, "gnl")){
-        try{
+        else if (hasExtension(input, "gnl"))
             N.load(input);
-        }catch (const Excp_Msg& err){
-            ShoutLn "PARSE ERROR! %_", err.msg;
+        else if (hasExtension(input, "gig"))
+            readGigForTechmap(input, N);
+        else{
+            ShoutLn "ERROR! Unknown file extension: %_", input;
             exit(1);
         }
-
-    }else{
-        ShoutLn "ERROR! Unknown file extension: %_", input;
+    }catch (const Excp_Msg& err){
+        ShoutLn "PARSE ERROR! %_", err.msg;
         exit(1);
     }
+
     N.compact();
 
     double T1 = cpuTime();

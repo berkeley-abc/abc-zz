@@ -26,10 +26,10 @@ static const uint DYNAMIC_GATE_SIZE = INT_MAX;
 
 
 enum GateAttrType {
-    attr_NULL,    // -- no argument (allows for three inputs to be inlined)                        
+    attr_NULL,    // -- no argument (allows for three inputs to be inlined)
     attr_Arg,     // -- uninterpreted 32-bit 'uint'.
-    attr_LB,      // -- uninterpreted 'lbool'. 
-    attr_Num,     // -- uniquely numbered (for side tables)                                        
+    attr_LB,      // -- uninterpreted 'lbool'.
+    attr_Num,     // -- uniquely numbered (for side tables)
     attr_Enum,    // -- uniquely numbered and enumerable (for fast access to all gates of this type)
     GateAttrType_size
 };
@@ -91,8 +91,8 @@ template<> fts_macro void write_(Out& out, const GateAttrType& v){
     Macro(Lut6) \
     Macro(WLut) \
     Macro(Uif) \
-    Macro(Box) \
     Macro(Delay) \
+    Macro(Box) \
     Macro(MFlop) \
     Macro(MemR) \
     Macro(MemW) \
@@ -151,9 +151,9 @@ DEF( Lut6     , 6    , Num  )   // 64-bit FTB too big, stored in side-table
 DEF( WLut     , INF  , Num  )   // FTB also stored in side-table
 
 // Black-boxes:
-DEF( Uif      , INF  , Arg  )   // combinational box, arg should identify the logic inside the box
-DEF( Box      , INF  , Arg  )   // sequential box, all inputs should go to 'Seq' gates
-DEF( Delay    , INF  , Arg  )   // combinational box, logic is lost, arg gives delay of box 
+DEF( Uif      , INF  , Arg  )   // Combinational box, arg should identify the logic inside the box
+DEF( Delay    , INF  , Arg  )   // Combinational box, logic is lost, arg gives delay of box 
+DEF( Box      , INF  , Arg  )   // Sequential box, all inputs should go to 'Seq' gates. Outputs may go to 'Sel' if more than one output pin.
 
 // Memories:
 DEF( MFlop    , 1    , Enum )
@@ -201,7 +201,10 @@ macro bool isNumbered(GateType type) {
 // Sub-types:
 
 
-macro bool combInput (GateType t) { return t >= gate_FF && t <= gate_PPI; }
+macro bool seqElem(GateType t) { return t == gate_FF || t == gate_Box || t == gate_MFlop; }
+    // -- these are the gates that should have 'Seq' gates on their input side
+
+macro bool combInput (GateType t) { return (t >= gate_FF && t <= gate_PPI) || seqElem(t); }
 macro bool combOutput(GateType t) { return t >= gate_PO && t <= gate_Seq; }
 
 macro bool seqInput (GateType t) { return t >= gate_PI && t <= gate_PPI; }

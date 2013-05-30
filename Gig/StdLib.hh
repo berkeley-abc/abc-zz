@@ -26,6 +26,11 @@ using namespace std;
 macro bool isCO(Wire w) { return combOutput(w.type()); }
 macro bool isCI(Wire w) { return combInput (w.type()); }
 
+macro bool isSO(Wire w) { return seqOutput(w.type()); }
+macro bool isSI(Wire w) { return seqInput (w.type()); }
+
+macro bool isSeqElem(Wire w) { return seqElem(w.type()); }
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 

@@ -549,7 +549,12 @@ void Gig::copyTo(Gig& M) const
 
 void Gig::compact(GigRemap& remap, bool remove_unreach, bool set_canonical)
 {
-    assert(!isFrozen());
+    if (frozen){
+        assert(frozen != 1);    // -- can't change the netlist, but it has no guarantees
+        assert(frozen == 3 || !remove_unreach);     // -- 'frozen == 3' means unreachable gates are already removed, otherwise we cannot require it
+        return;
+    }
+
     Gig& N = *this;
 
     // Initialize 'remap':
@@ -629,7 +634,7 @@ void Gig::compact(GigRemap& remap, bool remove_unreach, bool set_canonical)
 
     // Finish up:
     if (set_canonical)
-        frozen = 2;     // -- now in canonical mode
+        frozen = 2 + (uint)remove_unreach;     // -- now in canonical mode
 }
 
 

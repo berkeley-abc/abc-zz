@@ -27,7 +27,8 @@ struct Params_LutMap {
 };
 
 
-void lutMap(Gig& N, Params_LutMap P);
+void lutMap(Gig& N, Params_LutMap P, WSeen* keep = NULL);
+    // -- signals in 'keep' are always present after mapping (as if they were connected to a PO
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

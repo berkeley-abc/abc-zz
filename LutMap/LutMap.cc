@@ -17,6 +17,8 @@
 #include "ZZ_BFunc.hh"
 #include "ZZ/Generics/Sort.hh"
 
+#define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
+
 
 namespace ZZ {
 using namespace std;
@@ -182,6 +184,7 @@ class LutMap {
     // Input:
     const Params_LutMap& P;
     Gig&                 N;
+    WSeen&               keep;
 
     // State:
     SlimAlloc<Cut>    mem;
@@ -213,7 +216,7 @@ class LutMap {
 
 public:
 
-    LutMap(Gig& N, Params_LutMap P);
+    LutMap(Gig& N, Params_LutMap P, WSeen& keep);
 };
 
 
@@ -342,7 +345,7 @@ void LutMap::evaluateCuts(Wire w, Array<Cut> cuts)
             newMax(costs[i].delay, arrival[w]);
             costs[i].area += area_est[w];
         }
-        costs[i].area += 1;     // -- cut cost = 1
+        costs[i].area += 1;     // -- LUT cost = 1
     }
 
     // Compute order:
@@ -386,60 +389,6 @@ void LutMap::evaluateCuts(Wire w, Array<Cut> cuts)
     arrival(w) = costs[0].delay + 1.0f;
 }
 
-#if 0
-void LutMap::evaluateCuts(Wire w, Array<Cut> cuts)
-{
-    assert(cuts.size() > 0);
-
-    Vec<Cost>& costs = tmp_costs;   // -- pairs '(delay, area)'
-        // <<== use avg fanout of fanins?
-    costs.setSize(cuts.size());
-
-    for (uint i = 0; i < cuts.size(); i++){
-        costs[i] = tuple(0.0f, 0.0f);
-        for (uint j = 0; j < cuts[i].size(); j++){
-            Wire w = cuts[i][j] + N;
-            newMax(costs[i].fst, arrival[w]);
-            costs[i].snd += area_est[w];
-        }
-        costs[i].snd += 1;      // -- cut cost = 1
-    }
-
-    // TEMPORARY
-    for (uint i = 0; i < costs.size()-1; i++){
-        uint best = i;
-        for (uint j = i+1; j < costs.size(); j++)
-            if (costs[j].fst < costs[best].fst || (costs[j].fst == costs[best].fst && cuts[j].size() < cuts[best].size()))
-                best = j;
-        swp(costs[i], costs[best]);
-        swp(cuts [i], cuts [best]);
-    }
-
-    if (round > 0){
-        // väga samman delay + area på ett bättre sätt? speciellt under relaxerade delay constraints...
-
-//        float req_time = target_arrival - (depart[w] + 1);
-//        float req_time = (depart[w] == FLT_MAX) ? costs[0].fst : target_arrival - (depart[w] + 1);
-//        float req_time = (depart[w] == FLT_MAX) ? costs[0].fst + 1 : target_arrival - (depart[w] + 1);
-        float req_time = (depart[w] == FLT_MAX) ? FLT_MAX : target_arrival - (depart[w] + 1);
-        uint n = 1;
-        for (; n < cuts.size(); n++)
-            if (costs[n].fst > req_time)
-                break;
-        cuts.shrinkTo(n);       // <<== hmm, vi skall nog inte kasta cuts...
-        costs.shrinkTo(n);
-
-        sobSort(ordByFirst(sob(costs, RevPair_lt<Cost>()), sob(cuts)));
-
-        // <<== need to make sure previous best cut is kept!
-    }
-
-    assert(fanout_est[w] > 0);
-    area_est(w) = costs[0].snd / fanout_est[w];
-    arrival(w) = costs[0].fst + 1.0f;
-}
-#endif
-
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Cut generation:
@@ -466,9 +415,12 @@ void LutMap::generateCuts_And(Wire w, Vec<Cut>& out)
     l_tuple(triv_v, ds) = getCuts(+v, cutmap);
 
     // Compute cross-product:
-    for (int i = -1; i < (int)cs.size(); i++){
+    int cs_lim = keep.has(u) ? 0 : (int)cs.size();
+    int ds_lim = keep.has(v) ? 0 : (int)ds.size();
+
+    for (int i = -1; i < cs_lim; i++){
         const Cut& c = (i == -1) ? triv_u : cs[i];
-        for (int j = -1; j < (int)ds.size(); j++){
+        for (int j = -1; j < ds_lim; j++){
             const Cut& d = (j == -1) ? triv_v : ds[j];
 
             Cut cut = combineCuts_And(c, d);
@@ -484,6 +436,7 @@ void LutMap::generateCuts(Wire w)
     switch (w.type()){
     case gate_Const:    // -- constants should really have been propagated before mapping, but let's allow for them
     case gate_Reset:    // -- not used, but is part of each netlist
+    case gate_Box:      // -- treat sequential boxes like a global source
     case gate_PI:
     case gate_FF:
         // Base case -- Global sources:
@@ -508,8 +461,25 @@ void LutMap::generateCuts(Wire w)
 
     case gate_PO:
     case gate_Seq:
-        /*skip for now*/
+        // Nothing to do.
         break;
+
+    case gate_Sel:
+        // Treat pin selectors as PIs except for delay:
+        cutmap(w) = Array<Cut>(empty_);
+        area_est(w) = 0;
+        arrival(w) = arrival[w[0]];
+        break;
+
+    case gate_Delay:{
+        // Treat delay gates as PIs except for delay:
+        cutmap(w) = Array<Cut>(empty_);
+        area_est(w) = 0;
+        float arr = 0;
+        For_Inputs(w, v)
+            newMax(arr, arrival[v]);
+        arrival(w) = arr + w.arg() / DELAY_FRACTION;
+        break;}
 
     default:
         ShoutLn "INTERNAL ERROR! Unhandled gate type: %_", w.type();
@@ -539,10 +509,10 @@ void LutMap::updateFanoutEst(bool instantiate)
     depart.clear();
 
     For_All_Gates_Rev(N, w){
-        if (w == gate_And){
+        if (w == gate_And || w == gate_Lut4){
             if (fanouts[w] > 0){
                 const Cut& cut = cutmap[w][0];
-                mapped_area += 1;   // -- cut cost = 1
+                mapped_area += 1;       // -- LUT cost = 1
 
                 for (uint i = 0; i < cut.size(); i++){
                     Wire v = cut[i] + N;
@@ -552,9 +522,13 @@ void LutMap::updateFanoutEst(bool instantiate)
             }else
                 depart(w) = FLT_MAX;    // -- marks deactivated node
 
-
-        }else if (w == gate_PO)
-            fanouts(w[0])++;
+        }else if (!isCI(w)){
+            float delay = (w != gate_Delay) ? 0.0f : w.arg() / DELAY_FRACTION;
+            For_Inputs(w, v){
+                fanouts(v)++;
+                newMax(depart(v), depart[w] + delay);
+            }
+        }
     }
 
     mapped_delay = 0.0f;
@@ -606,8 +580,10 @@ void LutMap::updateFanoutEst(bool instantiate)
                 remove(w);
         N.compact();
 
+      #if 0
         N.setMode(gig_Lut6);
         N.assertMode();
+      #endif
     }
 }
 
@@ -664,8 +640,8 @@ void LutMap::run()
 }
 
 
-LutMap::LutMap(Gig& N_, Params_LutMap P_) :
-    P(P_), N(N_)
+LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_) :
+    P(P_), N(N_), keep(keep_)
 {
     if (!N.isCanonical()){
         WriteLn "Compacting... %_", info(N);
@@ -686,8 +662,14 @@ LutMap::LutMap(Gig& N_, Params_LutMap P_) :
 
 
 // Wrapper function:
-void lutMap(Gig& N, Params_LutMap P) {
-    LutMap inst(N, P); }
+void lutMap(Gig& N, Params_LutMap P, WSeen* keep)
+{
+    WSeen keep_dummy;
+    if (!keep)
+        keep = &keep_dummy;
+
+    LutMap inst(N, P, *keep);
+}
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
