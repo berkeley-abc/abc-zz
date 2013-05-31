@@ -124,7 +124,7 @@ macro bool moreThanSixBits(uint a)
 // Output: A cut representing AND of 'cut1' and 'cut2' with signs 'inv1' and 'inv2' respectively;
 // or 'Cut_NULL' if more than 6 inputs would be required.
 static
-Cut combineCuts_And(const Cut& cut1, const Cut& cut2)
+Cut combineCuts_Bin(const Cut& cut1, const Cut& cut2)
 {
     if (moreThanSixBits(cut1.abstr | cut2.abstr))
         return Cut_NULL;
@@ -162,6 +162,71 @@ Cut combineCuts_And(const Cut& cut1, const Cut& cut2)
     goto Done;
 
   Done:
+    return result;
+}
+
+// PRE-CONDITION: Inputs of 'cut0..3' are sorted.
+// Output: A cut representing the merge of 'cut0..3' after applying function 'ftb'; 
+// or 'Cut_NULL' if more than 6 inputs would be required.
+static
+Cut combineCuts_Tern(const Cut& cut0, const Cut& cut1, const Cut& cut2)
+{
+    if (moreThanSixBits(cut0.abstr | cut1.abstr | cut2.abstr))
+        return Cut_NULL;
+
+    // Merge inputs from cuts:
+    Cut result(empty_);
+    uint i0 = 0, i1 = 0, i2 = 0;
+    for(;;){
+        gate_id x0 = (i0 == cut0.size()) ? gid_MAX : cut0[i0];
+        gate_id x1 = (i1 == cut1.size()) ? gid_MAX : cut1[i1];
+        gate_id x2 = (i2 == cut2.size()) ? gid_MAX : cut2[i2];
+        gate_id smallest = min_(min_(x0, x1), x2);
+
+        if (smallest == gid_MAX) break;
+        if (result.size() == 6) return Cut_NULL;
+
+        if (x0 == smallest) i0++;
+        if (x1 == smallest) i1++;
+        if (x2 == smallest) i2++;
+
+        result.push(smallest);
+    }
+
+    return result;
+}
+
+
+// PRE-CONDITION: Inputs of 'cut0..3' are sorted.
+// Output: A cut representing the merge of 'cut0..3' after applying function 'ftb'; 
+// or 'Cut_NULL' if more than 6 inputs would be required.
+static
+Cut combineCuts_Quad(const Cut& cut0, const Cut& cut1, const Cut& cut2, const Cut& cut3)
+{
+    if (moreThanSixBits(cut0.abstr | cut1.abstr | cut2.abstr | cut3.abstr))
+        return Cut_NULL;
+
+    // Merge inputs from cuts:
+    Cut result(empty_);
+    uint i0 = 0, i1 = 0, i2 = 0, i3 = 0;
+    for(;;){
+        gate_id x0 = (i0 == cut0.size()) ? gid_MAX : cut0[i0];
+        gate_id x1 = (i1 == cut1.size()) ? gid_MAX : cut1[i1];
+        gate_id x2 = (i2 == cut2.size()) ? gid_MAX : cut2[i2];
+        gate_id x3 = (i3 == cut3.size()) ? gid_MAX : cut3[i3];
+        gate_id smallest = min_(min_(x0, x1), min_(x2, x3));
+
+        if (smallest == gid_MAX) break;
+        if (result.size() == 6) return Cut_NULL;
+
+        if (x0 == smallest) i0++;
+        if (x1 == smallest) i1++;
+        if (x2 == smallest) i2++;
+        if (x3 == smallest) i3++;
+
+        result.push(smallest);
+    }
+
     return result;
 }
 
@@ -203,7 +268,7 @@ class LutMap {
 
     // Internal methods:
     void  evaluateCuts(Wire w, Array<Cut> cuts);
-    void  generateCuts_And(Wire w, Vec<Cut>& out);
+    void  generateCuts_LogicGate(Wire w, Vec<Cut>& out);
     void  generateCuts(Wire w);
     void  updateFanoutEst(bool instantiate);
     void  run();
@@ -226,7 +291,6 @@ public:
 
 macro Pair<Cut, Array<Cut> > getCuts(Wire w, const WMap<Array<Cut> >& cutmap)
 {
-    assert(!sign(w));
     if (w == gate_Const)
         return tuple(Cut(empty_), Array<Cut>(empty_));
     else
@@ -402,7 +466,65 @@ departure estimation for non-mapped nodes? worth being conservative by having 'p
 make sure to keep previous best choice as an option in each cut list!
 */
 
+void LutMap::generateCuts_LogicGate(Wire w, Vec<Cut>& out)
+{
+    //**/if (w == gate_And){ generateCuts_And(w, out); return; }
+    assert(w == gate_And || w == gate_Lut4);
 
+    Array<Cut> cs[4];
+    Cut        triv[4];
+    int        lim[4];
+    uint       sz;
+    for (sz = 0; sz < w.size(); sz++){
+        if (+w[sz] == Wire_NULL) break;
+        l_tuple(triv[sz], cs[sz]) = getCuts(w[sz], cutmap);
+        lim[sz] = keep.has(w[sz]) ? 0 : (int)cs[sz].size();
+    }
+
+    // Compute cross-product:
+    switch (sz){
+    case 0:
+    case 1: {
+        Cut cut(w[0].id);
+        if (!applySubsumptionAndAddCut(cut, out)) return;
+        break;
+    }
+
+    case 2:{
+        for (int i0 = -1; i0 < lim[0]; i0++){ const Cut& c0 = (i0 == -1) ? triv[0] : cs[0][i0];
+        for (int i1 = -1; i1 < lim[1]; i1++){ const Cut& c1 = (i1 == -1) ? triv[1] : cs[1][i1];
+            Cut cut = combineCuts_Bin(c0, c1);
+            if (!cut.null() && !applySubsumptionAndAddCut(cut, out)) return;
+        }}
+        break;
+    }
+
+    case 3:{
+        for (int i0 = -1; i0 < lim[0]; i0++){ const Cut& c0 = (i0 == -1) ? triv[0] : cs[0][i0];
+        for (int i1 = -1; i1 < lim[1]; i1++){ const Cut& c1 = (i1 == -1) ? triv[1] : cs[1][i1];
+        for (int i2 = -1; i2 < lim[2]; i2++){ const Cut& c2 = (i2 == -1) ? triv[2] : cs[2][i2];
+            Cut cut = combineCuts_Tern(c0, c1, c2);
+            if (!cut.null() && !applySubsumptionAndAddCut(cut, out)) return;
+        }}}
+        break;
+    }
+
+    case 4:{
+        for (int i0 = -1; i0 < lim[0]; i0++){ const Cut& c0 = (i0 == -1) ? triv[0] : cs[0][i0];
+        for (int i1 = -1; i1 < lim[1]; i1++){ const Cut& c1 = (i1 == -1) ? triv[1] : cs[1][i1];
+        for (int i2 = -1; i2 < lim[2]; i2++){ const Cut& c2 = (i2 == -1) ? triv[2] : cs[2][i2];
+        for (int i3 = -1; i3 < lim[3]; i3++){ const Cut& c3 = (i3 == -1) ? triv[3] : cs[3][i3];
+            Cut cut = combineCuts_Quad(c0, c1, c2, c3);
+            if (!cut.null() && !applySubsumptionAndAddCut(cut, out)) return;
+        }}}}
+        break;
+    }
+
+    default: assert(false); }
+}
+
+
+/*
 void LutMap::generateCuts_And(Wire w, Vec<Cut>& out)
 {
     assert(w == gate_And);
@@ -411,8 +533,8 @@ void LutMap::generateCuts_And(Wire w, Vec<Cut>& out)
     Wire u = w[0], v = w[1];
     Array<Cut> cs, ds;
     Cut triv_u, triv_v;
-    l_tuple(triv_u, cs) = getCuts(+u, cutmap);
-    l_tuple(triv_v, ds) = getCuts(+v, cutmap);
+    l_tuple(triv_u, cs) = getCuts(u, cutmap);
+    l_tuple(triv_v, ds) = getCuts(v, cutmap);
 
     // Compute cross-product:
     int cs_lim = keep.has(u) ? 0 : (int)cs.size();
@@ -423,12 +545,14 @@ void LutMap::generateCuts_And(Wire w, Vec<Cut>& out)
         for (int j = -1; j < ds_lim; j++){
             const Cut& d = (j == -1) ? triv_v : ds[j];
 
-            Cut cut = combineCuts_And(c, d);
+            Cut cut = combineCuts_Bin(c, d);
             if (!cut.null() && !applySubsumptionAndAddCut(cut, out))
                 return;
         }
     }
 }
+
+*/
 
 
 void LutMap::generateCuts(Wire w)
@@ -446,11 +570,12 @@ void LutMap::generateCuts(Wire w)
         break;
 
     case gate_And:
+    case gate_Lut4:
         // Inductive case:
         if (!cutmap[w]){
             Vec<Cut>& cuts = tmp_cuts;
             cuts.clear();
-            generateCuts_And(w, cuts);
+            generateCuts_LogicGate(w, cuts);
             cuts_enumerated += cuts.size();
             evaluateCuts(w, cuts.slice());
             cuts.shrinkTo(P.cuts_per_node);
@@ -492,7 +617,7 @@ void LutMap::generateCuts(Wire w)
 // Fanout estimation:
 
 
-// Updates: 
+// Updates:
 //
 //   - depart
 //   - fanout_est
