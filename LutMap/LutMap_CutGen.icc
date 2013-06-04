@@ -1,0 +1,226 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : LutMap_CutGen.icc
+//| Author(s)   : Niklas Een
+//| Module      : LutMap
+//| Description : Included from within 'LutMap.cc'; put here to make it more readable.
+//| 
+//| (C) Copyright 2013, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//|________________________________________________________________________________________________
+
+
+macro Pair<Cut, Array<Cut> > getCuts(Wire w, const WMap<Array<Cut> >& cutmap)
+{
+    if (w == gate_Const)
+        return tuple(Cut(empty_), Array<Cut>(empty_));
+    else
+        return tuple(Cut(w.id), cutmap[w]);
+}
+
+
+// Add 'cut' to 'out' performing subsumption tests in both diretcions. If cut is constant or
+// trivial, FALSE is returned (abort the cut enumeration), otherwise TRUE.
+static
+bool applySubsumptionAndAddCut(const Cut& cut, Vec<Cut>& out)
+{
+    if (cut.size() <= 1){
+        // Constant cut, buffer or inverter:
+        out.clear();
+        out.push(cut);
+        return false;
+    }
+
+    // Test for subsumption (note that in presence of subsumption, the resulting cut set is no longer unique)
+    for (uint k = 0; k < out.size(); k++){
+        if (subsumes(out[k], cut)){
+            // Cut is subsumed by existing cut; don't add anything:
+            return true; }
+
+        if (subsumes(cut, out[k])){
+            // Cut subsumes at least one existing cut; need to remove them all:
+            out[k] = cut;
+            for (k++; k < out.size();){
+                assert_debug(!subsumes(out[k], cut));
+                if (subsumes(cut, out[k])){
+                    out[k] = out.last();
+                    out.pop();
+                }else
+                    k++;
+            }
+            return true;
+        }
+    }
+    out.push(cut);  // (non-subsuming and non-subsumed cut)
+    return true;
+}
+
+
+// PRE-CONDITION: Inputs of 'cut1' and 'cut2' are sorted.
+// Output: A cut representing AND of 'cut1' and 'cut2' with signs 'inv1' and 'inv2' respectively;
+// or 'Cut_NULL' if more than 6 inputs would be required.
+static
+Cut combineCuts_Bin(const Cut& cut1, const Cut& cut2)
+{
+    if (moreThanSixBits(cut1.abstr | cut2.abstr))
+        return Cut_NULL;
+
+    Cut   result(empty_);
+    uint  i = 0;
+    uint  j = 0;
+    if (cut1.size() == 0) goto FlushCut2;
+    if (cut2.size() == 0) goto FlushCut1;
+    for(;;){
+        if (result.size() == 6) return Cut_NULL;
+        if (cut1[i] < cut2[j]){
+            result.push(cut1[i]), i++;
+            if (i >= cut1.size()) goto FlushCut2;
+        }else if (cut1[i] > cut2[j]){
+            result.push(cut2[j]), j++;
+            if (j >= cut2.size()) goto FlushCut1;
+        }else{
+            result.push(cut1[i]), i++, j++;
+            if (i >= cut1.size()) goto FlushCut2;
+            if (j >= cut2.size()) goto FlushCut1;
+        }
+    }
+
+  FlushCut1:
+    if (result.size() + cut1.size() - i > 6) return Cut_NULL;
+    while (i < cut1.size())
+        result.push(cut1[i]), i++;
+    goto Done;
+
+  FlushCut2:
+    if (result.size() + cut2.size() - j > 6) return Cut_NULL;
+    while (j < cut2.size())
+        result.push(cut2[j]), j++;
+    goto Done;
+
+  Done:
+    return result;
+}
+
+// PRE-CONDITION: Inputs of 'cut0..3' are sorted.
+// Output: A cut representing the merge of 'cut0..3' after applying function 'ftb'; 
+// or 'Cut_NULL' if more than 6 inputs would be required.
+static
+Cut combineCuts_Tern(const Cut& cut0, const Cut& cut1, const Cut& cut2)
+{
+    if (moreThanSixBits(cut0.abstr | cut1.abstr | cut2.abstr))
+        return Cut_NULL;
+
+    // Merge inputs from cuts:
+    Cut result(empty_);
+    uint i0 = 0, i1 = 0, i2 = 0;
+    for(;;){
+        gate_id x0 = (i0 == cut0.size()) ? gid_MAX : cut0[i0];
+        gate_id x1 = (i1 == cut1.size()) ? gid_MAX : cut1[i1];
+        gate_id x2 = (i2 == cut2.size()) ? gid_MAX : cut2[i2];
+        gate_id smallest = min_(min_(x0, x1), x2);
+
+        if (smallest == gid_MAX) break;
+        if (result.size() == 6) return Cut_NULL;
+
+        if (x0 == smallest) i0++;
+        if (x1 == smallest) i1++;
+        if (x2 == smallest) i2++;
+
+        result.push(smallest);
+    }
+
+    return result;
+}
+
+
+// PRE-CONDITION: Inputs of 'cut0..3' are sorted.
+// Output: A cut representing the merge of 'cut0..3' after applying function 'ftb'; 
+// or 'Cut_NULL' if more than 6 inputs would be required.
+static
+Cut combineCuts_Quad(const Cut& cut0, const Cut& cut1, const Cut& cut2, const Cut& cut3)
+{
+    if (moreThanSixBits(cut0.abstr | cut1.abstr | cut2.abstr | cut3.abstr))
+        return Cut_NULL;
+
+    // Merge inputs from cuts:
+    Cut result(empty_);
+    uint i0 = 0, i1 = 0, i2 = 0, i3 = 0;
+    for(;;){
+        gate_id x0 = (i0 == cut0.size()) ? gid_MAX : cut0[i0];
+        gate_id x1 = (i1 == cut1.size()) ? gid_MAX : cut1[i1];
+        gate_id x2 = (i2 == cut2.size()) ? gid_MAX : cut2[i2];
+        gate_id x3 = (i3 == cut3.size()) ? gid_MAX : cut3[i3];
+        gate_id smallest = min_(min_(x0, x1), min_(x2, x3));
+
+        if (smallest == gid_MAX) break;
+        if (result.size() == 6) return Cut_NULL;
+
+        if (x0 == smallest) i0++;
+        if (x1 == smallest) i1++;
+        if (x2 == smallest) i2++;
+        if (x3 == smallest) i3++;
+
+        result.push(smallest);
+    }
+
+    return result;
+}
+
+
+void LutMap::generateCuts_LogicGate(Wire w, Vec<Cut>& out)
+{
+    assert(w == gate_And || w == gate_Lut4);
+
+    Array<Cut> cs[4];
+    Cut        triv[4];
+    int        lim[4];
+    uint       sz;
+    for (sz = 0; sz < w.size(); sz++){
+        if (+w[sz] == Wire_NULL) break;
+        l_tuple(triv[sz], cs[sz]) = getCuts(w[sz], cutmap);
+        lim[sz] = keep.has(w[sz]) ? 0 : (int)cs[sz].size();
+    }
+
+    // Compute cross-product:
+    switch (sz){
+    case 0:
+    case 1: {
+        Cut cut(w[0].id);
+        if (!applySubsumptionAndAddCut(cut, out)) return;
+        break;
+    }
+
+    case 2:{
+        for (int i0 = -1; i0 < lim[0]; i0++){ const Cut& c0 = (i0 == -1) ? triv[0] : cs[0][i0];
+        for (int i1 = -1; i1 < lim[1]; i1++){ const Cut& c1 = (i1 == -1) ? triv[1] : cs[1][i1];
+            Cut cut = combineCuts_Bin(c0, c1);
+            if (!cut.null() && !applySubsumptionAndAddCut(cut, out)) return;
+        }}
+        break;
+    }
+
+    case 3:{
+        for (int i0 = -1; i0 < lim[0]; i0++){ const Cut& c0 = (i0 == -1) ? triv[0] : cs[0][i0];
+        for (int i1 = -1; i1 < lim[1]; i1++){ const Cut& c1 = (i1 == -1) ? triv[1] : cs[1][i1];
+        for (int i2 = -1; i2 < lim[2]; i2++){ const Cut& c2 = (i2 == -1) ? triv[2] : cs[2][i2];
+            Cut cut = combineCuts_Tern(c0, c1, c2);
+            if (!cut.null() && !applySubsumptionAndAddCut(cut, out)) return;
+        }}}
+        break;
+    }
+
+    case 4:{
+        for (int i0 = -1; i0 < lim[0]; i0++){ const Cut& c0 = (i0 == -1) ? triv[0] : cs[0][i0];
+        for (int i1 = -1; i1 < lim[1]; i1++){ const Cut& c1 = (i1 == -1) ? triv[1] : cs[1][i1];
+        for (int i2 = -1; i2 < lim[2]; i2++){ const Cut& c2 = (i2 == -1) ? triv[2] : cs[2][i2];
+        for (int i3 = -1; i3 < lim[3]; i3++){ const Cut& c3 = (i3 == -1) ? triv[3] : cs[3][i3];
+            Cut cut = combineCuts_Quad(c0, c1, c2, c3);
+            if (!cut.null() && !applySubsumptionAndAddCut(cut, out)) return;
+        }}}}
+        break;
+    }
+
+    default: assert(false); }
+}
