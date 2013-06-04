@@ -129,7 +129,7 @@ void readGigForTechmap(String filename, Gig& N)
                 }else if (eq(gate, "Delay")){
                     float delay = 0;
                     try{
-                        delay = stringToDouble(attr);
+                        delay = attr ? stringToDouble(attr) : 0;
                     }catch (...){
                         Throw(Excp_Msg) "[line %_] Invalid delay number.", line_no;
                     }

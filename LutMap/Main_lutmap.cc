@@ -20,7 +20,7 @@ int main(int argc, char** argv)
     cli.add("blif"  , "string", ""          , "Save original input in BLIF format (for debugging only).");
     cli.add("N"     , "uint"  , "10"        , "Cuts to keep per node.");
     cli.add("iters" , "uint"  , "4"         , "Number of mapping phases.");
-    cli.add("delay" , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
+    cli.add("df"    , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
     cli.add("speed" , "bool"  , "no"        , "Optimize for delay (defaul is area).");
     cli.parseCmdLine(argc, argv);
 
@@ -30,7 +30,7 @@ int main(int argc, char** argv)
     Params_LutMap P;
     P.cuts_per_node = cli.get("N").int_val;
     P.n_rounds      = cli.get("iters").int_val;
-    P.delay_factor  = cli.get("delay").float_val;
+    P.delay_factor  = cli.get("df").float_val;
     P.map_for_area  = !cli.get("speed").bool_val;
 
     // Read input file:

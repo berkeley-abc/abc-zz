@@ -16,6 +16,7 @@
 #include "ZZ_Gig.hh"
 #include "ZZ_BFunc.hh"
 #include "ZZ/Generics/Sort.hh"
+#include "Cut.hh"
 
 #define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
 
@@ -25,221 +26,19 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Cut representation:
-
-
-#define Cut LutMap_Cut      // -- avoid linking problems
-
-
-class Cut {                // -- this class represents 6-input cuts.
-    void extendAbstr(gate_id g) { abstr |= 1u << (g & 31); }
-
-    gate_id inputs[6];
-    uint    sz;
-public:
-    uint    abstr;
-
-    Cut(Tag_empty) : sz(0), abstr(0) {}
-    Cut(gate_id g) : sz(1), abstr(0) { inputs[0] = g; extendAbstr(g); }
-    Cut()          : sz(7)           {}
-
-    uint    size()                const { return sz; }
-    gate_id operator[](int index) const { return inputs[index]; }
-    bool    null()                const { return uint(sz) > 6; }
-    void    mkNull()                    { sz = 7; }
-
-    void    push(gate_id g) { if (!null()){ inputs[sz++] = g; extendAbstr(g); } }
-};
-
-#define Cut_NULL Cut()
-
-
-template<> fts_macro void write_(Out& out, const Cut& v)
-{
-    if (v.null())
-        FWrite(out) "<null>";
-    else{
-        out += '{';
-        if (v.size() > 0){
-            out += v[0];
-            for (uint i = 1; i < v.size(); i++)
-                out += ',', ' ', v[i];
-        }
-        out += '}';
-    }
-}
-
-
-//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-
-// Check if cut 'c' is a subset of cut 'd'. Cuts must be sorted. FTB is ignored.
-macro bool subsumes(const Cut& c, const Cut& d)
-{
-    assert_debug(!c.null());
-    assert_debug(!d.null());
-
-    if (d.size() < c.size())
-        return false;
-
-    if (c.abstr & ~d.abstr)
-        return false;
-
-    if (c.size() == d.size()){
-        for (uint i = 0; i < c.size(); i++)
-            if (c[i] != d[i])
-                return false;
-    }else{
-        uint j = 0;
-        for (uint i = 0; i < c.size(); i++){
-            while (c[i] != d[j]){
-                j++;
-                if (j == d.size())
-                    return false;
-            }
-        }
-    }
-
-    return true;
-}
-
-
-macro bool moreThanSixBits(uint a)
-{
-  #if defined(__GNUC__)
-    return __builtin_popcount(a) > 6;
-  #else
-    a &= a - 1;
-    a &= a - 1;
-    a &= a - 1;
-    a &= a - 1;
-    a &= a - 1;
-    a &= a - 1;
-    return a;
-  #endif
-}
-
-
-// PRE-CONDITION: Inputs of 'cut1' and 'cut2' are sorted.
-// Output: A cut representing AND of 'cut1' and 'cut2' with signs 'inv1' and 'inv2' respectively;
-// or 'Cut_NULL' if more than 6 inputs would be required.
-static
-Cut combineCuts_Bin(const Cut& cut1, const Cut& cut2)
-{
-    if (moreThanSixBits(cut1.abstr | cut2.abstr))
-        return Cut_NULL;
-
-    Cut   result(empty_);
-    uint  i = 0;
-    uint  j = 0;
-    if (cut1.size() == 0) goto FlushCut2;
-    if (cut2.size() == 0) goto FlushCut1;
-    for(;;){
-        if (result.size() == 6) return Cut_NULL;
-        if (cut1[i] < cut2[j]){
-            result.push(cut1[i]), i++;
-            if (i >= cut1.size()) goto FlushCut2;
-        }else if (cut1[i] > cut2[j]){
-            result.push(cut2[j]), j++;
-            if (j >= cut2.size()) goto FlushCut1;
-        }else{
-            result.push(cut1[i]), i++, j++;
-            if (i >= cut1.size()) goto FlushCut2;
-            if (j >= cut2.size()) goto FlushCut1;
-        }
-    }
-
-  FlushCut1:
-    if (result.size() + cut1.size() - i > 6) return Cut_NULL;
-    while (i < cut1.size())
-        result.push(cut1[i]), i++;
-    goto Done;
-
-  FlushCut2:
-    if (result.size() + cut2.size() - j > 6) return Cut_NULL;
-    while (j < cut2.size())
-        result.push(cut2[j]), j++;
-    goto Done;
-
-  Done:
-    return result;
-}
-
-// PRE-CONDITION: Inputs of 'cut0..3' are sorted.
-// Output: A cut representing the merge of 'cut0..3' after applying function 'ftb'; 
-// or 'Cut_NULL' if more than 6 inputs would be required.
-static
-Cut combineCuts_Tern(const Cut& cut0, const Cut& cut1, const Cut& cut2)
-{
-    if (moreThanSixBits(cut0.abstr | cut1.abstr | cut2.abstr))
-        return Cut_NULL;
-
-    // Merge inputs from cuts:
-    Cut result(empty_);
-    uint i0 = 0, i1 = 0, i2 = 0;
-    for(;;){
-        gate_id x0 = (i0 == cut0.size()) ? gid_MAX : cut0[i0];
-        gate_id x1 = (i1 == cut1.size()) ? gid_MAX : cut1[i1];
-        gate_id x2 = (i2 == cut2.size()) ? gid_MAX : cut2[i2];
-        gate_id smallest = min_(min_(x0, x1), x2);
-
-        if (smallest == gid_MAX) break;
-        if (result.size() == 6) return Cut_NULL;
-
-        if (x0 == smallest) i0++;
-        if (x1 == smallest) i1++;
-        if (x2 == smallest) i2++;
-
-        result.push(smallest);
-    }
-
-    return result;
-}
-
-
-// PRE-CONDITION: Inputs of 'cut0..3' are sorted.
-// Output: A cut representing the merge of 'cut0..3' after applying function 'ftb'; 
-// or 'Cut_NULL' if more than 6 inputs would be required.
-static
-Cut combineCuts_Quad(const Cut& cut0, const Cut& cut1, const Cut& cut2, const Cut& cut3)
-{
-    if (moreThanSixBits(cut0.abstr | cut1.abstr | cut2.abstr | cut3.abstr))
-        return Cut_NULL;
-
-    // Merge inputs from cuts:
-    Cut result(empty_);
-    uint i0 = 0, i1 = 0, i2 = 0, i3 = 0;
-    for(;;){
-        gate_id x0 = (i0 == cut0.size()) ? gid_MAX : cut0[i0];
-        gate_id x1 = (i1 == cut1.size()) ? gid_MAX : cut1[i1];
-        gate_id x2 = (i2 == cut2.size()) ? gid_MAX : cut2[i2];
-        gate_id x3 = (i3 == cut3.size()) ? gid_MAX : cut3[i3];
-        gate_id smallest = min_(min_(x0, x1), min_(x2, x3));
-
-        if (smallest == gid_MAX) break;
-        if (result.size() == 6) return Cut_NULL;
-
-        if (x0 == smallest) i0++;
-        if (x1 == smallest) i1++;
-        if (x2 == smallest) i2++;
-        if (x3 == smallest) i3++;
-
-        result.push(smallest);
-    }
-
-    return result;
-}
-
-
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // LutMap class:
+
+
+#define Cut LutMap_Cut
+#define Cut_NULL Cut()
 
 
 struct LutMap_Cost {
     uint    idx;
-    uint    cut_size;
     float   delay;
     float   area;
+    uint    cut_size;
+    float   avg_fanout;
 };
 
 
@@ -258,6 +57,7 @@ class LutMap {
     WMap<float>       fanout_est;
     WMap<float>       arrival;
     WMap<float>       depart;               // -- 'FLT_MAX' marks a deactivated node
+    WMap<uchar>       active;
 
     uint              round;
     uint64            cuts_enumerated;      // -- for statistics
@@ -267,7 +67,7 @@ class LutMap {
     float             mapped_delay;
 
     // Internal methods:
-    void  evaluateCuts(Wire w, Array<Cut> cuts);
+    void  prioritizeCuts(Wire w, Array<Cut> cuts);
     void  generateCuts_LogicGate(Wire w, Vec<Cut>& out);
     void  generateCuts(Wire w);
     void  updateFanoutEst(bool instantiate);
@@ -289,52 +89,6 @@ public:
 // Helper functions:
 
 
-macro Pair<Cut, Array<Cut> > getCuts(Wire w, const WMap<Array<Cut> >& cutmap)
-{
-    if (w == gate_Const)
-        return tuple(Cut(empty_), Array<Cut>(empty_));
-    else
-        return tuple(Cut(w.id), cutmap[w]);
-}
-
-
-// Add 'cut' to 'out' performing subsumption tests in both diretcions. If cut is constant or
-// trivial, FALSE is returned (abort the cut enumeration), otherwise TRUE.
-static
-bool applySubsumptionAndAddCut(const Cut& cut, Vec<Cut>& out)
-{
-    if (cut.size() <= 1){
-        // Constant cut, buffer or inverter:
-        out.clear();
-        out.push(cut);
-        return false;
-    }
-
-    // Test for subsumption (note that in presence of subsumption, the resulting cut set is no longer unique)
-    for (uint k = 0; k < out.size(); k++){
-        if (subsumes(out[k], cut)){
-            // Cut is subsumed by existing cut; don't add anything:
-            return true; }
-
-        if (subsumes(cut, out[k])){
-            // Cut subsumes at least one existing cut; need to remove them all:
-            out[k] = cut;
-            for (k++; k < out.size();){
-                assert_debug(!subsumes(out[k], cut));
-                if (subsumes(cut, out[k])){
-                    out[k] = out.last();
-                    out.pop();
-                }else
-                    k++;
-            }
-            return true;
-        }
-    }
-    out.push(cut);  // (non-subsuming and non-subsumed cut)
-    return true;
-}
-
-
 static
 uint64 computeFtb(Wire w, const Cut& cut)
 {
@@ -350,14 +104,84 @@ uint64 computeFtb(Wire w, const Cut& cut)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+/*
+
+====================
+Globally:
+====================
+
+  - Initialize fanouts to:
+     1. Unit
+     2. Actual fanouts
+     3. Fanouts after XOR/Mux extraction
+     4. Fanouts of fanouts.
+     
+====================
+Per round:
+====================
+
+  [bool]    recompute or reuse cuts?  
+  [uint]    cuts to keep (only if recomputing, else same as previous round)
+  [uint]    max cut-width (probably always 6, but perhaps for first phase...)
+  [float]   alpha coefficient for fanout est. blending
+  [uint]    force keeping k best cuts from last round
+  [sort]    cut sorting criteria
+  [uint]    keep m cuts from secondary sorting criterita (put them last) 
+  [sort]    secondary cut sorting criteria 
+
+Perhaps only allow for two or three sorting functions and then reuse them
+if more phases (or put copying of these functions into mutation code).
+  
+    
+====================
+Sorting atoms:
+====================
+
+  Per cut:
+    float   delay       (or normalized delay [0..1])
+    float   area        (normalized area [0..1])
+    uint    cut_size
+    float   avg_fanout
+
+  For all cuts of a node:
+    float   req_time
+    uint    level, rev_level (and normalized versions)
+    enum    mode             -- (1) normal, (2) randomize before sort, (3) use 'idx' as final tie-breaking
+
+Lexicographical, weighted sum, sharp threshold, soft threshold (atan)    
+
+    (a < b * C) ?[D] 
+
+    
+            req_time = (depart[w] == FLT_MAX) ? FLT_MAX : target_arrival - (depart[w] + 1);
+            req_time = (depart[w] == FLT_MAX) ? costs[0].delay + 1 : target_arrival - (depart[w] + 1);  // -- give one unit of artificial slack
+
+    
+
+====================
+Scoring:
+====================
+
+  - delay
+  - area
+  - runtime
+  
+Either limits on two, improve the third, or perhaps weighted percentual improvement over a reference 
+point.
+
+
+====================
+Later extensions:
+====================
+  
+Re-expanding mapped LUTs in various ways (then 4-input LUT mapping will be more important,
+esp. if combined with lut-strashing and const. propagation/simple rules).
+
+
+*/
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Cut evalutation:
 
-
-/*
-Om inte omgenererar cuts, spara hälften delay-opt, hälften area-opt?
-Om växlar snabba (återanvänder cuts) och långsamma faser (nya cuts), hantera fanout-est blendingen annorlunda.
-Om genererar nya cuts, spara bästa (eller bästa k stycken) cut från förra fasen.
-*/
 
 struct Delay_lt {
     bool operator()(const LutMap_Cost& x, const LutMap_Cost& y) const {
@@ -368,7 +192,8 @@ struct Delay_lt {
       #else
         if (x.area < y.area) return true;
         if (x.area > y.area) return false;
-        return x.cut_size < y.cut_size;
+        return x.avg_fanout > y.avg_fanout;
+//        return x.cut_size < y.cut_size;
       #endif
     }
 };
@@ -383,13 +208,67 @@ struct Area_lt {
       #else
         if (x.delay < y.delay) return true;
         if (x.delay > y.delay) return false;
-        return x.cut_size < y.cut_size;
+        return x.avg_fanout > y.avg_fanout;
+//        return x.cut_size < y.cut_size;
       #endif
     }
 };
 
 
-void LutMap::evaluateCuts(Wire w, Array<Cut> cuts)
+macro float sq(float x) { return x*x; }
+
+struct Weighted_lt {
+    float min_delay;
+    float max_delay;
+    float min_area;
+    float max_area;
+    float req_time;
+    uint  round;
+    Weighted_lt(float min_delay_, float max_delay_, float min_area_, float max_area_, float req_time_, uint round_) : min_delay(min_delay_), max_delay(max_delay_), min_area(min_area_), max_area(max_area_), req_time(req_time_), round(round_) {}
+
+    bool operator()(const LutMap_Cost& x, const LutMap_Cost& y) const
+    {
+        float xa = (x.area  - min_area ) / (max_area  - min_area + 1);
+        float xd = (x.delay - min_delay) / (max_delay - min_delay + 1);
+        float ya = (y.area  - min_area ) / (max_area  - min_area + 1);
+        float yd = (y.delay - min_delay) / (max_delay - min_delay + 1);
+
+        if (req_time == FLT_MAX)
+//            return xa/1024 + xd < ya/1024 + yd;
+            return xd < yd;
+
+        else{
+            xd *= atan((x.delay - req_time) * 4) / M_PI + 0.5;
+            yd *= atan((y.delay - req_time) * 4) / M_PI + 0.5;
+
+            return xa + xd*4 < ya + yd*4;
+        }
+        //return sq(xa + xd) < sq(ya + yd);
+        //return sqrt(xa) + sqrt(xd) < sqrt(ya) + sqrt(yd);
+    }
+};
+
+
+static void sortCuts(Vec<LutMap_Cost>& costs, uint round, float req_time) ___unused;
+static void sortCuts(Vec<LutMap_Cost>& costs, uint round, float req_time)
+{
+    float min_delay = +FLT_MAX;
+    float max_delay = -FLT_MAX;
+    float min_area  = +FLT_MAX;
+    float max_area  = -FLT_MAX;
+    for (uint i = 0; i < costs.size(); i++){
+        newMin(min_delay, costs[i].delay);
+        newMax(max_delay, costs[i].delay);
+        newMin(min_area , costs[i].area );
+        newMax(max_area , costs[i].area );
+    }
+
+    Weighted_lt lt(min_delay, max_delay, min_area, max_area, req_time, round);
+    sobSort(sob(costs, lt));
+}
+
+
+void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
 {
     assert(cuts.size() > 0);
     assert(fanout_est[w] > 0);
@@ -403,19 +282,24 @@ void LutMap::evaluateCuts(Wire w, Array<Cut> cuts)
         costs[i].delay = 0.0f;
         costs[i].area  = 0.0f;
         costs[i].cut_size = cuts[i].size();
+        costs[i].avg_fanout = 0.0f;
 
         for (uint j = 0; j < cuts[i].size(); j++){
             Wire w = cuts[i][j] + N;
             newMax(costs[i].delay, arrival[w]);
             costs[i].area += area_est[w];
+            costs[i].avg_fanout += fanout_est[w];
         }
         costs[i].area += 1;     // -- LUT cost = 1
+        costs[i].avg_fanout /= cuts[i].size();
     }
 
     // Compute order:
+#if 1
     sobSort(sob(costs, Delay_lt()));
     if (round > 0){
         float req_time;
+        assert((depart[w] != FLT_MAX) == active[w]);
         if (P.map_for_area)
             req_time = (depart[w] == FLT_MAX) ? FLT_MAX : target_arrival - (depart[w] + 1);
         else
@@ -429,9 +313,21 @@ void LutMap::evaluateCuts(Wire w, Array<Cut> cuts)
         Array<Cost> pre = costs.slice(0, j);
         sobSort(sob(pre, Area_lt()));
 
-        Array<Cost> suf = costs.slice(min_(j, P.cuts_per_node / 2));
+        uint n_delay_cuts = uint(P.cuts_per_node * 0.3) + 1;
+        Array<Cost> suf = costs.slice(min_(j, costs.size() - n_delay_cuts));
         sobSort(sob(suf, Delay_lt()));
     }
+#else
+    //float req_time = (round == 0 || depart[w] == FLT_MAX) ? FLT_MAX : target_arrival - (depart[w] + 1);
+    float best_delay = FLT_MAX;
+    for (uint i = 0; i < costs.size(); i++)
+        newMin(best_delay, costs[i].delay);
+    float req_time = (round == 0)           ? FLT_MAX :
+                     (depart[w] == FLT_MAX) ? best_delay :
+                     /*otherwise*/            target_arrival - (depart[w] + 1);
+
+    sortCuts(costs, round, req_time);
+#endif
 
     // Implement order:
     Vec<uint>& where = tmp_where;
@@ -458,101 +354,7 @@ void LutMap::evaluateCuts(Wire w, Array<Cut> cuts)
 // Cut generation:
 
 
-/*
-delay optimal everywhere
-globally delay optimal, use slack for area recovery
-
-departure estimation for non-mapped nodes? worth being conservative by having 'pessimistic_departure' using unmapped cuts?
-make sure to keep previous best choice as an option in each cut list!
-*/
-
-void LutMap::generateCuts_LogicGate(Wire w, Vec<Cut>& out)
-{
-    //**/if (w == gate_And){ generateCuts_And(w, out); return; }
-    assert(w == gate_And || w == gate_Lut4);
-
-    Array<Cut> cs[4];
-    Cut        triv[4];
-    int        lim[4];
-    uint       sz;
-    for (sz = 0; sz < w.size(); sz++){
-        if (+w[sz] == Wire_NULL) break;
-        l_tuple(triv[sz], cs[sz]) = getCuts(w[sz], cutmap);
-        lim[sz] = keep.has(w[sz]) ? 0 : (int)cs[sz].size();
-    }
-
-    // Compute cross-product:
-    switch (sz){
-    case 0:
-    case 1: {
-        Cut cut(w[0].id);
-        if (!applySubsumptionAndAddCut(cut, out)) return;
-        break;
-    }
-
-    case 2:{
-        for (int i0 = -1; i0 < lim[0]; i0++){ const Cut& c0 = (i0 == -1) ? triv[0] : cs[0][i0];
-        for (int i1 = -1; i1 < lim[1]; i1++){ const Cut& c1 = (i1 == -1) ? triv[1] : cs[1][i1];
-            Cut cut = combineCuts_Bin(c0, c1);
-            if (!cut.null() && !applySubsumptionAndAddCut(cut, out)) return;
-        }}
-        break;
-    }
-
-    case 3:{
-        for (int i0 = -1; i0 < lim[0]; i0++){ const Cut& c0 = (i0 == -1) ? triv[0] : cs[0][i0];
-        for (int i1 = -1; i1 < lim[1]; i1++){ const Cut& c1 = (i1 == -1) ? triv[1] : cs[1][i1];
-        for (int i2 = -1; i2 < lim[2]; i2++){ const Cut& c2 = (i2 == -1) ? triv[2] : cs[2][i2];
-            Cut cut = combineCuts_Tern(c0, c1, c2);
-            if (!cut.null() && !applySubsumptionAndAddCut(cut, out)) return;
-        }}}
-        break;
-    }
-
-    case 4:{
-        for (int i0 = -1; i0 < lim[0]; i0++){ const Cut& c0 = (i0 == -1) ? triv[0] : cs[0][i0];
-        for (int i1 = -1; i1 < lim[1]; i1++){ const Cut& c1 = (i1 == -1) ? triv[1] : cs[1][i1];
-        for (int i2 = -1; i2 < lim[2]; i2++){ const Cut& c2 = (i2 == -1) ? triv[2] : cs[2][i2];
-        for (int i3 = -1; i3 < lim[3]; i3++){ const Cut& c3 = (i3 == -1) ? triv[3] : cs[3][i3];
-            Cut cut = combineCuts_Quad(c0, c1, c2, c3);
-            if (!cut.null() && !applySubsumptionAndAddCut(cut, out)) return;
-        }}}}
-        break;
-    }
-
-    default: assert(false); }
-}
-
-
-/*
-void LutMap::generateCuts_And(Wire w, Vec<Cut>& out)
-{
-    assert(w == gate_And);
-    assert(out.size() == 0);
-
-    Wire u = w[0], v = w[1];
-    Array<Cut> cs, ds;
-    Cut triv_u, triv_v;
-    l_tuple(triv_u, cs) = getCuts(u, cutmap);
-    l_tuple(triv_v, ds) = getCuts(v, cutmap);
-
-    // Compute cross-product:
-    int cs_lim = keep.has(u) ? 0 : (int)cs.size();
-    int ds_lim = keep.has(v) ? 0 : (int)ds.size();
-
-    for (int i = -1; i < cs_lim; i++){
-        const Cut& c = (i == -1) ? triv_u : cs[i];
-        for (int j = -1; j < ds_lim; j++){
-            const Cut& d = (j == -1) ? triv_v : ds[j];
-
-            Cut cut = combineCuts_Bin(c, d);
-            if (!cut.null() && !applySubsumptionAndAddCut(cut, out))
-                return;
-        }
-    }
-}
-
-*/
+#include "LutMap_CutGen.icc"
 
 
 void LutMap::generateCuts(Wire w)
@@ -577,11 +379,11 @@ void LutMap::generateCuts(Wire w)
             cuts.clear();
             generateCuts_LogicGate(w, cuts);
             cuts_enumerated += cuts.size();
-            evaluateCuts(w, cuts.slice());
+            prioritizeCuts(w, cuts.slice());
             cuts.shrinkTo(P.cuts_per_node);
             cutmap(w) = Array_copy(cuts, mem);
         }else
-            evaluateCuts(w, cutmap[w]);
+            prioritizeCuts(w, cutmap[w]);
         break;
 
     case gate_PO:
@@ -644,8 +446,12 @@ void LutMap::updateFanoutEst(bool instantiate)
                     fanouts(v)++;
                     newMax(depart(v), depart[w] + 1.0f);
                 }
-            }else
+                active(w) = true;
+            }else{
+                // <<== depart. est. heuristic goes here (leave last, reset, conservative etc.)
                 depart(w) = FLT_MAX;    // -- marks deactivated node
+                active(w) = false;
+            }
 
         }else if (!isCI(w)){
             float delay = (w != gate_Delay) ? 0.0f : w.arg() / DELAY_FRACTION;
@@ -704,11 +510,6 @@ void LutMap::updateFanoutEst(bool instantiate)
             if (w == gate_And)
                 remove(w);
         N.compact();
-
-      #if 0
-        N.setMode(gig_Lut6);
-        N.assertMode();
-      #endif
     }
 }
 
@@ -723,6 +524,8 @@ void LutMap::run()
 
     area_est  .reserve(N.size());
     fanout_est.reserve(N.size());
+    active    .reserve(N.size());
+    depart    .reserve(N.size());
 
     // Initialize fanout estimation (and zero area estimation):
     {
@@ -730,6 +533,8 @@ void LutMap::run()
         For_Gates(N, w){
             area_est  (w) = 0;
             fanout_est(w) = nFanouts(w);
+            active    (w) = true;
+            depart    (w) = FLT_MAX;
         }
     }
 
@@ -755,7 +560,8 @@ void LutMap::run()
         }
 
       #if 1
-        if (round == 0){
+        if (round == 0)
+        {
             for (uint i = 0; i < cutmap.base().size(); i++)
                 dispose(cutmap.base()[i], mem);
             cutmap.clear();
@@ -803,4 +609,30 @@ void lutMap(Gig& N, Params_LutMap P, WSeen* keep)
 /*
 Prova att spara 'depart' från iteration till iteration så att omappade noder har en bättre gissning.
 Markera omappade noder på annat sätt.
+*/
+
+/*
+Om inte omgenererar cuts, spara hälften delay-opt, hälften area-opt?
+Om växlar snabba (återanvänder cuts) och långsamma faser (nya cuts), hantera fanout-est blendingen annorlunda.
+Om genererar nya cuts, spara bästa (eller bästa k stycken) cut från förra fasen.
+
+Departure est. för omappade noder: välj ett cut i termer av mappade noder (om existerar) och tag max: ELLER
+loopa över alla cuts i alla instansierade noder och ta max.
+
+Parametrar:
+  - arrival-time range
+  - area-est range
+  - est. slack (incl. "unknown" as a boolean)
+
++ previous best choice? Or not needed?
+    
+Major rounds:
+  - blending ratio
+  - reuse cuts (boolean)
+ 
+*/
+
+/*
+delay optimal everywhere
+globally delay optimal, use slack for area recovery
 */
