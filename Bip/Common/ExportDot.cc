@@ -141,7 +141,7 @@ void writeDot(String filename, NetlistRef N, const WZet& region, Vec<String>* ui
     OutFile out(filename);
 
     FWriteLn(out) "digraph Netlist {";
-    FWriteLn(out) "edge [fontcolor=red labeldistance=1.75 arrowsize=0.7 arrowhead=none arrowtail=normal]";
+    FWriteLn(out) "edge [fontcolor=red labeldistance=1.75 arrowsize=0.7 arrowhead=none arrowtail=normal dir=both]";
     FNewLine(out);
 
     // Write gates in region:

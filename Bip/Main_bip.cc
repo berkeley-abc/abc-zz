@@ -975,7 +975,7 @@ int main(int argc, char** argv)
     cli_live.add("aig", "string", "", "Output AIGER file after conversion.");
     cli_live.add("gig", "string", "", "Output GIG file after conversion.");
     cli_live.add("wit", "string", "", "Output AIGER 1.9 witness.");
-    cli_live.add("eng", "{none, bmc, treb, treb-abs, pdr2, imc}", "none", "Proof-engine to apply to conversion.");
+    cli_live.add("eng", "{none, bmc, treb, treb-abs, pdr2, imc}", "treb", "Proof-engine to apply to conversion.");
     cli_live.add("bmc-depth", "uint | {inf}", "inf", "For '-eng=bmc' only; bound the depth.");
     cli.addCommand("live", "Liveness checking.", &cli_live);
 
@@ -1001,7 +1001,11 @@ int main(int argc, char** argv)
 
     // Command line -- show:
     CLI cli_show;
-    cli_show.add("gv", "string", "gv", "Postscript viewer to run on result.");
+  #if !defined(__APPLE__)
+    cli_show.add("gv", "string", "gv", "PDF viewer to run on result.");
+  #else
+    cli_show.add("gv", "string", "open", "PDF viewer to run on result.");
+  #endif
     cli_show.add("names", "bool", "no", "Show names instead of wire IDs.");
     cli_show.add("cleanup", "bool", "no", "Remove unreachable nodes.");
     cli_show.add("human", "bool", "no", "Make logic more human readable (may lose names).");
@@ -1240,7 +1244,7 @@ int main(int argc, char** argv)
             close(tmpFile("__bip_show_ps_" , tmp_ps));
             if (region.size() == 0) writeDot(tmp_dot, N, &uif_names);
             else                    writeDot(tmp_dot, N, region, &uif_names);
-            String cmd = (FMT "dot -Tps %_ > %_; %_ %_; rm %_ %_", tmp_dot, tmp_ps, gv, tmp_ps, tmp_dot, tmp_ps);
+            String cmd = (FMT "dot -Tpdf %_ > %_; %_ %_; rm %_ %_", tmp_dot, tmp_ps, gv, tmp_ps, tmp_dot, tmp_ps);
             int ignore ___unused = system(cmd.c_str());
         }
         return 0;

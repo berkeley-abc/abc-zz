@@ -83,7 +83,7 @@ default_build = "qr"    # -- must only contain PRIMART-TYPE letters
 
 
 build_path = None   # Absolute path to directory with build scripts
-machine    = None   # Result of 'uname -n'
+machine    = None   # Result of 'uname -n' (currently changed to 'uname -mrs' with spaces replaced by '-')
 os_name    = None   # Result of 'uname'
 n_cores    = None   # Number of CPU cores. Good default for '-j' in the make call
 static_cxx = None
@@ -99,8 +99,9 @@ def get_build_path():
 def get_machine():
     global machine
     global os_name
-    with os.popen("uname -n", "r") as p:
-        machine = p.readline().rstrip()
+#    with os.popen("uname -n", "r") as p:
+    with os.popen("uname -mrs", "r") as p:
+        machine = p.readline().rstrip().replace(' ', '-')
     with os.popen("uname", "r") as p:
         os_name = p.readline().rstrip()
 

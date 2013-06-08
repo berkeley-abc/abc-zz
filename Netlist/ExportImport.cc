@@ -293,7 +293,8 @@ void readAiger_(In& in, NetlistRef N, bool store_comment)
         char type  = in++;
         uind index = (uind)parseUInt64(in);
         while (isWS(*in)) in++;
-        gets(in, buf, isWS);
+//        gets(in, buf, isWS);
+        gets(in, buf, isNL);
         while (!in.eof() && isWS(*in)) in++;
         buf.push(0);
 
@@ -942,6 +943,7 @@ ZZ_Initializer(sif, 0)
     sif_name_char['.'] = 1;
     sif_name_char['#'] = 1;
     sif_name_char['%'] = 1;
+    sif_name_char[':'] = 1;
     for (uint i = '0'; i <= '9'; i++) sif_name_char[i] = 1;
     for (uint i = 'A'; i <= 'Z'; i++) sif_name_char[i] = 1;
     for (uint i = 'a'; i <= 'z'; i++) sif_name_char[i] = 1;
@@ -953,6 +955,7 @@ ZZ_Initializer(sif, 0)
     sif_token_char['='] = 1;
     sif_token_char['^'] = 1;
     sif_token_char['&'] = 1;
+    sif_token_char['|'] = 1;
     sif_token_char[';'] = 1;
 }
 
@@ -995,8 +998,13 @@ void sifTokenize(Str text, Vec<SifToken>& elems)
             break;      // DONE!
 
         if (sif_token_char[(uchar)*p]){
-            elems.push(SifToken(p - p0, 1, *p));
-            p++;
+            if (p[0] == '&' && p[1] == '&'){
+                elems.push(SifToken(p - p0, 2, '#'));       // -- convert '&&' into '#' for easier parsing
+                p += 2;
+            }else{
+                elems.push(SifToken(p - p0, 1, *p));
+                p++;
+            }
 
         }else if (*p == '\''){
             p++;
@@ -1049,7 +1057,8 @@ struct SifStream : XP_TokenStream {
                 type = xop_PREFIX;
                 prio = 1;
                 return true;
-            }else if (elems[p].op() == '&'){
+            }else if (elems[p].op() == '&' || elems[p].op() == '|' || elems[p].op() == '#'){
+                op_tag = elems[p].op();
                 p++;
                 type = xop_INFIXL;
                 prio = 0;
@@ -1087,8 +1096,10 @@ struct SifStream : XP_TokenStream {
     void* applyPostfix(uint, void*) {
         assert(false); }
 
-    void* applyInfix(uint, void* expr0, void* expr1) {
-        return toExpr(s_And(toGLit(expr0) + N, toGLit(expr1) + N)); }
+    void* applyInfix(uint op_tag, void* expr0, void* expr1) {
+        return (op_tag == '&') ? toExpr(s_And(toGLit(expr0) + N, toGLit(expr1) + N)) :
+               (op_tag == '|') ? toExpr(s_Or (toGLit(expr0) + N, toGLit(expr1) + N)) :
+                                 toExpr(s_Xor(toGLit(expr0) + N, toGLit(expr1) + N)); }
 
 
     void disposeExpr(void* expr) {
@@ -1142,13 +1153,11 @@ char sifGetOp(const Array<char>& text, const Vec<SifToken>& elems, uind& p, char
 /*
 Not yet supported:
 
-   LIVELOCK RWADR0;  // property which fails if the following does not hold AG AF !RWADR0
    FAIRNESS signalF; // constrains a LIVELOCK counterexample: signalF must hold at least once in the failing lasso loop
    ARRAY {R,W} #address_pins #columns #rows I{0,1,X initial value string of width #columns} {array_name}
    ARRAY_PIN {array_name} {R,W,I} #port_num {E,A,D} #pin_num {signal_name_being_connected};
 
    && for XOR
-   | for OR
 */
 
 void readSif(String filename, NetlistRef N, String* module_name, Vec<String>* liveness_names)
@@ -1169,6 +1178,7 @@ void readSif(String filename, NetlistRef N, String* module_name, Vec<String>* li
     uind p = 0;
     SifStream ss(N, text, elems, p);
     Vec<Str> ff_reset;
+    Vec<GLit> livelock;
 
     #define EXPECT_NAME(name) sifGetName(text, elems, p, name)
     #define READ_NAME         sifGetName(text, elems, p)
@@ -1242,6 +1252,20 @@ void readSif(String filename, NetlistRef N, String* module_name, Vec<String>* li
                 fair_properties[LAST].push(N.add(PO_(N.typeCount(gate_PO)), w));
             }
 
+        }else if (eq(s, "LIVELOCK")){
+            Str live_net = READ_NAME;
+            Wire w = N.names().lookup(live_net) + N;
+            if (!w) THROW_UNDEF_SYM(live_net);
+            livelock.push(w);
+
+        }else if (eq(s, "FAIRNESS")){
+            Str fair_net = READ_NAME;
+            Wire w = N.names().lookup(fair_net) + N;
+            if (!w) THROW_UNDEF_SYM(fair_net);
+
+            Assure_Pob(N, fair_constraints);
+            fair_constraints.push(N.add(PO_(N.typeCount(gate_PO)), w));
+
         }else if (eq(s, "TEST")){
             Str test_net = READ_NAME;
             Wire w = N.names().lookup(test_net) + N;
@@ -1249,6 +1273,18 @@ void readSif(String filename, NetlistRef N, String* module_name, Vec<String>* li
 
             Assure_Pob(N, properties);
             properties.push(N.add(PO_(N.typeCount(gate_PO)), w));
+
+        }else if (eq(s, "COVER")){
+            Str test_net = READ_NAME;
+            Wire w = N.names().lookup(test_net) + N;
+            if (!w) THROW_UNDEF_SYM(test_net);
+
+            Assure_Pob(N, properties);
+            properties.push(N.add(PO_(N.typeCount(gate_PO)), ~w));
+
+        }else if (eq(s, "REACHABILITY_HINT")){
+            // Ignore:
+            while (p < elems.size() && !(elems[p].isOp() && elems[p].op() == ';')) p++;
 
         }else if (eq(s, "END")){
             // DONE!
@@ -1269,6 +1305,17 @@ void readSif(String filename, NetlistRef N, String* module_name, Vec<String>* li
         EXPECT_OP(';');
     }
 
+    // Taxonomize reset PIs: (if a PI is used more than once, we cannot use 'l_Undef' in 'flopinit')
+    WMap<uchar> pi_used(0);
+    For_Gatetype(N, gate_Flop, w){
+        int num = attr_Flop(w).number;
+        Wire w_reset = N.names().lookup(ff_reset[num]) + N;
+        if (w_reset && type(w_reset) == gate_PI){
+            pi_used(w_reset)++;
+            if (pi_used[w_reset] == 3) pi_used(w_reset) = 2;
+        }
+    }
+
     // Add reset logic:
     Add_Pob(N, flop_init);
     Scoped_Pob(N, fanouts);
@@ -1285,7 +1332,7 @@ void readSif(String filename, NetlistRef N, String* module_name, Vec<String>* li
             flop_init(w) = l_True;
         else if (w_reset == ~N.True())
             flop_init(w) = l_False;
-        else if (type(w_reset) == gate_PI && fanouts[w_reset].size() == 1)
+        else if (type(w_reset) == gate_PI && fanouts[w_reset].size() == 0 && pi_used[w_reset] == 1)
             flop_init(w) = l_Undef;
         else{
             if (!reset){
@@ -1300,6 +1347,27 @@ void readSif(String filename, NetlistRef N, String* module_name, Vec<String>* li
             flop_init(w) = l_Undef;
         }
     }
+
+    // Add livelocks:
+    Assure_Pob(N, fair_properties);
+    for (uint i = 0; i < livelock.size(); i++){
+        Wire w = livelock[i] + N;   // -- A witness if on the form: EF EG w
+        Wire start = N.add(PI_(N.typeCount(gate_PI)));
+        Wire has_started = N.add(Flop_(N.typeCount(gate_Flop)));
+        Wire has_failed  = N.add(Flop_(N.typeCount(gate_Flop)));
+        flop_init(has_started) = l_False;
+        flop_init(has_failed)  = l_False;
+        Wire started = s_Or(start, has_started);
+        Wire failed  = s_Or(s_And(started, ~w), has_failed);
+        has_started.set(0, started);
+        has_failed .set(0, failed);
+
+        fair_properties.push();
+//        fair_properties[LAST].push(N.add(PO_(N.typeCount(gate_PO)), ~has_failed));
+        fair_properties[LAST].push(N.add(PO_(N.typeCount(gate_PO)), s_And(started, ~has_failed)));
+    }
+
+    removeAllUnreach(N);
 }
 
 
