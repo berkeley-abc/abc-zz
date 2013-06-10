@@ -104,7 +104,7 @@ Cut combineCuts_Bin(const Cut& cut1, const Cut& cut2)
 }
 
 // PRE-CONDITION: Inputs of 'cut0..3' are sorted.
-// Output: A cut representing the merge of 'cut0..3' after applying function 'ftb'; 
+// Output: A cut representing the merge of 'cut0..3' after applying function 'ftb';
 // or 'Cut_NULL' if more than 6 inputs would be required.
 static
 Cut combineCuts_Tern(const Cut& cut0, const Cut& cut1, const Cut& cut2)

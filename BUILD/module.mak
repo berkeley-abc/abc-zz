@@ -57,6 +57,7 @@ LINK = $(BUILD_PATH)/zz_gdep_link
 
 COMMA=,
 
+#$(warning $(BIN_OUT)  $(OUT)/Main_%.o  $(LIB_BIN)  $(LMOD))
 
 # Quick-ref:
 #
