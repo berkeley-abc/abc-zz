@@ -93,9 +93,9 @@ void writeScl(Out& out, const SC_Lib& L)
     putu(out, /*version*/5);
 
     // Write non-composite fields:
-    puts(out, L.lib_name);
-    puts(out, L.default_wire_load);
-    puts(out, L.default_wire_load_sel);
+    putz(out, L.lib_name);
+    putz(out, L.default_wire_load);
+    putz(out, L.default_wire_load_sel);
     putF(out, L.default_max_out_slew);
 
     assert(L.unit_time >= 0);
@@ -107,7 +107,7 @@ void writeScl(Out& out, const SC_Lib& L)
     // Write 'wire_load' vector:
     putu(out, L.wire_load.size());
     for (uint i = 0; i < L.wire_load.size(); i++){
-        puts(out, L.wire_load[i].name);
+        putz(out, L.wire_load[i].name);
         putF(out, L.wire_load[i].res);
         putF(out, L.wire_load[i].cap);
 
@@ -121,12 +121,12 @@ void writeScl(Out& out, const SC_Lib& L)
     // Write 'wire_load_sel' vector:
     putu(out, L.wire_load_sel.size());
     for (uint i = 0; i < L.wire_load_sel.size(); i++){
-        puts(out, L.wire_load_sel[i].name);
+        putz(out, L.wire_load_sel[i].name);
         putu(out, L.wire_load_sel[i].sel.size());
         for (uint j = 0; j < L.wire_load_sel[i].sel.size(); j++){
             putF(out, L.wire_load_sel[i].sel[j].fst);
             putF(out, L.wire_load_sel[i].sel[j].snd);
-            puts(out, L.wire_load_sel[i].sel[j].trd);
+            putz(out, L.wire_load_sel[i].sel[j].trd);
         }
     }
 
@@ -143,7 +143,7 @@ void writeScl(Out& out, const SC_Lib& L)
         const SC_Cell& cell = L.cells[i];
         if (cell.seq || cell.unsupp) continue;
 
-        puts(out, cell.name);
+        putz(out, cell.name);
         putF(out, cell.area);
         putu(out, cell.drive_strength);
 
@@ -155,7 +155,7 @@ void writeScl(Out& out, const SC_Lib& L)
             const SC_Pin& pin = cell.pins[j];
             assert(pin.dir == sc_dir_Input);
 
-            puts(out, pin.name);
+            putz(out, pin.name);
             putF(out, pin.rise_cap);
             putF(out, pin.fall_cap);
         }
@@ -164,7 +164,7 @@ void writeScl(Out& out, const SC_Lib& L)
             const SC_Pin& pin = cell.pins[cell.n_inputs + j];
             assert(pin.dir == sc_dir_Output);
 
-            puts(out, pin.name);
+            putz(out, pin.name);
             putF(out, pin.max_out_cap);
             putF(out, pin.max_out_slew);        // -- might be derived, not actually from the Liberty file
 
@@ -175,7 +175,7 @@ void writeScl(Out& out, const SC_Lib& L)
             // Write 'rtiming': (pin-to-pin timing tables for this particular output)
             assert(pin.rtiming.size() == cell.n_inputs);
             for (uint k = 0; k < pin.rtiming.size(); k++){
-                puts(out, pin.rtiming[k].name); // <<== redundant? remove?
+                putz(out, pin.rtiming[k].name); // <<== redundant? remove?
                 putu(out, pin.rtiming[k].size());
                     // -- NOTE! After post-processing, the size of the 'rtiming[k]' vector is either
                     // 0 or 1 (in static timing, we have merged all tables to get the worst case).
