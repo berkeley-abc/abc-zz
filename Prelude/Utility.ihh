@@ -570,7 +570,7 @@ macro uint64 geti(In& in) { return getInt(in); }
 macro char   getc(In& in) { return in.scan(); }
 macro uchar  getb(In& in) { return (uchar)in.scan(); }
 
-// Zero-terminated strings:
+// Put string using zero-terminatation:
 macro void putz(Out& out, cchar* s) { while (*s != 0) out.push(*s++); out.push(0); }
 macro void putz(Out& out, String s) { putz(out, s.c_str()); }
 macro void putz(Out& out, Str    s) {

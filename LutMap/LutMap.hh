@@ -30,6 +30,9 @@ struct Params_LutMap {
 void lutMap(Gig& N, Params_LutMap P, WSeen* keep = NULL);
     // -- signals in 'keep' are always present after mapping (as if they were connected to a PO
 
+void lutMapTune(Gig& N, Params_LutMap P, WSeen* keep = NULL);
+    // -- experimental version for auto-tuning
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }

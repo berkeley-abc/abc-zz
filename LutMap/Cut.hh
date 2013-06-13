@@ -38,7 +38,19 @@ public:
     void    mkNull()                    { sz = 7; }
 
     void    push(gate_id g) { if (!null()){ inputs[sz++] = g; extendAbstr(g); } }
+
+    bool    operator==(const LutMap_Cut& other) const;
 };
+
+
+inline bool LutMap_Cut::operator==(const LutMap_Cut& other) const
+{
+    if (abstr != other.abstr) return false;
+    if (sz != other.sz) return false;
+    for (uint i = 0; i < sz; i++)
+        if (inputs[i] != other.inputs[i]) return false;
+    return true;
+}
 
 
 template<> fts_macro void write_(Out& out, const LutMap_Cut& v)

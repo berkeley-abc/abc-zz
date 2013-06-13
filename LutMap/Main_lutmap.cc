@@ -22,6 +22,7 @@ int main(int argc, char** argv)
     cli.add("iters" , "uint"  , "4"         , "Number of mapping phases.");
     cli.add("df"    , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
     cli.add("speed" , "bool"  , "no"        , "Optimize for delay (defaul is area).");
+    cli.add("a" ,     "bool"  , "no"        , "[EXPERIMENTAL] Auto-tune.");
     cli.parseCmdLine(argc, argv);
 
     String input  = cli.get("input").string_val;
@@ -62,7 +63,10 @@ int main(int argc, char** argv)
         WriteLn "Wrote: \a*%_\a*", blif;
     }
 
-    lutMap(N, P);
+    if (cli.get("a").bool_val)
+        lutMapTune(N, P);
+    else
+        lutMap(N, P);
 
     double T2 = cpuTime();
     WriteLn "Mapping: %t", T2-T1;

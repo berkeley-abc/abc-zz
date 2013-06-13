@@ -126,13 +126,13 @@ Per round:
   [float]   alpha coefficient for fanout est. blending
   [uint]    force keeping k best cuts from last round
   [sort]    cut sorting criteria
-  [uint]    keep m cuts from secondary sorting criterita (put them last) 
-  [sort]    secondary cut sorting criteria 
+  [uint]    keep m cuts from secondary sorting criterita (put them last)
+  [sort]    secondary cut sorting criteria
 
 Perhaps only allow for two or three sorting functions and then reuse them
 if more phases (or put copying of these functions into mutation code).
-  
-    
+
+
 ====================
 Sorting atoms:
 ====================
@@ -148,15 +148,15 @@ Sorting atoms:
     uint    level, rev_level (and normalized versions)
     enum    mode             -- (1) normal, (2) randomize before sort, (3) use 'idx' as final tie-breaking
 
-Lexicographical, weighted sum, sharp threshold, soft threshold (atan)    
+Lexicographical, weighted sum, sharp threshold, soft threshold (atan)
 
-    (a < b * C) ?[D] 
+    (a < b * C) ?[D]
 
-    
+
             req_time = (depart[w] == FLT_MAX) ? FLT_MAX : target_arrival - (depart[w] + 1);
             req_time = (depart[w] == FLT_MAX) ? costs[0].delay + 1 : target_arrival - (depart[w] + 1);  // -- give one unit of artificial slack
 
-    
+
 
 ====================
 Scoring:
@@ -165,15 +165,15 @@ Scoring:
   - delay
   - area
   - runtime
-  
-Either limits on two, improve the third, or perhaps weighted percentual improvement over a reference 
+
+Either limits on two, improve the third, or perhaps weighted percentual improvement over a reference
 point.
 
 
 ====================
 Later extensions:
 ====================
-  
+
 Re-expanding mapped LUTs in various ways (then 4-input LUT mapping will be more important,
 esp. if combined with lut-strashing and const. propagation/simple rules).
 
@@ -299,7 +299,7 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
     sobSort(sob(costs, Delay_lt()));
     if (round > 0){
         float req_time;
-        assert((depart[w] != FLT_MAX) == active[w]);
+        //assert((depart[w] != FLT_MAX) == active[w]);
         if (P.map_for_area)
             req_time = (depart[w] == FLT_MAX) ? FLT_MAX : target_arrival - (depart[w] + 1);
         else
@@ -462,6 +462,27 @@ void LutMap::updateFanoutEst(bool instantiate)
         }
     }
 
+#if 1   /*DEBUG*/
+    WMap<float> tmpdep;
+    depart.copyTo(tmpdep);
+    For_Gates_Rev(N, w){
+        if (w != gate_And && w != gate_Lut4) continue;
+        For_Inputs(w, v){
+            if (v != gate_And && v != gate_Lut4) continue;
+            if (depart[v] != FLT_MAX) continue;
+
+            if (tmpdep[v] == FLT_MAX) tmpdep(v) = 0;
+//            newMax(tmpdep(v), depart[w] + 1);
+            newMax(tmpdep(v), depart[w] + 0);
+        }
+    }
+
+    For_Gates(N, w)
+        if (depart[w] == FLT_MAX && tmpdep[w] != FLT_MAX)
+            depart(w) = tmpdep[w];
+
+#endif  /*END DEBUG*/
+
     mapped_delay = 0.0f;
     For_Gates(N, w)
         if (isCI(w))
@@ -470,12 +491,14 @@ void LutMap::updateFanoutEst(bool instantiate)
     if (!instantiate){
         // Blend new values with old:
         uint  r = round + 1.0f;
-        float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 1.0f);
+//        float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 1.0f);
+        float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 2.0f);
         float beta  = 1.0f - alpha;
 
         For_Gates(N, w){
             if (w == gate_And){
-                fanout_est(w) = alpha * max_(fanouts[w], 1u)
+//                fanout_est(w) = alpha * max_(fanouts[w], 1u)
+                fanout_est(w) = alpha * max_(double(fanouts[w]), 0.95)   // -- slightly less than 1 leads to better delay
                               + beta  * fanout_est[w];
                               //+ beta  * fanout_count[w];
             }

@@ -265,16 +265,16 @@ void relationalToFunctional(const SemAbs& A, NetlistRef N, Vec<Wire>& props)
 
     Vec<GLit> pi;
 
-    /**/A.netlist().write(std_out);
+    //**/A.netlist().write(std_out);
 
     // Create next-state variables:
     For_Gatetype(A.netlist(), gate_Flop, w){
         int num = attr_Flop(w).number;
-        /**/WriteLn "Creating next-state flop %_ as PI %_", num, num + A.next_state_offset;
+        //**/WriteLn "Creating next-state flop %_ as PI %_", num, num + A.next_state_offset;
         num += A.next_state_offset;
         xlat(w) = pi(num) = N.add(PI_(num));
     }
-    /**/WriteLn "Done";
+    //**/WriteLn "Done";
 
     // Copy transition relation into 'N':
     Vec<gate_id> order;
