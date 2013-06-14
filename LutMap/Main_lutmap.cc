@@ -11,6 +11,51 @@ using namespace ZZ;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+// Returns TRUE if 'w' is the top AND-gate of a balanced, 3 AND-gate tree making up a MUX.
+// Note that XOR is a special case.
+static
+bool isMux(Wire w, Wire& sel, Wire& d1, Wire& d0)
+{
+    assert(!w.sign);
+    if (w != gate_And)
+        return false;
+
+    Wire x = w[0];
+    Wire y = w[1];
+    if (x != gate_And || y != gate_And)
+        return false;
+    if (!x.sign || !y.sign)
+        return false;
+
+    Wire xx = x[0];
+    Wire yx = x[1];
+    Wire xy = y[0];
+    Wire yy = y[1];
+    if      (xx == ~xy){ sel = xx, d1 = ~yx, d0 = ~yy; return true; }
+    else if (yx == ~xy){ sel = yx, d1 = ~xx, d0 = ~yy; return true; }
+    else if (xx == ~yy){ sel = xx, d1 = ~yx, d0 = ~xy; return true; }
+    else if (yx == ~yy){ sel = yx, d1 = ~xx, d0 = ~xy; return true; }
+
+    return false;
+}
+
+
+static
+void introduceMuxes(Gig& N)
+{
+    Wire sel, d1, d0;
+    N.setMode(gig_FreeForm);
+
+    For_DownOrder(N, w){
+        if (isMux(w, sel, d1, d0))
+            change(w, gate_Lut4, 0x5353).init(d0, d1, sel);     // <<== unverified + need to remove signs
+    }
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+
+
 int main(int argc, char** argv)
 {
     ZZ_Init;
@@ -52,6 +97,8 @@ int main(int argc, char** argv)
         ShoutLn "PARSE ERROR! %_", err.msg;
         exit(1);
     }
+
+    /**/introduceMuxes(N);
 
     N.compact();
 

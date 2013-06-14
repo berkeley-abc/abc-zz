@@ -16,6 +16,7 @@
 //|   For_Gatetype(N, type, w)  -- Iterate over all gates of given type (must be a "numbered" type)  
 //| 
 //|   For_UpOrder(netlist, w)
+//|   For_DownOrder(netlist, w)
 //| 
 //| Fanin iteration:
 //| 

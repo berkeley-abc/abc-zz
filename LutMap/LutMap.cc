@@ -53,6 +53,7 @@ class LutMap {
     // State:
     SlimAlloc<Cut>    mem;
     WMap<Array<Cut> > cutmap;
+    WMap<Cut>         winner;
     WMap<float>       area_est;
     WMap<float>       fanout_est;
     WMap<float>       arrival;
@@ -62,6 +63,7 @@ class LutMap {
     uint              round;
     uint64            cuts_enumerated;      // -- for statistics
     float             target_arrival;
+    float             best_arrival;
 
     uint64            mapped_area;
     float             mapped_delay;
@@ -187,14 +189,12 @@ struct Delay_lt {
     bool operator()(const LutMap_Cost& x, const LutMap_Cost& y) const {
         if (x.delay < y.delay) return true;
         if (x.delay > y.delay) return false;
-      #if 0
-        return x.area < y.area;
-      #else
         if (x.area < y.area) return true;
         if (x.area > y.area) return false;
-        return x.avg_fanout > y.avg_fanout;
+        if (x.avg_fanout > y.avg_fanout) return true;
+        if (x.avg_fanout < y.avg_fanout) return false;
+        return false;
 //        return x.cut_size < y.cut_size;
-      #endif
     }
 };
 
@@ -203,14 +203,12 @@ struct Area_lt {
     bool operator()(const LutMap_Cost& x, const LutMap_Cost& y) const {
         if (x.area < y.area) return true;
         if (x.area > y.area) return false;
-      #if 0
-        return (x.delay < y.delay);
-      #else
         if (x.delay < y.delay) return true;
         if (x.delay > y.delay) return false;
-        return x.avg_fanout > y.avg_fanout;
+        if (x.avg_fanout > y.avg_fanout) return true;
+        if (x.avg_fanout < y.avg_fanout) return false;
+        return false;
 //        return x.cut_size < y.cut_size;
-      #endif
     }
 };
 
@@ -299,11 +297,19 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
     sobSort(sob(costs, Delay_lt()));
     if (round > 0){
         float req_time;
-        //assert((depart[w] != FLT_MAX) == active[w]);
+      #if 0
+        assert((depart[w] != FLT_MAX) == active[w]);
         if (P.map_for_area)
             req_time = (depart[w] == FLT_MAX) ? FLT_MAX : target_arrival - (depart[w] + 1);
         else
             req_time = (depart[w] == FLT_MAX) ? costs[0].delay + 1 : target_arrival - (depart[w] + 1);  // -- give one unit of artificial slack
+      #else
+        assert(depart[w] != FLT_MAX);
+        if (P.map_for_area)
+            req_time = target_arrival - (depart[w] + 1);
+        else
+            req_time = target_arrival - (depart[w] + 1) - (uint)active[w];
+      #endif
 
         uint j = 0;
         for (uint i = 0; i < costs.size(); i++)
@@ -376,7 +382,9 @@ void LutMap::generateCuts(Wire w)
         // Inductive case:
         if (!cutmap[w]){
             Vec<Cut>& cuts = tmp_cuts;
-            cuts.clear();
+            cuts.clear();   // -- keep last winner
+            if (!winner[w].null())
+                cuts.push(winner[w]);
             generateCuts_LogicGate(w, cuts);
             cuts_enumerated += cuts.size();
             prioritizeCuts(w, cuts.slice());
@@ -462,26 +470,27 @@ void LutMap::updateFanoutEst(bool instantiate)
         }
     }
 
-#if 1   /*DEBUG*/
+#if 1   // -- temporary solution for computing estimated departure for inactive nodes
     WMap<float> tmpdep;
     depart.copyTo(tmpdep);
     For_Gates_Rev(N, w){
-        if (w != gate_And && w != gate_Lut4) continue;
+        if (isCI(w)) continue;
+        if (tmpdep[w] == FLT_MAX) continue;
+
+        //if (w != gate_And && w != gate_Lut4) continue;
         For_Inputs(w, v){
             if (v != gate_And && v != gate_Lut4) continue;
             if (depart[v] != FLT_MAX) continue;
 
             if (tmpdep[v] == FLT_MAX) tmpdep(v) = 0;
-//            newMax(tmpdep(v), depart[w] + 1);
-            newMax(tmpdep(v), depart[w] + 0);
+            newMax(tmpdep(v), tmpdep[w]);
         }
     }
 
     For_Gates(N, w)
         if (depart[w] == FLT_MAX && tmpdep[w] != FLT_MAX)
             depart(w) = tmpdep[w];
-
-#endif  /*END DEBUG*/
+#endif
 
     mapped_delay = 0.0f;
     For_Gates(N, w)
@@ -496,7 +505,7 @@ void LutMap::updateFanoutEst(bool instantiate)
         float beta  = 1.0f - alpha;
 
         For_Gates(N, w){
-            if (w == gate_And){
+            if (w == gate_And || w == gate_Lut4){
 //                fanout_est(w) = alpha * max_(fanouts[w], 1u)
                 fanout_est(w) = alpha * max_(double(fanouts[w]), 0.95)   // -- slightly less than 1 leads to better delay
                               + beta  * fanout_est[w];
@@ -544,6 +553,7 @@ void LutMap::updateFanoutEst(bool instantiate)
 void LutMap::run()
 {
     round = 0;
+    best_arrival = 0;
 
     area_est  .reserve(N.size());
     fanout_est.reserve(N.size());
@@ -575,6 +585,7 @@ void LutMap::run()
 
         if (round == 0)
             target_arrival = mapped_delay * P.delay_factor;
+        newMin(best_arrival, mapped_delay);
 
         if (!P.quiet){
             if (round == 0)
@@ -583,12 +594,21 @@ void LutMap::run()
         }
 
       #if 1
-        if (round == 0)
-        {
+        if (round == 0){
+            winner.clear();
+            For_Gates(N, w)
+                if ((w == gate_And || w == gate_Lut4) && cutmap[w].size() > 0)
+                    winner(w) = cutmap[w][0];
+
             for (uint i = 0; i < cutmap.base().size(); i++)
                 dispose(cutmap.base()[i], mem);
             cutmap.clear();
         }
+      #endif
+
+      #if 0
+        if (round == P.n_rounds - 2)
+            target_arrival = best_arrival;
       #endif
     }
 }
