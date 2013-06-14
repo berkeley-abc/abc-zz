@@ -60,14 +60,15 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
-    cli.add("input" , "string", arg_REQUIRED, "Input AIGER.", 0);
-    cli.add("output", "string", ""          , "Output GNL file (optional).", 1);
-    cli.add("blif"  , "string", ""          , "Save original input in BLIF format (for debugging only).");
-    cli.add("N"     , "uint"  , "10"        , "Cuts to keep per node.");
-    cli.add("iters" , "uint"  , "4"         , "Number of mapping phases.");
-    cli.add("df"    , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
-    cli.add("speed" , "bool"  , "no"        , "Optimize for delay (defaul is area).");
-    cli.add("a" ,     "bool"  , "no"        , "[EXPERIMENTAL] Auto-tune.");
+    cli.add("input"  , "string", arg_REQUIRED, "Input AIGER.", 0);
+    cli.add("output" , "string", ""          , "Output GNL file (optional).", 1);
+    cli.add("blif"   , "string", ""          , "Save original input in BLIF format (for debugging only).");
+    cli.add("N"      , "uint"  , "10"        , "Cuts to keep per node.");
+    cli.add("iters"  , "uint"  , "4"         , "Number of mapping phases.");
+    cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
+    cli.add("recycle", "bool"  , "yes"       , "Recycle cuts for faster iterations.");
+    cli.add("speed"  , "bool"  , "no"        , "Optimize for delay (defaul is area).");
+    cli.add("a"      , "bool"  , "no"        , "[EXPERIMENTAL] Auto-tune.");
     cli.parseCmdLine(argc, argv);
 
     String input  = cli.get("input").string_val;
@@ -78,6 +79,7 @@ int main(int argc, char** argv)
     P.n_rounds      = cli.get("iters").int_val;
     P.delay_factor  = cli.get("df").float_val;
     P.map_for_area  = !cli.get("speed").bool_val;
+    P.recycle_cuts  = cli.get("recycle").bool_val;
 
     // Read input file:
     double  T0 = cpuTime();

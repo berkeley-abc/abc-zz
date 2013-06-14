@@ -594,11 +594,13 @@ void LutMap::run()
         }
 
       #if 1
-        if (round == 0){
-            winner.clear();
-            For_Gates(N, w)
-                if ((w == gate_And || w == gate_Lut4) && cutmap[w].size() > 0)
-                    winner(w) = cutmap[w][0];
+        if (round == 0 || !P.recycle_cuts){
+            if (round != P.n_rounds - 1){   // -- last round
+                winner.clear();
+                For_Gates(N, w)
+                    if ((w == gate_And || w == gate_Lut4) && cutmap[w].size() > 0)
+                        winner(w) = cutmap[w][0];
+            }
 
             for (uint i = 0; i < cutmap.base().size(); i++)
                 dispose(cutmap.base()[i], mem);

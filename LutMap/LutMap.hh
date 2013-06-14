@@ -15,6 +15,7 @@ struct Params_LutMap {
     uint    n_rounds;           // #iterations in techmapper. First iteration will always be depth optimal, later phases will use area recovery.
     float   delay_factor;       // If '1', delay optimal mapping is produced. If '1.15', 15% artificial slack is given to mapper.
     bool    map_for_area;       // Otherwise, prioritize delay harder.
+    bool    recycle_cuts;       // Faster but sacrifice some quality
     bool    quiet;
 
     Params_LutMap() :
@@ -22,6 +23,7 @@ struct Params_LutMap {
         n_rounds(4),
         delay_factor(1.0),
         map_for_area(true),
+        recycle_cuts(true),
         quiet(false)
     {}
 };
