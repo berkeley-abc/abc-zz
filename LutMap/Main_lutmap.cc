@@ -67,7 +67,8 @@ int main(int argc, char** argv)
     cli.add("iters"  , "uint"  , "4"         , "Number of mapping phases.");
     cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
     cli.add("recycle", "bool"  , "yes"       , "Recycle cuts for faster iterations.");
-    cli.add("speed"  , "bool"  , "no"        , "Optimize for delay (defaul is area).");
+    cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (defaul is area).");
+    cli.add("mux"    , "bool"  , "yes"       , "Do MUX and XOR extraction first.");
     cli.add("a"      , "bool"  , "no"        , "[EXPERIMENTAL] Auto-tune.");
     cli.parseCmdLine(argc, argv);
 
@@ -78,7 +79,7 @@ int main(int argc, char** argv)
     P.cuts_per_node = cli.get("N").int_val;
     P.n_rounds      = cli.get("iters").int_val;
     P.delay_factor  = cli.get("df").float_val;
-    P.map_for_area  = !cli.get("speed").bool_val;
+    P.map_for_delay = cli.get("dopt").bool_val;
     P.recycle_cuts  = cli.get("recycle").bool_val;
 
     // Read input file:
@@ -100,7 +101,8 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-    /**/introduceMuxes(N);
+    if (cli.get("mux").bool_val)
+        introduceMuxes(N);
 
     N.compact();
 

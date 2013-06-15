@@ -189,6 +189,8 @@ struct Delay_lt {
     bool operator()(const LutMap_Cost& x, const LutMap_Cost& y) const {
         if (x.delay < y.delay) return true;
         if (x.delay > y.delay) return false;
+        //**/if (x.cut_size < y.cut_size) return true;
+        //**/if (x.cut_size > y.cut_size) return false;
         if (x.area < y.area) return true;
         if (x.area > y.area) return false;
         if (x.avg_fanout > y.avg_fanout) return true;
@@ -293,9 +295,8 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
     }
 
     // Compute order:
-#if 1
     sobSort(sob(costs, Delay_lt()));
-    if (round > 0){
+    if (round > 1 || (!P.map_for_delay && round > 0)){
         float req_time;
       #if 0
         assert((depart[w] != FLT_MAX) == active[w]);
@@ -305,10 +306,8 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
             req_time = (depart[w] == FLT_MAX) ? costs[0].delay + 1 : target_arrival - (depart[w] + 1);  // -- give one unit of artificial slack
       #else
         assert(depart[w] != FLT_MAX);
-        if (P.map_for_area)
-            req_time = target_arrival - (depart[w] + 1);
-        else
-            req_time = target_arrival - (depart[w] + 1) - (uint)active[w];
+        req_time = target_arrival - (depart[w] + 1);
+        //req_time = target_arrival - (depart[w] + 1) - (uint)active[w];    // -- conservative
       #endif
 
         uint j = 0;
@@ -323,17 +322,32 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
         Array<Cost> suf = costs.slice(min_(j, costs.size() - n_delay_cuts));
         sobSort(sob(suf, Delay_lt()));
     }
-#else
-    //float req_time = (round == 0 || depart[w] == FLT_MAX) ? FLT_MAX : target_arrival - (depart[w] + 1);
-    float best_delay = FLT_MAX;
-    for (uint i = 0; i < costs.size(); i++)
-        newMin(best_delay, costs[i].delay);
-    float req_time = (round == 0)           ? FLT_MAX :
-                     (depart[w] == FLT_MAX) ? best_delay :
-                     /*otherwise*/            target_arrival - (depart[w] + 1);
 
-    sortCuts(costs, round, req_time);
-#endif
+#if 0   /*DEBUG*/
+    bool has3 = false;
+    for (uint i = 0; i < min_(costs.size(), P.cuts_per_node); i++){
+        if (costs[i].cut_size == 3){
+            has3 = true;
+            break; }
+    }
+
+    if (!has3){
+        for (uint i = P.cuts_per_node; i < costs.size(); i++){
+            if (costs[i].cut_size == 3){
+                swp(costs[i], costs[P.cuts_per_node-1]);
+                break;
+            }
+        }
+    }
+#endif  /*END DEBUG*/
+
+    //**/Write "Cut sizes:";
+    //**/for (uint i = 0; i < costs.size(); i++){
+    //**/    if (i == P.cuts_per_node) Write " |";
+    //**/    Write " %_", costs[i].cut_size;
+    //**/}
+    //**/NewLine;
+
 
     // Implement order:
     Vec<uint>& where = tmp_where;
@@ -363,6 +377,18 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
 #include "LutMap_CutGen.icc"
 
 
+static
+float delay(const Cut& cut, const WMap<float>& arrival, Gig& N)
+{
+    float arr = 0.0f;
+    for (uint i = 0; i < cut.size(); i++){
+        Wire w = cut[i] + N;
+        newMax(arr, arrival[w]);
+    }
+    return arr + 1.0f;
+}
+
+
 void LutMap::generateCuts(Wire w)
 {
     switch (w.type()){
@@ -388,7 +414,16 @@ void LutMap::generateCuts(Wire w)
             generateCuts_LogicGate(w, cuts);
             cuts_enumerated += cuts.size();
             prioritizeCuts(w, cuts.slice());
-            cuts.shrinkTo(P.cuts_per_node);
+
+            if (round > 0 || !P.map_for_delay)
+                cuts.shrinkTo(P.cuts_per_node);
+            else{
+                for (uint i = 1; i < cuts.size(); i++){
+                    if (delay(cuts[i], arrival, N) > delay(cuts[0], arrival, N))
+                        cuts.shrinkTo(i);
+                }
+                cuts.shrinkTo(2 * P.cuts_per_node);
+            }
             cutmap(w) = Array_copy(cuts, mem);
         }else
             prioritizeCuts(w, cutmap[w]);
@@ -499,8 +534,9 @@ void LutMap::updateFanoutEst(bool instantiate)
 
     if (!instantiate){
         // Blend new values with old:
+if (!P.map_for_delay || round > 0){
         uint  r = round + 1.0f;
-//        float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 1.0f);
+        if (P.map_for_delay && round != 0) r -= 1.0;
         float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 2.0f);
         float beta  = 1.0f - alpha;
 
@@ -509,9 +545,9 @@ void LutMap::updateFanoutEst(bool instantiate)
 //                fanout_est(w) = alpha * max_(fanouts[w], 1u)
                 fanout_est(w) = alpha * max_(double(fanouts[w]), 0.95)   // -- slightly less than 1 leads to better delay
                               + beta  * fanout_est[w];
-                              //+ beta  * fanout_count[w];
             }
         }
+}
 
     }else{
         // Compute FTBs:
@@ -572,14 +608,15 @@ void LutMap::run()
     }
 
     // Techmap:
-    for (round = 0; round < P.n_rounds; round++){
+    uint last_round = P.n_rounds - 1 + (uint)P.map_for_delay;
+    for (round = 0; round <= last_round; round++){
         double T0 = cpuTime();
         cuts_enumerated = 0;
         For_All_Gates(N, w)
             generateCuts(w);
         double T1 = cpuTime();
 
-        bool instantiate = (round == P.n_rounds - 1);
+        bool instantiate = (round == last_round);
         updateFanoutEst(instantiate);
         double T2 = cpuTime();
 
@@ -593,9 +630,8 @@ void LutMap::run()
             WriteLn "round=%d   mapped_area=%,d   mapped_delay=%_   [enum: %t, blend: %t]", round, mapped_area, mapped_delay, T1-T0, T2-T1;
         }
 
-      #if 1
-        if (round == 0 || !P.recycle_cuts){
-            if (round != P.n_rounds - 1){   // -- last round
+        if (round == 0 || !P.recycle_cuts || (round == 1 && P.map_for_delay)){
+            if (round != last_round){
                 winner.clear();
                 For_Gates(N, w)
                     if ((w == gate_And || w == gate_Lut4) && cutmap[w].size() > 0)
@@ -606,12 +642,6 @@ void LutMap::run()
                 dispose(cutmap.base()[i], mem);
             cutmap.clear();
         }
-      #endif
-
-      #if 0
-        if (round == P.n_rounds - 2)
-            target_arrival = best_arrival;
-      #endif
     }
 }
 
@@ -680,4 +710,6 @@ Major rounds:
 /*
 delay optimal everywhere
 globally delay optimal, use slack for area recovery
+
+hur få diversity med? varför svåt att hitta delay optimal med få cuts när Alan lyckas?
 */
