@@ -129,6 +129,8 @@ class LutMapT {
     Vec<uint> tmp_where;
     Vec<uint> tmp_list;
 
+    bool probeRound() const { return false; }
+    bool delayRound() const { return false; }
 public:
 
     LutMapT(Gig& N, Params_LutMap P, WSeen& keep);

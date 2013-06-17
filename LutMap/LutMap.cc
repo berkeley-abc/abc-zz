@@ -81,6 +81,9 @@ class LutMap {
     Vec<uint> tmp_where;
     Vec<uint> tmp_list;
 
+    bool probeRound() const { return P.map_for_delay && round == 0; }
+    bool delayRound() const { return P.map_for_delay ? round == 1 : round == 0; }
+
 public:
 
     LutMap(Gig& N, Params_LutMap P, WSeen& keep);
@@ -296,19 +299,10 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
 
     // Compute order:
     sobSort(sob(costs, Delay_lt()));
-    if (round > 1 || (!P.map_for_delay && round > 0)){
-        float req_time;
-      #if 0
-        assert((depart[w] != FLT_MAX) == active[w]);
-        if (P.map_for_area)
-            req_time = (depart[w] == FLT_MAX) ? FLT_MAX : target_arrival - (depart[w] + 1);
-        else
-            req_time = (depart[w] == FLT_MAX) ? costs[0].delay + 1 : target_arrival - (depart[w] + 1);  // -- give one unit of artificial slack
-      #else
+    float req_time = 0;
+    if (!probeRound() && !delayRound()){
         assert(depart[w] != FLT_MAX);
         req_time = target_arrival - (depart[w] + 1);
-        //req_time = target_arrival - (depart[w] + 1) - (uint)active[w];    // -- conservative
-      #endif
 
         uint j = 0;
         for (uint i = 0; i < costs.size(); i++)
@@ -322,32 +316,6 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
         Array<Cost> suf = costs.slice(min_(j, costs.size() - n_delay_cuts));
         sobSort(sob(suf, Delay_lt()));
     }
-
-#if 0   /*DEBUG*/
-    bool has3 = false;
-    for (uint i = 0; i < min_(costs.size(), P.cuts_per_node); i++){
-        if (costs[i].cut_size == 3){
-            has3 = true;
-            break; }
-    }
-
-    if (!has3){
-        for (uint i = P.cuts_per_node; i < costs.size(); i++){
-            if (costs[i].cut_size == 3){
-                swp(costs[i], costs[P.cuts_per_node-1]);
-                break;
-            }
-        }
-    }
-#endif  /*END DEBUG*/
-
-    //**/Write "Cut sizes:";
-    //**/for (uint i = 0; i < costs.size(); i++){
-    //**/    if (i == P.cuts_per_node) Write " |";
-    //**/    Write " %_", costs[i].cut_size;
-    //**/}
-    //**/NewLine;
-
 
     // Implement order:
     Vec<uint>& where = tmp_where;
@@ -415,9 +383,9 @@ void LutMap::generateCuts(Wire w)
             cuts_enumerated += cuts.size();
             prioritizeCuts(w, cuts.slice());
 
-            if (round > 0 || !P.map_for_delay)
+            if (!probeRound()){
                 cuts.shrinkTo(P.cuts_per_node);
-            else{
+            }else{
                 for (uint i = 1; i < cuts.size(); i++){
                     if (delay(cuts[i], arrival, N) > delay(cuts[0], arrival, N))
                         cuts.shrinkTo(i);
@@ -533,21 +501,21 @@ void LutMap::updateFanoutEst(bool instantiate)
             newMax(mapped_delay, depart[w]);
 
     if (!instantiate){
-        // Blend new values with old:
-if (!P.map_for_delay || round > 0){
-        uint  r = round + 1.0f;
-        if (P.map_for_delay && round != 0) r -= 1.0;
-        float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 2.0f);
-        float beta  = 1.0f - alpha;
+        if (!P.map_for_delay || round > 0){
+            // Blend new values with old:
+            uint  r = round + 1.0f;
+            if (P.map_for_delay && round != 0) r -= 1.0;
+            float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 2.0f);
+            float beta  = 1.0f - alpha;
 
-        For_Gates(N, w){
-            if (w == gate_And || w == gate_Lut4){
-//                fanout_est(w) = alpha * max_(fanouts[w], 1u)
-                fanout_est(w) = alpha * max_(double(fanouts[w]), 0.95)   // -- slightly less than 1 leads to better delay
-                              + beta  * fanout_est[w];
+            For_Gates(N, w){
+                if (w == gate_And || w == gate_Lut4){
+    //                fanout_est(w) = alpha * max_(fanouts[w], 1u)
+                    fanout_est(w) = alpha * max_(double(fanouts[w]), 0.95)   // -- slightly less than 1 leads to better delay
+                                  + beta  * fanout_est[w];
+                }
             }
         }
-}
 
     }else{
         // Compute FTBs:
@@ -624,11 +592,8 @@ void LutMap::run()
             target_arrival = mapped_delay * P.delay_factor;
         newMin(best_arrival, mapped_delay);
 
-        if (!P.quiet){
-            if (round == 0)
-                WriteLn "cuts_enumerated=%,d", cuts_enumerated;
-            WriteLn "round=%d   mapped_area=%,d   mapped_delay=%_   [enum: %t, blend: %t]", round, mapped_area, mapped_delay, T1-T0, T2-T1;
-        }
+        if (!P.quiet)
+            WriteLn "round=%d   mapped_area=%,d   mapped_delay=%_   cuts=%,d   [enum: %t, blend: %t]", round, mapped_area, mapped_delay, cuts_enumerated, T1-T0, T2-T1;
 
         if (round == 0 || !P.recycle_cuts || (round == 1 && P.map_for_delay)){
             if (round != last_round){
