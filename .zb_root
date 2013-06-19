@@ -4,5 +4,3 @@ conf_file     = MODULE.conf # contains configuration for the build of a module
 module_header = MODULE.hh   # optional header file that exports the collective API of the module
 prelude_mod   = ZZ_Prelude  # this module is always included (set to 'None' to disable this)
 pseudo_root   = ZZ          # a symlink, visible for #include:s, with this name will point to the root directory
-
-# <<== allow for different g++/gcc (take full path?)

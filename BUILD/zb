@@ -82,13 +82,14 @@ default_build = "qr"    # -- must only contain PRIMART-TYPE letters
 ## Probe architecture:
 
 
-build_path = None   # Absolute path to directory with build scripts
-machine    = None   # Result of 'uname -n' (currently changed to 'uname -mrs' with spaces replaced by '-')
-os_name    = None   # Result of 'uname'
-n_cores    = None   # Number of CPU cores. Good default for '-j' in the make call
-static_cxx = None
-popcnt     = None
-qt_libpath = None
+build_path   = None   # Absolute path to directory with build scripts
+machine      = None   # Result of 'uname -n' (currently changed to 'uname -mrs' with spaces replaced by '-')
+os_name      = None   # Result of 'uname'
+n_cores      = None   # Number of CPU cores. Good default for '-j' in the make call
+static_cxx   = None
+popcnt       = None
+qt_libpath   = None
+has_readline = None
 
 
 def get_build_path():
@@ -111,14 +112,17 @@ def get_n_cores():
     n_cores = multiprocessing.cpu_count()
 
 
+#def try_gcc(arg):
+#    with os.popen('echo "int main(){ return 0; }" | g++ -xc ' + arg + ' - -o /dev/null 2>&1', "r") as p:
+#        tmp = p.readline()
+#        if "unrecognized" in tmp:
+#            return False
+#        else:
+#            return True
+
 def try_gcc(arg):
-    with os.popen('echo "int main(){ return 0; }" | g++ -xc ' + arg + ' - -o /dev/null 2>&1', "r") as p:
-        tmp = p.readline()
-        #print "arg:", arg, "  tmp:", tmp
-        if "unrecognized" in tmp:
-            return False
-        else:
-            return True
+    return os.system('echo "int main(){ return 0; }" | g++ -xc '+arg+' - -o /dev/null >/dev/null 2>&1') == 0
+
 
 def get_gcc_version():
     global static_cxx
@@ -131,12 +135,17 @@ def get_qt_libpath():
     with os.popen("qmake -query QT_INSTALL_LIBS 2> /dev/null", "r") as p:
         qt_libpath = p.readline().rstrip()
 
+def get_available_libs():
+    global has_readline
+    has_readline = try_gcc("-lreadline")
+
 def probe():
     get_build_path()
     get_machine()
     get_n_cores()
     get_gcc_version()
     get_qt_libpath()
+    get_available_libs()
 
 
 ##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -452,6 +461,7 @@ def setup_cflags(pri, secs, cxx_mode):
     flags.append("-Wall -ffloat-store -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS -msse2")
     flags.append("-DZZ_CONSTANTS_AS_MACROS")
     if popcnt: flags.append("-mpopcnt")
+    if has_readline: flags.append("-DZZ_HAS_READLINE")
 
     # Primary type:
     if pri == "r": flags.append("-O3 -fomit-frame-pointer")
@@ -480,9 +490,9 @@ def setup_cflags(pri, secs, cxx_mode):
 
 def setup_lflags(pri, secs):
     flags = []
-    if static_cxx:  flags.append("-static-libstdc++")
-    if pri == "p":  flags.append("-pg")
-    if "t" in secs: flags.append("-pthread")
+    if static_cxx:   flags.append("-static-libstdc++")
+    if pri == "p":   flags.append("-pg")
+    if "t" in secs:  flags.append("-pthread")
     return " ".join(flags)
 
 
