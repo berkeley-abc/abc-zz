@@ -611,6 +611,8 @@ void LutMap::run()
 }
 
 
+// <<== put preprocessing here, not in Main_lutmap.cc
+
 LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_) :
     P(P_), N(N_), keep(keep_)
 {

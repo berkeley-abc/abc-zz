@@ -571,7 +571,9 @@ static void dotty (lua_State *L) {
         l_message(progname, lua_pushfstring(L,
                                "error calling " LUA_QL("print") " (%s)",
                                lua_tostring(L, -1)));
+
     }
+    lua_gc(L, LUA_GCCOLLECT, 0);  /* Added by Niklas Een 2013-06-18 */
   }
   lua_settop(L, 0);  /* clear stack */
   luai_writeline();
