@@ -4,11 +4,11 @@
 //| Author(s)   : Niklas Een
 //| Module      : LutMap
 //| Description :
-//|
+//| 
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//|
+//| 
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -446,9 +446,83 @@ void LutMap::updateFanoutEst(bool instantiate)
     mapped_area = 0;
     depart.clear();
 
+#if 1   /*EXPERIMENTAL*/
+    Vec<GLit>  outputs;
+    Vec<float> out_arr;
+    For_Gates(N, w){
+        if (isCO(w)){
+            outputs.push(w);
+            out_arr.push(-arrival[w]);
+        }
+    }
+    sobSort(ordByFirst(sob(out_arr), sob(outputs)));
+
+    Vec<GLit> order;
+    WSeen seen;
+    uint q = 0;
+    for (uint i = 0; i < outputs.size(); i++){
+        order.push(outputs[i]);
+        seen.add(outputs[i]);
+        while (q < order.size()){
+            Wire w = order[q++] + N;
+            For_Inputs(w, v){
+                if (!isCO(v) && !seen.has(v)){
+                    order.push(v);
+                    seen.add(v);
+                }
+            }
+        }
+    }
+
+    For_All_Gates_Rev(N, w){
+//    for (uint n = 0; n < order.size(); n++){
+//        Wire w = order[n] + N;
+
+        if (w == gate_And || w == gate_Lut4){
+            if (fanouts[w] > 0){
+                prioritizeCuts(w, cutmap[w]);
+                const Cut& cut = cutmap[w][0];
+                mapped_area += 1;       // -- LUT cost = 1
+
+                for (uint i = 0; i < cut.size(); i++){
+                    Wire v = cut[i] + N;
+                    fanouts(v)++;
+                    area_est(v) = 0;
+                }
+                active(w) = true;
+            }else
+                active(w) = false;
+
+        }else if (!isCI(w)){
+            For_Inputs(w, v)
+                fanouts(v)++;
+        }
+    }
+
+    For_All_Gates_Rev(N, w){
+        if (w == gate_And || w == gate_Lut4){
+            if (active[w]){
+                const Cut& cut = cutmap[w][0];
+                for (uint i = 0; i < cut.size(); i++){
+                    Wire v = cut[i] + N;
+                    newMax(depart(v), depart[w] + 1.0f);
+                }
+            }else
+                depart(w) = FLT_MAX;    // -- marks deactivated node
+
+        }else if (!isCI(w)){
+            float delay = (w != gate_Delay) ? 0.0f : w.arg() / DELAY_FRACTION;
+            For_Inputs(w, v)
+                newMax(depart(v), depart[w] + delay);
+        }
+    }
+#endif  /*END EXPERIMENTAL*/
+
+#if 0
     For_All_Gates_Rev(N, w){
         if (w == gate_And || w == gate_Lut4){
             if (fanouts[w] > 0){
+                /**/prioritizeCuts(w, cutmap[w]);
                 const Cut& cut = cutmap[w][0];
                 mapped_area += 1;       // -- LUT cost = 1
 
@@ -456,6 +530,7 @@ void LutMap::updateFanoutEst(bool instantiate)
                     Wire v = cut[i] + N;
                     fanouts(v)++;
                     newMax(depart(v), depart[w] + 1.0f);
+                    /**/area_est(v) = 0;
                 }
                 active(w) = true;
             }else{
@@ -472,6 +547,7 @@ void LutMap::updateFanoutEst(bool instantiate)
             }
         }
     }
+#endif
 
 #if 1   // -- temporary solution for computing estimated departure for inactive nodes
     WMap<float> tmpdep;
@@ -678,5 +754,5 @@ Major rounds:
 delay optimal everywhere
 globally delay optimal, use slack for area recovery
 
-hur få diversity med? varför svåt att hitta delay optimal med få cuts när Alan lyckas?
+hur få diversity med? varför svårt att hitta delay optimal med få cuts när Alan lyckas?
 */
