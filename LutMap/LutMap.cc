@@ -16,6 +16,7 @@
 #include "ZZ_Gig.hh"
 #include "ZZ_BFunc.hh"
 #include "ZZ/Generics/Sort.hh"
+#include "ZZ/Generics/Heap.hh"
 #include "Cut.hh"
 
 #define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
@@ -79,6 +80,7 @@ class LutMap {
 
     // Internal methods:
     void  prioritizeCuts(Wire w, Array<Cut> cuts);
+    void  reprioritizeCuts(Wire w, Array<Cut> cuts);
     void  generateCuts_LogicGate(Wire w, Vec<Cut>& out);
     void  generateCuts(Wire w);
     void  updateFanoutEst(bool instantiate);
@@ -347,6 +349,37 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
 }
 
 
+// Applied during instantiation where some 'area_est[w]' is set to zero.
+void LutMap::reprioritizeCuts(Wire w, Array<Cut> cuts)
+{
+    float best_delay = FLT_MAX;
+    float best_area  = FLT_MAX;
+    uint  best_i = 0;
+
+    for (uint i = 0; i < cuts.size(); i++){
+        float this_delay = 0.0f;
+        float this_area  = 0.0f;
+        for (uint j = 0; j < cuts[i].size(); j++){
+            Wire v = cuts[i][j] + N;
+            this_area += area_est[v];
+            newMax(this_delay, arrival[v]);
+        }
+
+        if (i == 0){
+            best_delay = this_delay;
+            best_area  = this_area;
+        }else if (this_delay > best_delay)
+            break;
+
+        if (newMin(best_area, this_area))
+            best_i = i;
+    }
+
+    if (best_i != 0)
+        swp(cuts[0], cuts[best_i]);
+}
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Cut generation:
 
@@ -439,6 +472,23 @@ void LutMap::generateCuts(Wire w)
 // Fanout estimation:
 
 
+struct InstOrder {
+    const WMap<float>& arrival;
+    const WMap<float>& depart;
+    InstOrder(const WMap<float>& arrival_, const WMap<float>& depart_) : arrival(arrival_), depart(depart_) {}
+
+    bool operator()(GLit p, GLit q) const {
+        float len_p = arrival[p] + depart[p];
+        float len_q = arrival[q] + depart[q];
+        if (len_p > len_q) return true;
+        if (len_p < len_q) return false;
+        if (arrival[p] < arrival[q]) return true;
+        if (arrival[p] > arrival[q]) return false;
+        return false;
+    }
+};
+
+
 // Updates:
 //
 //   - depart
@@ -455,57 +505,42 @@ void LutMap::updateFanoutEst(bool instantiate)
     mapped_area = 0;
 
 #if 1   /*EXPERIMENTAL*/
-  #if 1
-    Vec<GLit>  outputs;
-    Vec<float> out_arr;
+    active.clear();
+
+    InstOrder lt(arrival, depart);
+    KeyHeap<GLit, false, InstOrder> ready(lt);
     For_Gates(N, w){
         if (isCO(w)){
-            outputs.push(w);
-            out_arr.push(-arrival[w]);
-        }
-    }
-    sobSort(ordByFirst(sob(out_arr), sob(outputs)));
-
-    Vec<GLit> order;
-    WSeen seen;
-    uint q = 0;
-    for (uint i = 0; i < outputs.size(); i++){
-        order.push(outputs[i]);
-        seen.add(outputs[i]);
-        while (q < order.size()){
-            Wire w = order[q++] + N;
-            For_Inputs(w, v){
-                if (!isCO(v) && !seen.has(v)){
-                    order.push(v);
-                    seen.add(v);
-                }
-            }
+            ready.add(w);
+            active(w) = true;
         }
     }
 
-  #endif
-
-    active.clear();
-//    For_All_Gates_Rev(N, w){
-    for (uint n = 0; n < order.size(); n++){
-        Wire w = order[n] + N;
+    while (ready.size() > 0){
+        Wire w = ready.pop() + N;
+        assert(active[w]);
 
         if (isLogic(w)){
-            if (active[w]){
-                //prioritizeCuts(w, cutmap[w]);
-                const Cut& cut = cutmap[w][0];
-                mapped_area += 1;       // -- LUT cost = 1
+            reprioritizeCuts(w, cutmap[w]);
+            const Cut& cut = cutmap[w][0];
+            mapped_area += 1;       // -- LUT cost = 1
 
-                for (uint i = 0; i < cut.size(); i++){
-                    Wire v = cut[i] + N;
-//                    area_est(v) = 0;
+            for (uint i = 0; i < cut.size(); i++){
+                Wire v = cut[i] + N;
+                area_est(v) = 0;
+                if (!active[v]){
+                    ready.add(v);
                     active(v) = true;
                 }
             }
 
         }else if (!isCI(w)){
-            For_Inputs(w, v)
-                active(v) = true;
+            For_Inputs(w, v){
+                if (!active[v]){
+                    ready.add(v);
+                    active(v) = true;
+                }
+            }
         }
     }
 
@@ -602,8 +637,8 @@ void LutMap::updateFanoutEst(bool instantiate)
 
             For_Gates(N, w){
                 if (isLogic(w)){
-    //                fanout_est(w) = alpha * max_(fanouts[w], 1u)
-                    fanout_est(w) = alpha * max_(double(fanouts[w]), 0.95)   // -- slightly less than 1 leads to better delay
+                    fanout_est(w) = alpha * max_(fanouts[w], 1u)
+//                    fanout_est(w) = alpha * max_(double(fanouts[w]), 0.95)   // -- slightly less than 1 leads to better delay
                                   + beta  * fanout_est[w];
                 }
             }
