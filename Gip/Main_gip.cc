@@ -114,12 +114,14 @@ int myTab(int count, int key)
     while (start > 0 && isIdentChar0(rl_line_buffer[start-1])) start--;
     Str tail = slice(rl_line_buffer[start], rl_line_buffer[rl_point]);
 
+#if !defined(__APPLE__)
     if (eq(tail, "lm")){
         rl_delete_text(start, rl_point);
         rl_point = start;
         rl_insert_text("lutmap()");
         rl_point--;
     }
+#endif
 
     return 0;
 }
