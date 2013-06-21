@@ -26,6 +26,15 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Helpers:
+
+
+macro bool isLogic(Wire w) {
+    return w == gate_And || w == gate_Lut4;
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // LutMap class:
 
 
@@ -444,9 +453,9 @@ void LutMap::updateFanoutEst(bool instantiate)
     fanouts.reserve(N.size());
 
     mapped_area = 0;
-    depart.clear();
 
 #if 1   /*EXPERIMENTAL*/
+  #if 1
     Vec<GLit>  outputs;
     Vec<float> out_arr;
     For_Gates(N, w){
@@ -474,37 +483,40 @@ void LutMap::updateFanoutEst(bool instantiate)
         }
     }
 
-    For_All_Gates_Rev(N, w){
-//    for (uint n = 0; n < order.size(); n++){
-//        Wire w = order[n] + N;
+  #endif
 
-        if (w == gate_And || w == gate_Lut4){
-            if (fanouts[w] > 0){
-                prioritizeCuts(w, cutmap[w]);
+    active.clear();
+//    For_All_Gates_Rev(N, w){
+    for (uint n = 0; n < order.size(); n++){
+        Wire w = order[n] + N;
+
+        if (isLogic(w)){
+            if (active[w]){
+                //prioritizeCuts(w, cutmap[w]);
                 const Cut& cut = cutmap[w][0];
                 mapped_area += 1;       // -- LUT cost = 1
 
                 for (uint i = 0; i < cut.size(); i++){
                     Wire v = cut[i] + N;
-                    fanouts(v)++;
-                    area_est(v) = 0;
+//                    area_est(v) = 0;
+                    active(v) = true;
                 }
-                active(w) = true;
-            }else
-                active(w) = false;
+            }
 
         }else if (!isCI(w)){
             For_Inputs(w, v)
-                fanouts(v)++;
+                active(v) = true;
         }
     }
 
+    depart.clear();
     For_All_Gates_Rev(N, w){
-        if (w == gate_And || w == gate_Lut4){
+        if (isLogic(w)){
             if (active[w]){
                 const Cut& cut = cutmap[w][0];
                 for (uint i = 0; i < cut.size(); i++){
                     Wire v = cut[i] + N;
+                    fanouts(v)++;
                     newMax(depart(v), depart[w] + 1.0f);
                 }
             }else
@@ -512,15 +524,17 @@ void LutMap::updateFanoutEst(bool instantiate)
 
         }else if (!isCI(w)){
             float delay = (w != gate_Delay) ? 0.0f : w.arg() / DELAY_FRACTION;
-            For_Inputs(w, v)
+            For_Inputs(w, v){
+                fanouts(v)++;
                 newMax(depart(v), depart[w] + delay);
+            }
         }
     }
-#endif  /*END EXPERIMENTAL*/
 
-#if 0
+#else  /*END EXPERIMENTAL*/
+    depart.clear();
     For_All_Gates_Rev(N, w){
-        if (w == gate_And || w == gate_Lut4){
+        if (isLogic(w)){
             if (fanouts[w] > 0){
                 /**/prioritizeCuts(w, cutmap[w]);
                 const Cut& cut = cutmap[w][0];
@@ -549,6 +563,8 @@ void LutMap::updateFanoutEst(bool instantiate)
     }
 #endif
 
+    //**/For_All_Gates_Rev(N, w) Dump(w, (int)active[w], fanouts[w]);
+
 #if 1   // -- temporary solution for computing estimated departure for inactive nodes
     WMap<float> tmpdep;
     depart.copyTo(tmpdep);
@@ -556,9 +572,9 @@ void LutMap::updateFanoutEst(bool instantiate)
         if (isCI(w)) continue;
         if (tmpdep[w] == FLT_MAX) continue;
 
-        //if (w != gate_And && w != gate_Lut4) continue;
+        //if (isLogic(w)) continue;
         For_Inputs(w, v){
-            if (v != gate_And && v != gate_Lut4) continue;
+            if (!isLogic(v)) continue;
             if (depart[v] != FLT_MAX) continue;
 
             if (tmpdep[v] == FLT_MAX) tmpdep(v) = 0;
@@ -585,7 +601,7 @@ void LutMap::updateFanoutEst(bool instantiate)
             float beta  = 1.0f - alpha;
 
             For_Gates(N, w){
-                if (w == gate_And || w == gate_Lut4){
+                if (isLogic(w)){
     //                fanout_est(w) = alpha * max_(fanouts[w], 1u)
                     fanout_est(w) = alpha * max_(double(fanouts[w]), 0.95)   // -- slightly less than 1 leads to better delay
                                   + beta  * fanout_est[w];
@@ -597,7 +613,7 @@ void LutMap::updateFanoutEst(bool instantiate)
         // Compute FTBs:
         Vec<uint64> ftbs(reserve_, mapped_area);
         For_Gates(N, w){
-            if (w == gate_And && depart[w] != FLT_MAX){
+            if (isLogic(w) && active[w]){
                 const Cut& cut = cutmap[w][0];
                 ftbs += computeFtb(w, cut);
             }
@@ -608,7 +624,7 @@ void LutMap::updateFanoutEst(bool instantiate)
         N.setMode(gig_FreeForm);
         uint j = 0;
         For_Gates(N, w){
-            if (w == gate_And && depart[w] != FLT_MAX){
+            if (isLogic(w) && active[w]){
                 // Change AND gate into a LUT6:
                 const Cut& cut = cutmap[w][0];
                 change(w, gate_Lut6);
@@ -675,7 +691,7 @@ void LutMap::run()
             if (round != last_round){
                 winner.clear();
                 For_Gates(N, w)
-                    if ((w == gate_And || w == gate_Lut4) && cutmap[w].size() > 0)
+                    if (isLogic(w) && cutmap[w].size() > 0)
                         winner(w) = cutmap[w][0];
             }
 
@@ -684,6 +700,8 @@ void LutMap::run()
             cutmap.clear();
         }
     }
+
+    WriteLn "Result: %_", info(N);
 }
 
 
@@ -743,11 +761,11 @@ Parametrar:
   - est. slack (incl. "unknown" as a boolean)
 
 + previous best choice? Or not needed?
-    
+
 Major rounds:
   - blending ratio
   - reuse cuts (boolean)
- 
+
 */
 
 /*

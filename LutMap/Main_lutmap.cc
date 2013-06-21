@@ -124,6 +124,7 @@ int main(int argc, char** argv)
 
     if (output != ""){
         if (hasExtension(output, "blif")){
+            N.setMode(gig_Lut6);
             writeBlifFile(output, N);
             WriteLn "Wrote: \a*%_\a*", output;
         }else if (hasExtension(output, "gnl")){
