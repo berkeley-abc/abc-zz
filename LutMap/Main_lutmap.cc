@@ -57,6 +57,43 @@ void introduceMuxes(Gig& N)
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+void makeCombinational(Gig& N)
+{
+    Vec<GLit> ins;
+    For_Gates(N, w){
+        if (isCI(w)){
+            if (w != gate_PI)
+                change(w, gate_PI);
+
+        }else if (isCO(w)){
+            if (w != gate_PO){
+                assert(w.size() == 1);
+                Wire v = w[0];
+                change(w, gate_PO);
+                w.set(0, v);
+            }
+
+        }else if (w == gate_Delay){
+            if (w.size() == 0)
+                change(w, gate_PI);
+            else{
+                vecCopy(w, ins);
+                Wire acc = ins[0] + N;
+                for (uint i = 1; i < ins.size(); i++)
+                    acc = aig_Xor(acc, ins[i] + N);
+
+                change(w, gate_And);
+                w.set(0, acc);
+                w.set(1, acc);
+            }
+        }
+    }
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+
+
 int main(int argc, char** argv)
 {
     ZZ_Init;
@@ -69,6 +106,7 @@ int main(int argc, char** argv)
     cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
     cli.add("recycle", "bool"  , "yes"       , "Recycle cuts for faster iterations.");
     cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (defaul is area).");
+    cli.add("comb"   , "bool"  , "no"        , "Remove white/black boxes and sequential elements (may change delay profile).");
     cli.add("mux"    , "bool"  , "yes"       , "Do MUX and XOR extraction first.");
     cli.add("a"      , "bool"  , "no"        , "[EXPERIMENTAL] Auto-tune.");
     cli.parseCmdLine(argc, argv);
@@ -102,6 +140,9 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+    if (cli.get("comb").bool_val)
+        makeCombinational(N);
+
     if (cli.get("mux").bool_val)
         introduceMuxes(N);
 
@@ -112,8 +153,15 @@ int main(int argc, char** argv)
     WriteLn "Input: %_", info(N);
 
     if (blif != ""){
+        bool quit = false;
+        if (blif.last() == '@'){
+            quit = true;
+            blif.pop(); }
+
         writeBlifFile(blif, N);
         WriteLn "Wrote: \a*%_\a*", blif;
+
+        if (quit) return 0;
     }
 
     if (cli.get("a").bool_val)

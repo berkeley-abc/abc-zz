@@ -38,8 +38,6 @@ template<> fts_macro void write_(Out& out, const Name& v)
 // Will output combinational netlist; sequential elements are treated as CIs/COs.
 void writeBlif(Out& out, Gig& N)
 {
-    assert(N.mode() == gig_Lut6 || N.mode() == gig_Aig);
-
     // Generate names:
     WMap<Name> nam;
     nam(N.False()) = Name('c', 0);
@@ -104,6 +102,36 @@ void writeBlif(Out& out, Gig& N)
             bool wrote_something = false;
             for (uint v = 0; v < (1u << n_inputs); v++){
                 if (ftb(w) & (1ull << v)){
+                    for (uint i = 0; i < n_inputs; i++)
+                        out += (v & (1u << i)) ? '1' : '0';
+                    FWriteLn(out) " 1";
+                    wrote_something = true;
+                }
+            }
+
+            if (!wrote_something){
+                for (uint i = 0; i < n_inputs; i++)
+                    out += '-';
+                FWriteLn(out) " 0";    // -- degenerate case (constant zero)
+            }
+
+            break;}
+
+        case gate_Lut4:{
+            uint n_inputs = 4;
+            while (n_inputs > 0 && w[n_inputs-1] == Wire_NULL)
+                n_inputs--;
+            for (uint i = 0; i < n_inputs; i++)
+                assert(w[i] != Wire_NULL);  // -- must not be gaps between the used input pins, only top pins can be unused
+
+            FWrite(out) ".names";
+            for (uint i = 0; i < n_inputs; i++)
+                FWrite(out) " %_", nam[w[i]];
+            FWriteLn(out) " %_", nam[w];
+
+            bool wrote_something = false;
+            for (uint v = 0; v < (1u << n_inputs); v++){
+                if (w.arg() & (1ull << v)){
                     for (uint i = 0; i < n_inputs; i++)
                         out += (v & (1u << i)) ? '1' : '0';
                     FWriteLn(out) " 1";
