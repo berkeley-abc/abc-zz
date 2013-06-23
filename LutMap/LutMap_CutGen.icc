@@ -14,10 +14,7 @@
 
 macro Pair<Cut, Array<Cut> > getCuts(Wire w, const WMap<Array<Cut> >& cutmap)
 {
-    if (w == gate_Const)
-        return tuple(Cut(empty_), Array<Cut>(empty_));
-    else
-        return tuple(Cut(w.id), cutmap[w]);
+    return tuple(Cut(w.id), cutmap[w]);
 }
 
 

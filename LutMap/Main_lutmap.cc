@@ -44,11 +44,12 @@ static
 void introduceMuxes(Gig& N)
 {
     Wire sel, d1, d0;
+    N.thaw();
     N.setMode(gig_FreeForm);
 
     For_DownOrder(N, w){
         if (isMux(w, sel, d1, d0))
-            change(w, gate_Lut4, 0x5353).init(d0, d1, sel);     // <<== unverified + need to remove signs
+            change(w, gate_Lut4, 0xCACA).init(d0, d1, sel);     // <<== unverified + need to remove signs
     }
 }
 
@@ -108,6 +109,7 @@ int main(int argc, char** argv)
 
     double T1 = cpuTime();
     WriteLn "Parsing: %t", T1-T0;
+    WriteLn "Input: %_", info(N);
 
     if (blif != ""){
         writeBlifFile(blif, N);
@@ -129,6 +131,9 @@ int main(int argc, char** argv)
             WriteLn "Wrote: \a*%_\a*", output;
         }else if (hasExtension(output, "gnl")){
             N.save(output);
+            WriteLn "Wrote: \a*%_\a*", output;
+        }else if (hasExtension(output, "gig")){
+            writeGigForTechmap(output, N);
             WriteLn "Wrote: \a*%_\a*", output;
         }else{
             ShoutLn "ERROR! Unknown file extension: %_", output;

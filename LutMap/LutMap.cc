@@ -87,10 +87,12 @@ class LutMap {
     void  run();
 
     // Temporaries:
-    Vec<Cut>  tmp_cuts;
-    Vec<Cost> tmp_costs;
-    Vec<uint> tmp_where;
-    Vec<uint> tmp_list;
+    Vec<Cut>     tmp_cuts;
+    Vec<Cost>    tmp_costs;
+    Vec<uint>    tmp_where;
+    Vec<uint>    tmp_list;
+    WZet         in_memo;
+    WMap<uint64> memo;
 
     bool probeRound() const { return P.map_for_delay && round == 0; }
     bool delayRound() const { return P.map_for_delay ? round == 1 : round == 0; }
@@ -105,17 +107,56 @@ public:
 // Helper functions:
 
 
+
 static
-uint64 computeFtb(Wire w, const Cut& cut)
+uint64 computeFtb_(Wire w, const Cut& cut, WZet& in_memo, WMap<uint64>& memo)
 {
+    uint64 imask = (w.sign ? 0xFFFFFFFFFFFFFFFFull : 0ull);
+
     if (w.id == gid_True)
-        return w.sign ? 0ull : 0xFFFFFFFFFFFFFFFFull;
+        return ~imask;
 
+    if (in_memo.has(w))
+        return memo[w] ^ imask;
+
+    uint64 ret;
     for (uint i = 0; i < cut.size(); i++)
-        if (w.id == cut[i])
-            return ftb6_proj[w.sign][i];
+        if (w.id == cut[i]){
+            ret = ftb6_proj[0][i];
+            goto Found; }
+    /*else*/
+    {
+        if (w == gate_And)
+            ret = computeFtb_(w[0], cut, in_memo, memo) & computeFtb_(w[1], cut, in_memo, memo);
+        else if (w == gate_Lut4){
+            uint64 ftb[4];
+            for (uint i = 0; i < 4; i++)
+                ftb[i] = w[i] ? computeFtb_(w[i], cut, in_memo, memo) : 0ull;
 
-    return (computeFtb(w[0], cut) & computeFtb(w[1], cut)) ^ (w.sign ? 0xFFFFFFFFFFFFFFFFull : 0ull);
+            ret = 0;
+            for (uint64 m = 1; m != 0; m <<= 1){
+                uint b = uint(bool(ftb[0] & m)) | (uint(bool(ftb[1] & m)) << 1) | (uint(bool(ftb[2] & m)) << 2) | (uint(bool(ftb[3] & m)) << 3);
+                if (w.arg() & (1 << b))
+                    ret |= m;
+            }
+
+        }else
+            assert(false);
+    }Found:;
+
+    memo(w) = ret;
+    in_memo.add(w);
+
+    return ret ^ imask;
+}
+
+
+static
+uint64 computeFtb(Wire w, const Cut& cut, WZet& in_memo, WMap<uint64>& memo)
+{
+    uint64 ret = computeFtb_(w, cut, in_memo, memo);
+    in_memo.clear();
+    return ret;
 }
 
 
@@ -650,7 +691,7 @@ void LutMap::updateFanoutEst(bool instantiate)
         For_Gates(N, w){
             if (isLogic(w) && active[w]){
                 const Cut& cut = cutmap[w][0];
-                ftbs += computeFtb(w, cut);
+                ftbs += computeFtb(w, cut, in_memo, memo);
             }
         }
 

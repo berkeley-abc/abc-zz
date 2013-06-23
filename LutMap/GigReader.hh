@@ -21,6 +21,7 @@ using namespace std;
 
 
 void readGigForTechmap(String filename, Gig& N);
+bool writeGigForTechmap(String filename, Gig& N);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

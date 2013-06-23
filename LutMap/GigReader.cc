@@ -20,6 +20,7 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Reader:
 
 
 const float delay_MemR = 15;
@@ -41,6 +42,7 @@ void readGigForTechmap(String filename, Gig& N)
     Map<Str,GLit> name2gate;
     Vec<Pair<GLit,uint> > fgates;
     Vec<Str> fanins;
+    Vec<GLit> loops;
 
     name2gate.set(slize("0"), N.False());
     name2gate.set(slize("1"), N.True());
@@ -108,7 +110,8 @@ void readGigForTechmap(String filename, Gig& N)
             // Create gate: 
             Wire w;
             if (phase == 0){
-                if      (eq(gate, "PI"   )) w = N.add(gate_PI);
+                if      (eq(gate, "Const")) w = N.True() ^ (attr[0] == '0');
+                else if (eq(gate, "PI"   )) w = N.add(gate_PI);
                 else if (eq(gate, "PO"   )) w = N.add(gate_PO);
                 else if (eq(gate, "And"  )) w = N.add(gate_And);
                 else if (eq(gate, "FF"   )) w = N.add(gate_FF);
@@ -118,7 +121,7 @@ void readGigForTechmap(String filename, Gig& N)
                 else if (eq(gate, "MemW" )) w = N.addDyn(gate_Delay, args.size(), delay_MemW);
                 else if (eq(gate, "PadR" )) w = N.addDyn(gate_Delay, args.size(), delay_PadR);
                 else if (eq(gate, "PadW" )) w = N.addDyn(gate_Delay, args.size(), delay_PadW);
-                else if (eq(gate, "Lut"  )){
+                else if (eq(gate, "Lut") || eq(gate, "Lut4") || eq(gate, "Loop")){
                     if (attr.size() != 4)
                         Throw(Excp_Msg) "[line %_] Invalid FTB, must be exactly four hexadecimal digits.", line_no;
                     ushort ftb = fromHex(attr[0])
@@ -126,6 +129,8 @@ void readGigForTechmap(String filename, Gig& N)
                                | (fromHex(attr[2]) << 8)
                                | (fromHex(attr[3]) << 12);
                     w = N.add(gate_Lut4, ftb);
+                    if (gate[1] == 'o')
+                        loops.push(w);
                 }else if (eq(gate, "Delay")){
                     float delay = 0;
                     try{
@@ -162,13 +167,27 @@ void readGigForTechmap(String filename, Gig& N)
 
                     v = v + N;
                     if (+v != Wire_NULL)
-                        w.set(i, !isSeqElem(w) ? v : N.add(gate_Seq).init(v));
+                        w.set(i, !isSeqElem(w) ? v : N.add(gate_Seq).init(v));  // -- 'Seq's are added here!
                 }
             }
         }
 
         in.rewind();
     }
+
+    // Post-process 'Loop's:
+    for (uint i = 0; i < loops.size(); i++){
+        // For loops, pin 0 should be the implicit unit-delayed output signal:
+        Wire w = loops[i] + N;
+        assert(!w[3]);
+        w.set(3, w[2]);
+        w.set(2, w[1]);
+        w.set(1, w[0]);
+        Wire w_seq = N.add(gate_Seq).init(w);
+        Wire w_ff  = N.add(gate_FF ).init(w_seq);
+        w.set(0, w_ff);
+    }
+    loops.clear(true);
 
     // Palladium fixup:
     Add_Gob(N, FanoutCount);
@@ -196,6 +215,41 @@ void readGigForTechmap(String filename, Gig& N)
     }
 
     N.compact();
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Writer:
+
+
+bool writeGigForTechmap(String filename, Gig& N)
+{
+    OutFile out(filename);
+    if (!out) return false;
+
+    For_Gates(N, w){
+        FWrite(out) "%w = %_", w.lit(), w.type();
+        if (w.size() == 0)
+            FNewLine(out);
+        else{
+            FWrite(out) "(";
+            for (uint i = 0; i < w.size(); i++){
+                if (i != 0) out += ", ";
+                if (w[i])
+                    FWrite(out) "%w", w[i].lit();
+                else
+                    out += '-';
+            }
+            FWrite(out) ")";
+
+            if (w == gate_Lut6)
+                FWrite(out) " [%.16X]", ftb(w);
+
+            FNewLine(out);
+        }
+    }
+
+    return true;
 }
 
 
