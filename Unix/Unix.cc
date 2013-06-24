@@ -67,7 +67,7 @@ String userName()
 }
 
 
-bool fileExists(String filename)
+bool statFileExists(String filename)
 {
     struct stat buf;
     int ret = stat(filename.c_str(), &buf);

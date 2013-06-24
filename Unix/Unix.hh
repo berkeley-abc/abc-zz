@@ -24,7 +24,7 @@ using namespace std;
 String userName();
 String homeDir();
 String homeDir(String username);
-bool   fileExists(String filename);
+bool   statFileExists(String filename);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

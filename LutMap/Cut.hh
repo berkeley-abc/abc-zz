@@ -103,22 +103,6 @@ macro bool subsumes(const LutMap_Cut& c, const LutMap_Cut& d)
 }
 
 
-macro bool moreThanSixBits(uint a)
-{
-  #if defined(__GNUC__) && !defined(ZZ_DEBUG)   // -- valgrind doesn't like popcount()
-    return __builtin_popcount(a) > 6;
-  #else
-    a &= a - 1;
-    a &= a - 1;
-    a &= a - 1;
-    a &= a - 1;
-    a &= a - 1;
-    a &= a - 1;
-    return a;
-  #endif
-}
-
-
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
 #endif

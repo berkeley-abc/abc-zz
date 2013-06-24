@@ -12,6 +12,21 @@
 //|________________________________________________________________________________________________
 
 
+#define CUT_SIZE 6      // -- allow smaller cuts at compile time (for experimentation)
+
+
+macro bool moreThanSixBits(uint a)
+{
+  #if defined(__GNUC__) && !defined(ZZ_DEBUG)   // -- valgrind doesn't like popcount()
+    return __builtin_popcount(a) > CUT_SIZE;
+  #else
+    for (uint i = 0; i < CUT_SIZE; i++)
+        a &= a - 1;
+    return a;
+  #endif
+}
+
+
 macro Pair<Cut, Array<Cut> > getCuts(Wire w, const WMap<Array<Cut> >& cutmap)
 {
     return tuple(Cut(w.id), cutmap[w]);
@@ -70,7 +85,7 @@ Cut combineCuts_Bin(const Cut& cut1, const Cut& cut2)
     if (cut1.size() == 0) goto FlushCut2;
     if (cut2.size() == 0) goto FlushCut1;
     for(;;){
-        if (result.size() == 6) return Cut_NULL;
+        if (result.size() == CUT_SIZE) return Cut_NULL;
         if (cut1[i] < cut2[j]){
             result.push(cut1[i]), i++;
             if (i >= cut1.size()) goto FlushCut2;
@@ -85,13 +100,13 @@ Cut combineCuts_Bin(const Cut& cut1, const Cut& cut2)
     }
 
   FlushCut1:
-    if (result.size() + cut1.size() - i > 6) return Cut_NULL;
+    if (result.size() + cut1.size() - i > CUT_SIZE) return Cut_NULL;
     while (i < cut1.size())
         result.push(cut1[i]), i++;
     goto Done;
 
   FlushCut2:
-    if (result.size() + cut2.size() - j > 6) return Cut_NULL;
+    if (result.size() + cut2.size() - j > CUT_SIZE) return Cut_NULL;
     while (j < cut2.size())
         result.push(cut2[j]), j++;
     goto Done;
@@ -119,7 +134,7 @@ Cut combineCuts_Tern(const Cut& cut0, const Cut& cut1, const Cut& cut2)
         gate_id smallest = min_(min_(x0, x1), x2);
 
         if (smallest == gid_MAX) break;
-        if (result.size() == 6) return Cut_NULL;
+        if (result.size() == CUT_SIZE) return Cut_NULL;
 
         if (x0 == smallest) i0++;
         if (x1 == smallest) i1++;
@@ -152,7 +167,7 @@ Cut combineCuts_Quad(const Cut& cut0, const Cut& cut1, const Cut& cut2, const Cu
         gate_id smallest = min_(min_(x0, x1), min_(x2, x3));
 
         if (smallest == gid_MAX) break;
-        if (result.size() == 6) return Cut_NULL;
+        if (result.size() == CUT_SIZE) return Cut_NULL;
 
         if (x0 == smallest) i0++;
         if (x1 == smallest) i1++;

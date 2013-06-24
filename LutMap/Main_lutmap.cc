@@ -1,6 +1,7 @@
 #include "Prelude.hh"
 #include "ZZ_CmdLine.hh"
 #include "ZZ_Gig.IO.hh"
+#include "ZZ_Unix.hh"
 #include "LutMap.hh"
 #include "GigReader.hh"
 
@@ -127,7 +128,21 @@ int main(int argc, char** argv)
     try{
         if (hasExtension(input, "aig"))
             readAigerFile(input, N, false);
-        else if (hasExtension(input, "gnl"))
+        else if (hasExtension(input, "aig.gpg")){
+            // Start GPG process:
+            int pid;
+            int io[3];
+            Vec<String> args;
+            args += "--batch", "--no-use-agent", "--passphrase-file", homeDir() + "/.gnupg/key.txt", "-d", input;
+            startProcess("*gpg", args, pid, io);
+
+            // Read file:
+            File file(io[1], READ, false);
+            In   in(file);
+            readAiger(in, N, false);
+            closeChildIo(io);
+
+        }else if (hasExtension(input, "gnl"))
             N.load(input);
         else if (hasExtension(input, "gig"))
             readGigForTechmap(input, N);

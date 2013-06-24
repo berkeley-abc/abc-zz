@@ -326,7 +326,6 @@ static void sortCuts(Vec<LutMap_Cost>& costs, uint round, float req_time)
 void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
 {
     assert(cuts.size() > 0);
-    /**/if (!(fanout_est[w] > 0)){ Add_Gob(N, Fanouts); WriteLn "w=%_  ins=%_  outs=%_", w, w.fanins(), fanouts(w); }
     assert(fanout_est[w] > 0);
 
     // Setup cost vector:
