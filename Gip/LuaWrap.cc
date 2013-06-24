@@ -11,6 +11,13 @@
 //| 
 //|________________________________________________________________________________________________
 
+#if defined(ZZ_HAS_READLINE)
+extern "C"{
+#include <readline/readline.h>
+#include <readline/history.h>
+}
+#endif
+
 #include "Prelude.hh"
 #include "ZZ_Lua.hh"
 #include "ZZ_Gig.IO.hh"
@@ -219,10 +226,71 @@ int l_lutmap(lua_State* L_)
 }
 
 
+int rlfun_loadStd(int count, int key)
+{
+    rl_replace_line("dofile(\"std.lua\")", true);
+    rl_redisplay();
+    rl_crlf();
+    rl_done = 1;
+    return 0;
+}
+
+
+int rlfun_wrapPrint(int count, int key)
+{
+    String text;
+    FWrite(text) "print(%_)", rl_line_buffer;
+    rl_replace_line(text.c_str(), true);
+    rl_redisplay();
+    rl_crlf();
+    rl_done = 1;
+    return 0;
+}
+
+
+void rl_bindFunctionKey(int key, rl_command_func_t* fun)
+{
+    static cchar* key_seq[12][2] = {
+        { "\\eOP", "\\e[11~" },
+        { "\\eOQ", "\\e[12~" },
+        { "\\eOR", "\\e[13~" },
+        { "\\eOS", "\\e[14~" },
+        { "\\e[15~", NULL   },
+        { "\\e[17~", NULL   },
+        { "\\e[18~", NULL   },
+        { "\\e[19~", NULL   },
+        { "\\e[20~", NULL   },
+        { "\\e[21~", NULL   },
+        { "\\e[23~", NULL   },
+        { "\\e[24~", NULL   }
+    };
+
+    assert(key >= 1 && key <= 12);
+
+    rl_generic_bind(ISFUNC, key_seq[key-1][0], (char*)fun, rl_get_keymap());
+    if (key_seq[key-1][1])
+        rl_generic_bind(ISFUNC, key_seq[key-1][1], (char*)fun, rl_get_keymap());
+}
+
+
 void testLua()
 {
     Lua L;
 
+    //Keymap m = (Keymap)rl_get_keymap()[27].function;
+    //for (uint i = 0; i < KEYMAP_SIZE; i++)
+    //    WriteLn "%_: %_ %_", i, (uint)m[i].type, (void*)m[i].function;
+    //exit(0);
+
+    rl_bindFunctionKey(1, rlfun_loadStd);
+    rl_generic_bind(ISFUNC, "\\e[27;5;13~", (char*)rlfun_wrapPrint, rl_get_keymap());
+
+    // ^[OP (Q R ...)
+    //rl_bind_key_in_map ('P', rlLoadStd, Keymap map)    
+    // rl_generic_bind
+    // rl_get_keymap_by_name (const char *name)
+    //  rl_get_keymap
+    // "\e[11~": "Function Key 1"
 //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     L.pushnumber(0);   // -- upvalue
     L.pushcclosure(l_newString, 1);
