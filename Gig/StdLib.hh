@@ -55,5 +55,16 @@ void upOrderTest(const Gig& N);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Unstrashed AIG construction:
+
+
+macro Wire mkAnd  (Wire x, Wire y)           { return gig(x).add(gate_And).init(x, y); }
+macro Wire mkOr   (Wire x, Wire y)           { return ~mkAnd(~x, ~y); }
+macro Wire mkMux  (Wire s, Wire d1, Wire d0) { return ~mkAnd(~mkAnd(s, d1), ~mkAnd(~s, d0)); }
+macro Wire mkXor  (Wire x, Wire y)           { return mkMux(x, ~y,  y); }
+macro Wire mkEquiv(Wire x, Wire y)           { return mkMux(x,  y, ~y); }
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
 #endif

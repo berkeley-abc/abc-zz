@@ -632,6 +632,10 @@ inline void Gig::tell_subst(GLit w_old, GLit w_new)
 // Functions:
 
 
+macro Gig& gig(Wire w) {
+    return *w.gig(); }
+
+
 macro void remove(Wire w) {
     w.gig()->remove(w.id); }
 

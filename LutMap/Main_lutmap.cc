@@ -60,6 +60,8 @@ void introduceMuxes(Gig& N)
 
 void makeCombinational(Gig& N)
 {
+    N.thaw();
+
     Vec<GLit> ins;
     For_Gates(N, w){
         if (isCI(w)){
@@ -81,7 +83,7 @@ void makeCombinational(Gig& N)
                 vecCopy(w, ins);
                 Wire acc = ins[0] + N;
                 for (uint i = 1; i < ins.size(); i++)
-                    acc = aig_Xor(acc, ins[i] + N);
+                    acc = mkXor(acc, ins[i] + N);
 
                 change(w, gate_And);
                 w.set(0, acc);
