@@ -89,6 +89,12 @@ void makeCombinational(Gig& N)
                 w.set(0, acc);
                 w.set(1, acc);
             }
+
+        }else if (w == gate_Sel){
+            Wire v = w[0];
+            change(w, gate_And);
+            w.set(0, N.add(gate_PI));
+            w.set(1, v);
         }
     }
 }
