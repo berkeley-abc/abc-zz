@@ -599,7 +599,7 @@ void pushf(Vec<uchar>& out, cchar* format, ...)
 // Directories:
 
 
-bool readDir(String path, Vec<FileInfo>& files, Vec<FileInfo>& dirs)
+bool readDir(String path, Vec<FileInfo>& files, Vec<FileInfo>& dirs, Vec<FileInfo>* others)
 {
     char* cwd0 = getcwd(NULL, 0);
     int err = chdir(path.c_str());
@@ -625,6 +625,8 @@ bool readDir(String path, Vec<FileInfo>& files, Vec<FileInfo>& dirs)
             files.push(info);
         else if (S_ISDIR(st.st_mode))
             dirs.push(info);
+        else if (others)
+            others->push(info);
     }
     closedir(dir);
     int err2 = chdir(cwd0); assert(err2 == 0);

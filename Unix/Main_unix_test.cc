@@ -1,5 +1,6 @@
 #include "Prelude.hh"
 #include "Unix.hh"
+#include "Linux.hh"
 #include "Processes.hh"
 
 using namespace ZZ;
@@ -12,6 +13,15 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
+    String cmd;
+    FWrite(cmd) "cat /proc/%_/stat", getpid();
+    int ignore ___unused = system(cmd.c_str());
+
+    int pid = getpid();
+    for (uint i = 1; i <= 44; i++)
+        WriteLn "field %_: %_", i, getProcStatField(pid, i);
+
+#if 0
     ProcMode mode;
 //    mode.username = "een";
 //    mode.dir = "/home/een/ZZ/Bip";
@@ -26,6 +36,8 @@ int main(int argc, char** argv)
 
     pid_t pid;
     int io[3];
+#endif
+
 #if 0
     char ret = startProcess(exec, args, pid, io, mode);
 
@@ -56,8 +68,9 @@ int main(int argc, char** argv)
             ssize_t m ___unused = write(STDOUT_FILENO, buf, n);
         }
     }
+#endif
 
-#else
+#if 0
     for(;;){
         char ret = startProcess(exec, args, pid, io, mode);
         if (ret != 0){

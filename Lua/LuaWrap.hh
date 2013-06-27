@@ -11,6 +11,9 @@
 //| 
 //|________________________________________________________________________________________________
 
+#ifndef ZZ__Lua__LuaWrap_hh
+#define ZZ__Lua__LuaWrap_hh
+
 extern "C" {
 #include "ZZ/Lua/luaconf.h"
 #include "ZZ/Lua/lualib.h"
@@ -30,6 +33,10 @@ using namespace std;
 typedef const void const_void;
 typedef const lua_Number const_lua_Number;
 typedef const lua_Debug const_lua_Debug;
+typedef const luaL_Reg const_luaL_Reg;
+typedef const char *const lua_const_str_array[];
+typedef const luaL_Reg lua_reg_array[];
+
 #define lua_typename_ lua_typename
 #define lua_register_ lua_register
     // -- simplifies auto-generation of low-level interface
@@ -129,7 +136,6 @@ public:
     int resume(lua_State* from, int narg) { return lua_resume(L, from, narg); }
     int status() { return lua_status(L); }
     int gc(int what, int data) { return lua_gc(L, what, data); }
-    int error() { return lua_error(L); }
     int next(int idx) { return lua_next(L, idx); }
     void concat(int n) { lua_concat(L, n); }
     void len(int idx) { lua_len(L, idx); }
@@ -163,6 +169,58 @@ public:
     bool isnone(int n) { return lua_isnone(L, n); }
     bool isnoneornil(int n) { return lua_isnoneornil(L, n); }
     cchar* tostring(int i) { return lua_tostring(L, i); }
+    void L_checkversion_(lua_Number ver) { luaL_checkversion_(L, ver); }
+    int L_getmetafield(int obj, cchar* e) { return luaL_getmetafield(L, obj, e); }
+    int L_callmeta(int obj, cchar* e) { return luaL_callmeta(L, obj, e); }
+    cchar* L_tolstring(int idx, size_t* len) { return luaL_tolstring(L, idx, len); }
+    int L_argerror(int numarg, cchar* extramsg) { return luaL_argerror(L, numarg, extramsg); }
+    cchar* L_checklstring(int numArg, size_t* l) { return luaL_checklstring(L, numArg, l); }
+    cchar* L_optlstring(int numArg, cchar* def, size_t* l) { return luaL_optlstring(L, numArg, def, l); }
+    lua_Number L_checknumber(int numArg) { return luaL_checknumber(L, numArg); }
+    lua_Number L_optnumber(int nArg, lua_Number def) { return luaL_optnumber(L, nArg, def); }
+    lua_Integer L_checkinteger(int numArg) { return luaL_checkinteger(L, numArg); }
+    lua_Integer L_optinteger(int nArg, lua_Integer def) { return luaL_optinteger(L, nArg, def); }
+    lua_Unsigned L_checkunsigned(int numArg) { return luaL_checkunsigned(L, numArg); }
+    lua_Unsigned L_optunsigned(int numArg, lua_Unsigned def) { return luaL_optunsigned(L, numArg, def); }
+    void L_checkstack(int sz, cchar* msg) { luaL_checkstack(L, sz, msg); }
+    void L_checktype(int narg, int t) { luaL_checktype(L, narg, t); }
+    void L_checkany(int narg) { luaL_checkany(L, narg); }
+    int L_newmetatable(cchar* tname) { return luaL_newmetatable(L, tname); }
+    void L_setmetatable(cchar* tname) { luaL_setmetatable(L, tname); }
+    void* L_testudata(int ud, cchar* tname) { return luaL_testudata(L, ud, tname); }
+    void* L_checkudata(int ud, cchar* tname) { return luaL_checkudata(L, ud, tname); }
+    void L_where(int lvl) { luaL_where(L, lvl); }
+    int L_checkoption(int narg, cchar* def, lua_const_str_array lst) { return luaL_checkoption(L, narg, def, lst); }
+    int L_fileresult(int stat, cchar* fname) { return luaL_fileresult(L, stat, fname); }
+    int L_execresult(int stat) { return luaL_execresult(L, stat); }
+    int L_ref(int t) { return luaL_ref(L, t); }
+    void L_unref(int t, int ref) { luaL_unref(L, t, ref); }
+    int L_loadfilex(cchar* filename, cchar* mode) { return luaL_loadfilex(L, filename, mode); }
+    int L_loadbufferx(cchar* buff, size_t sz, cchar* name, cchar* mode) { return luaL_loadbufferx(L, buff, sz, name, mode); }
+    int L_loadstring(cchar* s) { return luaL_loadstring(L, s); }
+    int L_len(int idx) { return luaL_len(L, idx); }
+    cchar* L_gsub(cchar* s, cchar* p, cchar* r) { return luaL_gsub(L, s, p, r); }
+    void L_setfuncs(const_luaL_Reg* l, int nup) { luaL_setfuncs(L, l, nup); }
+    int L_getsubtable(int idx, cchar* fname) { return luaL_getsubtable(L, idx, fname); }
+    void L_traceback(lua_State* L1, cchar* msg, int level) { luaL_traceback(L, L1, msg, level); }
+    void L_requiref(cchar* modname, lua_CFunction openf, int glb) { luaL_requiref(L, modname, openf, glb); }
+    void L_pushmodule(cchar* modname, int sizehint) { luaL_pushmodule(L, modname, sizehint); }
+    void L_openlib(cchar* libname, const_luaL_Reg* l, int nup) { luaL_openlib(L, libname, l, nup); }
+    void L_checkversion() { luaL_checkversion(L); }
+    int L_loadfile(cchar* filename) { return luaL_loadfile(L, filename); }
+    void L_newlibtable(lua_reg_array l) { luaL_newlibtable(L, l); }
+    void L_newlib(lua_reg_array l) { luaL_newlib(L, l); }
+    void L_argcheck(int cond, int arg, cchar* extramsg) { luaL_argcheck(L, cond, arg, extramsg); }
+    cchar* L_checkstring(int arg) { return luaL_checkstring(L, arg); }
+    cchar* L_optstring(int arg, cchar* d) { return luaL_optstring(L, arg, d); }
+    int L_checkint(int arg) { return luaL_checkint(L, arg); }
+    int L_optint(int arg, int d) { return luaL_optint(L, arg, d); }
+    long L_checklong(int arg) { return luaL_checklong(L, arg); }
+    long L_optlong(int arg, long d) { return luaL_optlong(L, arg, d); }
+    cchar* L_typename(int index) { return luaL_typename(L, index); }
+    int L_dofile(cchar* filename) { return luaL_dofile(L, filename); }
+    int L_dostring(cchar* str) { return luaL_dostring(L, str); }
+    void L_getmetatable(cchar* tname) { luaL_getmetatable(L, tname); }
 };
 
 
@@ -197,3 +255,5 @@ inline bool LuaRef::start()
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
+
+#endif

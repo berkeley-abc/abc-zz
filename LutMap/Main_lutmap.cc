@@ -149,6 +149,7 @@ int main(int argc, char** argv)
             In   in(file);
             readAiger(in, N, false);
             closeChildIo(io);
+            waitpid(pid, NULL, 0);
 
         }else if (hasExtension(input, "gnl"))
             N.load(input);

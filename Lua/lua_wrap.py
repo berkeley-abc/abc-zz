@@ -11,6 +11,7 @@ for line in open("lua.api"):
     t = t.replace("const void", "const_void")
     t = t.replace("const lua_Number", "const_lua_Number")
     t = t.replace("const lua_Debug", "const_lua_Debug")
+    t = t.replace("const luaL_Reg", "const_luaL_Reg")
     t = t.replace(" *", "*")
     t = t.replace("*", "* ")
     t = t.replace("  ", " ")
@@ -30,6 +31,9 @@ for line in open("lua.api"):
     if args[1::2] == []: actuals = '(L)'
     else: actuals = '(L, ' + ' '.join(args[1::2]) + ')'
 
-    assert name[:4] == 'lua_'
+    if   name[:4] == 'lua_':  cname = name[4:]
+    elif name[:5] == "luaL_": cname = "L_" + name[5:]
+    else: assert false
+
     retstr = "return " if ret != "void" else ""
-    print "    "+ret+" "+name[4:]+formals+" { "+retstr+name+actuals+"; }"
+    print "    "+ret+" "+cname+formals+" { "+retstr+name+actuals+"; }"

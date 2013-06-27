@@ -744,7 +744,7 @@ void Treb::dumpInvar()
 void Treb::addBlockedCube(TCube s, bool subsumption)
 {
     //**/WriteLn "addBlockedCube(\a/%_\a/)", fmt(s);
-    if (par) sendMsg_UnreachCube(N, s);
+//    if (par) sendMsg_UnreachCube(N, s);
 
     if (refining){
         //**/WriteLn "!!  rtrace learned: %_", s;

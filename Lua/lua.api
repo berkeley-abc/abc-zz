@@ -1,6 +1,9 @@
+###mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+### From 'lua.h'
+
+
 ### API:
 ###
-void       (lua_close) (lua_State *L);
 lua_State *(lua_newthread) (lua_State *L);
 lua_CFunction (lua_atpanic) (lua_State *L, lua_CFunction panicf);
 const lua_Number *(lua_version) (lua_State *L);
@@ -73,7 +76,6 @@ int  (lua_yield) (lua_State *L, int nresults);
 int  (lua_resume) (lua_State *L, lua_State *from, int narg);
 int  (lua_status) (lua_State *L);
 int (lua_gc) (lua_State *L, int what, int data);
-int   (lua_error) (lua_State *L);
 int   (lua_next) (lua_State *L, int idx);
 void  (lua_concat) (lua_State *L, int n);
 void  (lua_len)    (lua_State *L, int idx);
@@ -110,3 +112,67 @@ bool  (lua_isthread) (lua_State *L, int n);
 bool  (lua_isnone) (lua_State *L, int n);
 bool  (lua_isnoneornil) (lua_State *L, int n);
 const char * (lua_tostring) (lua_State *L, int i);
+
+
+###mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+### From 'lauxlib.h'
+
+
+### API:
+###
+void (luaL_checkversion_) (lua_State *L, lua_Number ver);
+int (luaL_getmetafield) (lua_State *L, int obj, const char *e);
+int (luaL_callmeta) (lua_State *L, int obj, const char *e);
+const char *(luaL_tolstring) (lua_State *L, int idx, size_t *len);
+int (luaL_argerror) (lua_State *L, int numarg, const char *extramsg);
+const char *(luaL_checklstring) (lua_State *L, int numArg, size_t *l);
+const char *(luaL_optlstring) (lua_State *L, int numArg, const char *def, size_t *l);
+lua_Number (luaL_checknumber) (lua_State *L, int numArg);
+lua_Number (luaL_optnumber) (lua_State *L, int nArg, lua_Number def);
+lua_Integer (luaL_checkinteger) (lua_State *L, int numArg);
+lua_Integer (luaL_optinteger) (lua_State *L, int nArg, lua_Integer def);
+lua_Unsigned (luaL_checkunsigned) (lua_State *L, int numArg);
+lua_Unsigned (luaL_optunsigned) (lua_State *L, int numArg, lua_Unsigned def);
+void (luaL_checkstack) (lua_State *L, int sz, const char *msg);
+void (luaL_checktype) (lua_State *L, int narg, int t);
+void (luaL_checkany) (lua_State *L, int narg);
+int   (luaL_newmetatable) (lua_State *L, const char *tname);
+void  (luaL_setmetatable) (lua_State *L, const char *tname);
+void *(luaL_testudata) (lua_State *L, int ud, const char *tname);
+void *(luaL_checkudata) (lua_State *L, int ud, const char *tname);
+void (luaL_where) (lua_State *L, int lvl);
+int (luaL_checkoption) (lua_State *L, int narg, const char *def, lua_const_str_array lst);
+int (luaL_fileresult) (lua_State *L, int stat, const char *fname);
+int (luaL_execresult) (lua_State *L, int stat);
+int (luaL_ref) (lua_State *L, int t);
+void (luaL_unref) (lua_State *L, int t, int ref);
+int (luaL_loadfilex) (lua_State *L, const char *filename, const char *mode);
+int (luaL_loadbufferx) (lua_State *L, const char *buff, size_t sz, const char *name, const char *mode);
+int (luaL_loadstring) (lua_State *L, const char *s);
+int (luaL_len) (lua_State *L, int idx);
+const char *(luaL_gsub) (lua_State *L, const char *s, const char *p, const char *r);
+void (luaL_setfuncs) (lua_State *L, const luaL_Reg *l, int nup);
+int (luaL_getsubtable) (lua_State *L, int idx, const char *fname);
+void (luaL_traceback) (lua_State *L, lua_State *L1, const char *msg, int level);
+void (luaL_requiref) (lua_State *L, const char *modname, lua_CFunction openf, int glb);
+void (luaL_pushmodule) (lua_State *L, const char *modname, int sizehint);
+void (luaL_openlib) (lua_State *L, const char *libname, const luaL_Reg *l, int nup);
+
+### Macros:
+###
+void (luaL_checkversion) (lua_State *L);
+int (luaL_loadfile) (lua_State *L, const char *filename);
+void (luaL_newlibtable) (lua_State *L, lua_reg_array l);
+void (luaL_newlib) (lua_State *L, lua_reg_array l);
+void (luaL_argcheck) (lua_State *L, int cond, int arg, const char *extramsg);
+const char *(luaL_checkstring) (lua_State *L, int arg);
+const char *(luaL_optstring) (lua_State *L, int arg, const char *d);
+int (luaL_checkint) (lua_State *L, int arg);
+int (luaL_optint) (lua_State *L, int arg, int d);
+long (luaL_checklong) (lua_State *L, int arg);
+long (luaL_optlong) (lua_State *L, int arg, long d);
+const char *(luaL_typename) (lua_State *L, int index);
+int (luaL_dofile) (lua_State *L, const char *filename);
+int (luaL_dostring) (lua_State *L, const char *str);
+void (luaL_getmetatable) (lua_State *L, const char *tname);
+

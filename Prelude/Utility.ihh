@@ -119,7 +119,7 @@ struct FileInfo {
 };
 
 
-bool readDir(String path, Vec<FileInfo>& files, Vec<FileInfo>& dirs);
+bool readDir(String path, Vec<FileInfo>& files, Vec<FileInfo>& dirs, Vec<FileInfo>* others = NULL);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

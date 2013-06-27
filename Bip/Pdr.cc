@@ -1367,9 +1367,11 @@ bool Pdr::isBlocked(Cub s, uint k)              // -- about 5% of runtime
 // are iterating over them). If 'proper_invariant' is TRUE, 'k' is ignored.
 void Pdr::addBlockingClause(const Vec<GLit>& s, uint k, bool proper_invariant, bool external)
 {
+#if 0
     if (par && !external){
         //**/WriteLn "~~~~>> sending @%_ %_", k, s;
         sendMsg_UnreachCube(s, k); }
+#endif
 
     Cla gc(s);
     //**/Dump(gc, k, proper_invariant);
