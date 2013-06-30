@@ -162,8 +162,8 @@ void (luaL_openlib) (lua_State *L, const char *libname, const luaL_Reg *l, int n
 ###
 void (luaL_checkversion) (lua_State *L);
 int (luaL_loadfile) (lua_State *L, const char *filename);
-void (luaL_newlibtable) (lua_State *L, lua_reg_array l);
-void (luaL_newlib) (lua_State *L, lua_reg_array l);
+#void (luaL_newlibtable) (lua_State *L, lua_reg_array l);
+#void (luaL_newlib) (lua_State *L, lua_reg_array l);
 void (luaL_argcheck) (lua_State *L, int cond, int arg, const char *extramsg);
 const char *(luaL_checkstring) (lua_State *L, int arg);
 const char *(luaL_optstring) (lua_State *L, int arg, const char *d);
