@@ -208,8 +208,8 @@ public:
     void L_openlib(cchar* libname, const_luaL_Reg* l, int nup) { luaL_openlib(L, libname, l, nup); }
     void L_checkversion() { luaL_checkversion(L); }
     int L_loadfile(cchar* filename) { return luaL_loadfile(L, filename); }
-    void L_newlibtable(lua_reg_array l) { luaL_newlibtable(L, l); }
-    void L_newlib(lua_reg_array l) { luaL_newlib(L, l); }
+//    void L_newlibtable(lua_reg_array l) { luaL_newlibtable(L, l); }
+//    void L_newlib(lua_reg_array l) { luaL_newlib(L, l); }
     void L_argcheck(int cond, int arg, cchar* extramsg) { luaL_argcheck(L, cond, arg, extramsg); }
     cchar* L_checkstring(int arg) { return luaL_checkstring(L, arg); }
     cchar* L_optstring(int arg, cchar* d) { return luaL_optstring(L, arg, d); }

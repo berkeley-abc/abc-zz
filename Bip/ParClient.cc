@@ -433,7 +433,7 @@ void streamOut_Netlist(Vec<uchar>& data, NetlistRef N)
     }else
         putu(data, 0);  // -- no properties
 
-    // Save fairness properties and constraints: 
+    // Save fairness properties and constraints:
     // <<== to be done
 }
 
@@ -856,11 +856,10 @@ void sendMsg_AbstrBad()
 }
 
 
-void sendMsg_Reparam(NetlistRef N, NetlistRef N_recons)
+void sendMsg_Reparam(NetlistRef N)
 {
     Vec<uchar> data;
     streamOut_Netlist(data, N);
-    streamOut_Netlist(data, N_recons);
     sendMsg(108/*Reparam*/, data.slice());
 }
 

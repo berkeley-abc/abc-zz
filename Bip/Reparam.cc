@@ -85,8 +85,10 @@ void analyzeRegion(NetlistRef N, const WZet& area, const WZet& int_pi, const WZe
 
                 if (type(w) == gate_And)
                     val(w) = ((bool)val[w[0]] ^ sign(w[0])) & ((bool)val[w[1]] ^ sign(w[1]));
-                else assert(w.size() == 1),
+                else if (w.size() == 1)
                     val(w) = (bool)val[w[0]] ^ sign(w[0]);
+                else assert(w == N.True()),
+                    val(w) = true;
             }
             seen[val[area.list()[0]]] = true;
             //**/WriteLn "xval=%b", xval;
@@ -269,68 +271,76 @@ void reparamRegion(Wire w_dom, const Params_Reparam& P, ReparamTmps& tmps)
 
 void reparam(NetlistRef N, const Params_Reparam& P)
 {
-    double T0 = cpuTime();
+    {
+        double T0 = cpuTime();
 
-    //**/N.write("N.gig");
-    Auto_Pob(N, up_order);
-    Auto_Pob(N, fanout_count);
-
-    uintg orig_pis  = N.typeCount(gate_PI);
-    uintg orig_ands = N.typeCount(gate_And);
-
-    if (!P.quiet) writeHeader("Reparametrization", 79);
-
-    WMap<gate_id> dom;
-    computeDominators(N, dom);
-
-    ReparamTmps tmps;
-    WZet cands;
-    int percent = -1;
-    for (uintg i = 0; i < up_order.size(); i++){
-        int p = floor((i * 100.0 + 0.5) / up_order.size());
-        if (p != percent){
-            percent = p;
-            if (!P.quiet) Write "\rProgress: %_ %%\f", p;
+      #if 0
+        if (!Has_Pob(N, strash)){
+            Add_Pob(N, strash);
         }
+      #endif
+        Remove_Pob(N, strash);
 
-        Wire w = N[up_order[i]];
-        if (deleted(w)) continue;
+        //**/N.write("N.gig");
+        Auto_Pob(N, up_order);
+        Auto_Pob(N, fanout_count);
 
-        if (type(w) == gate_PI){
-            gate_id d0 = id(w);
-            gate_id d  = dom[N[d0]];
-            while (d != d0){
-                if (d < N.size()){
-                    cands.add(N[d]);
-                    d0 = d;
-                    d = dom[N[d0]];
-                }else
-                    break;
+        uintg orig_pis  = N.typeCount(gate_PI);
+        uintg orig_ands = N.typeCount(gate_And);
+
+        if (!P.quiet) writeHeader("Reparametrization", 79);
+
+        WMap<gate_id> dom;
+        computeDominators(N, dom);
+
+        ReparamTmps tmps;
+        WZet cands;
+        int percent = -1;
+        for (uintg i = 0; i < up_order.size(); i++){
+            int p = floor((i * 100.0 + 0.5) / up_order.size());
+            if (p != percent){
+                percent = p;
+                if (!P.quiet) Write "\rProgress: %_ %%\f", p;
             }
 
-        }else if (cands.has(w))
-            reparamRegion(w, P, tmps);
-    }
-    if (!P.quiet) WriteLn "\rPost-processing...";
+            Wire w = N[up_order[i]];
+            if (deleted(w)) continue;
 
-    For_Gatetype(N, gate_PI, w)
-        if (fanout_count[w] == 0)
-            remove(w);
+            if (type(w) == gate_PI){
+                gate_id d0 = id(w);
+                gate_id d  = dom[N[d0]];
+                while (d != d0){
+                    if (d < N.size()){
+                        cands.add(N[d]);
+                        d0 = d;
+                        d = dom[N[d0]];
+                    }else
+                        break;
+                }
 
-    removeBuffers(N);
-    Add_Pob0(N, strash);
-    removeAllUnreach(N);
+            }else if (cands.has(w))
+                reparamRegion(w, P, tmps);
+        }
+        if (!P.quiet) WriteLn "\rPost-processing...";
 
-    if (!P.quiet){
-        WriteLn "CPU-time: %t", cpuTime() - T0;
-        WriteLn "PIs : %_ -> %_", orig_pis , N.typeCount(gate_PI);
-        WriteLn "ANDs: %_ -> %_", orig_ands, N.typeCount(gate_And);
+        For_Gatetype(N, gate_PI, w)
+            if (fanout_count[w] == 0)
+                remove(w);
+
+        removeBuffers(N);
+        Add_Pob0(N, strash);
+        removeAllUnreach(N);
+
+        if (!P.quiet){
+            WriteLn "CPU-time: %t", cpuTime() - T0;
+            WriteLn "PIs : %_ -> %_", orig_pis , N.typeCount(gate_PI);
+            WriteLn "ANDs: %_ -> %_", orig_ands, N.typeCount(gate_And);
+        }
     }
 
     if (par){
-        Remove_Pob(N, up_order);
         renumberPIs(N);         // <<== TEMPORARY! Should preserve PI numbers, but PAR doesn't handle it correctly yet.
-        Add_Pob0(N, up_order);  // <<== should fix 'Auto_Pob' macro to handle this!
+        sendMsg_Reparam(N);
     }
 }
 

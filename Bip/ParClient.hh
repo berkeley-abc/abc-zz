@@ -72,7 +72,7 @@ void sendMsg_Result_holds(const Vec<uint>& props, NetlistRef N_invar = Netlist_N
 void sendMsg_Abstr(const WZetL& abstr, NetlistRef N);
 void sendMsg_AbstrBad();
 
-void sendMsg_Reparam(NetlistRef N, NetlistRef N_recons);
+void sendMsg_Reparam(NetlistRef N);
 
 void sendMsg_Abort(String text);
 
