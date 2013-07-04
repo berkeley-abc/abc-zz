@@ -187,20 +187,16 @@ int main(int argc, char** argv)
         if (quit) return 0;
     }
 
-  #if 0
+  #if 1
     lutMap(N, P);
   #else
-    N.setMode(gig_Aig);
-    N.thaw();
-//    Add_Gob(N, Strash);
-    N.compact();
-
     WMapX<GLit> remap;
     For_Gates(N, w) Dump(w);
 
     lutMap(N, P, NULL, &remap);
 
     For_Gates(N, w) Dump(w);
+    WriteLn "== REMAP ==";
     for (uint i = 0; i < remap.base().size(); i++)
         WriteLn "%_ -> %_", Lit(i), remap[Lit(i)];
   #endif
