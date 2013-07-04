@@ -117,7 +117,6 @@ int main(int argc, char** argv)
     cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (defaul is area).");
     cli.add("comb"   , "bool"  , "no"        , "Remove white/black boxes and sequential elements (may change delay profile).");
     cli.add("mux"    , "bool"  , "yes"       , "Do MUX and XOR extraction first.");
-    cli.add("a"      , "bool"  , "no"        , "[EXPERIMENTAL] Auto-tune.");
     cli.parseCmdLine(argc, argv);
 
     String input  = cli.get("input").string_val;
@@ -188,10 +187,23 @@ int main(int argc, char** argv)
         if (quit) return 0;
     }
 
-    if (cli.get("a").bool_val)
-        lutMapTune(N, P);
-    else
-        lutMap(N, P);
+  #if 0
+    lutMap(N, P);
+  #else
+    N.setMode(gig_Aig);
+    N.thaw();
+//    Add_Gob(N, Strash);
+    N.compact();
+
+    WMapX<GLit> remap;
+    For_Gates(N, w) Dump(w);
+
+    lutMap(N, P, NULL, &remap);
+
+    For_Gates(N, w) Dump(w);
+    for (uint i = 0; i < remap.base().size(); i++)
+        WriteLn "%_ -> %_", Lit(i), remap[Lit(i)];
+  #endif
 
     double T2 = cpuTime();
     WriteLn "Mapping: %t", T2-T1;

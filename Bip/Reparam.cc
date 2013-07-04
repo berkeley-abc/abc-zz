@@ -297,7 +297,7 @@ void reparam(NetlistRef N, const Params_Reparam& P)
         WZet cands;
         int percent = -1;
         for (uintg i = 0; i < up_order.size(); i++){
-            int p = floor((i * 100.0 + 0.5) / up_order.size());
+            int p = (int)floor((i * 100.0 + 0.5) / up_order.size());
             if (p != percent){
                 percent = p;
                 if (!P.quiet) Write "\rProgress: %_ %%\f", p;

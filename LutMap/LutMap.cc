@@ -59,6 +59,7 @@ class LutMap {
     const Params_LutMap& P;
     Gig&                 N;
     WSeen&               keep;
+    WMapX<GLit>*         remap;
 
     // State:
     SlimAlloc<Cut>    mem;
@@ -99,7 +100,7 @@ class LutMap {
 
 public:
 
-    LutMap(Gig& N, Params_LutMap P, WSeen& keep);
+    LutMap(Gig& N, Params_LutMap P, WSeen& keep, WMapX<GLit>* remap);
 };
 
 
@@ -172,12 +173,12 @@ Globally:
      2. Actual fanouts
      3. Fanouts after XOR/Mux extraction
      4. Fanouts of fanouts.
-     
+
 ====================
 Per round:
 ====================
 
-  [bool]    recompute or reuse cuts?  
+  [bool]    recompute or reuse cuts?
   [uint]    cuts to keep (only if recomputing, else same as previous round)
   [uint]    max cut-width (probably always 6, but perhaps for first phase...)
   [float]   alpha coefficient for fanout est. blending
@@ -713,7 +714,10 @@ void LutMap::updateFanoutEst(bool instantiate)
         For_Gates_Rev(N, w)
             if (w == gate_And)
                 remove(w);
-        N.compact();
+        GigRemap m;
+        N.compact(m);
+        if (remap)
+            m.applyTo(remap->base());
     }
 }
 
@@ -783,13 +787,29 @@ void LutMap::run()
 
 // <<== put preprocessing here, not in Main_lutmap.cc
 
-LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_) :
-    P(P_), N(N_), keep(keep_)
+LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_, WMapX<GLit>* remap_) :
+    P(P_), N(N_), keep(keep_), remap(remap_)
 {
+    if (Has_Gob(N, Strash))
+        Remove_Gob(N, Strash);
+
     if (!N.isCanonical()){
         WriteLn "Compacting... %_", info(N);
-        N.compact();
+
+        gate_id orig_sz = N.size();
+        GigRemap m;
+        N.compact(m);
+        if (remap){
+            for (gate_id i = 0; i < orig_sz; i++){
+                Lit p = GLit(i);
+                (*remap)(p) = m(p);
+            }
+        }
         WriteLn "Done... %_", info(N);
+
+    }else if (remap){
+        For_All_Gates(N, w)
+            (*remap)(w) = w;
     }
 
     run();
@@ -803,15 +823,19 @@ LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_) :
     fanout_est.clear(true);
 }
 
-
-// Wrapper function:
-void lutMap(Gig& N, Params_LutMap P, WSeen* keep)
+// If provided, each gate in 'keep' will be the output of a lookup table (not necessarily unique,
+// but they can be duplicated afterwards, if needed). The 'remap' map will map old gates to new
+// gates (with sign, so 'x' can go to '~y'). Naturally, many signals may be gone; these are mapped
+// to 'glit_NULL'. NOTE! Even inputs may be missing from 'remap' if they are not in the transitive
+// fanin of any output.
+// 
+void lutMap(Gig& N, Params_LutMap P, WSeen* keep, WMapX<GLit>* remap)
 {
     WSeen keep_dummy;
     if (!keep)
         keep = &keep_dummy;
 
-    LutMap inst(N, P, *keep);
+    LutMap inst(N, P, *keep, remap);
 }
 
 

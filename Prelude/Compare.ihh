@@ -22,6 +22,8 @@ template<class T> macro bool operator!=(const T& x, const T& y) { return !(x == 
 template<class T> macro bool operator> (const T& x, const T& y) { return y < x;     }
 template<class T> macro bool operator<=(const T& x, const T& y) { return !(y < x);  }
 template<class T> macro bool operator>=(const T& x, const T& y) { return !(x < y);  }
+    // -- NOTE! We intentionally don't use a second type 'S' for 'y'; this would catch too many
+    // cases.
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

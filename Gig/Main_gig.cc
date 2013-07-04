@@ -52,6 +52,13 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
+    Gig N;
+    Wire a = N.add(gate_PI);
+    Wire b = N.add(gate_PI);
+    WriteLn "%_", (a < b.lit());
+    WriteLn "%_", (b < a.lit());
+    WriteLn "%_", (b != a.lit());
+
 #if 0
     {
         Gig N;

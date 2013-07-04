@@ -447,6 +447,8 @@ void Gig::setMode(GigMode m)
 
         }else
             mode_mask = mode_masks[m];
+
+        strash_mask = mode_mask;
     }
 
   #if defined(ZZ_DEBUG)

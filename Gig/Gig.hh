@@ -272,6 +272,26 @@ inline void Wire::set(uint pin, GLit v)
 
 template<> fts_macro uint64 hash_<Wire>(const Wire& w) { return hash_(w.lit()); }
 
+macro bool operator==(Wire u, Wire v) { return u.lit() == v.lit(); }
+macro bool operator!=(Wire u, Wire v) { return u.lit() != v.lit(); }
+macro bool operator< (Wire u, Wire v) { return u.lit() <  v.lit(); }
+macro bool operator<=(Wire u, Wire v) { return u.lit() <= v.lit(); }
+macro bool operator> (Wire u, Wire v) { return u.lit() >  v.lit(); }
+macro bool operator>=(Wire u, Wire v) { return u.lit() >= v.lit(); }
+macro bool operator==(Wire w, GLit p) { return w.lit() == p; }
+macro bool operator!=(Wire w, GLit p) { return w.lit() != p; }
+macro bool operator< (Wire w, GLit p) { return w.lit() <  p; }
+macro bool operator<=(Wire w, GLit p) { return w.lit() <= p; }
+macro bool operator> (Wire w, GLit p) { return w.lit() >  p; }
+macro bool operator>=(Wire w, GLit p) { return w.lit() >= p; }
+macro bool operator==(GLit p, Wire w) { return w.lit() == p; }
+macro bool operator!=(GLit p, Wire w) { return w.lit() != p; }
+macro bool operator< (GLit p, Wire w) { return w.lit() <  p; }
+macro bool operator<=(GLit p, Wire w) { return w.lit() <= p; }
+macro bool operator> (GLit p, Wire w) { return w.lit() >  p; }
+macro bool operator>=(GLit p, Wire w) { return w.lit() >= p; }
+    // -- because 'Wire' is inherited from 'GLit', which can be compared either by 'bool_type' or 'Lit', this is apparently needed.
+
 macro bool operator==(Wire w, GateType t) { return w.type() == t; }
 macro bool operator==(GateType t, Wire w) { return w.type() == t; }
 macro bool operator!=(Wire w, GateType t) { return w.type() != t; }
@@ -450,7 +470,7 @@ struct Gig : Gig_data, NonCopyable {
         // NOTE! In strashed mode, gates controlled by strashing (e.g. AND-gates) should be
         // constructed by functions in 'Strash.hh' ('aig_And()', 'xig_Mux()' etc.).
 
-    void  remove(gate_id id, bool recreate = false);    // -- 'recreate' is for internal use, don't set 
+    void  remove(gate_id id, bool recreate = false);    // -- 'recreate' is for internal use, don't set
 
   //________________________________________
   //  Gate access:

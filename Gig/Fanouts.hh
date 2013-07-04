@@ -74,6 +74,9 @@ struct Connect : Wire {
         Wire v = other;
         return (w == v); }
 
+    bool operator!=(const Wire& other) const {
+        return !(*this == other); }
+
     bool operator<(const Wire& other) const {
         Wire w = *this;
         Wire v = other;

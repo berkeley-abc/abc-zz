@@ -430,6 +430,8 @@ void GigObj_Strash::strashNetlist()
     }
     if (!got_strash_gates) return;
 
+    assert(!N->isFrozen());
+
     // Turn off listeners temporarily:
     Vec<GigLis*> lis_cache[GigMsgIdx_size];
     for (uint i = 0; i < GigMsgIdx_size; i++)
