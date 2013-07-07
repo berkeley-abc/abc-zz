@@ -1244,6 +1244,7 @@ lbool MiniSat<pfl>::search(int nof_conflicts, int nof_learnts)
                 return l_False;
             }
             clause_id id = analyze(confl, learnt_clause);
+            //**/ShoutLn "%_", learnt_clause;
             newClause(learnt_clause, id);
             varDecayActivity();
             claDecayActivity();

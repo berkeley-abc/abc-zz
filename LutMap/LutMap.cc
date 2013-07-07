@@ -823,6 +823,7 @@ LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_, WMapX<GLit>* remap_) :
     fanout_est.clear(true);
 }
 
+
 // If provided, each gate in 'keep' will be the output of a lookup table (not necessarily unique,
 // but they can be duplicated afterwards, if needed). The 'remap' map will map old gates to new
 // gates (with sign, so 'x' can go to '~y'). Naturally, many signals may be gone; these are mapped

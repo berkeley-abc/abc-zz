@@ -601,6 +601,7 @@ macro float getF(In& in) {
 Declare_Exception(Excp_ParseError);
 
 macro bool isZero(char c) { return c == 0; }
+macro bool isSpace(char c) { return c == 32; }
 macro bool isWS(char c) { return (c >= 8 && c <= 13) || c == 32; }
 macro bool isNL(char c) { return c == 10; }
 macro bool isUpAlpha(char c) { return (c >= 'A') && (c <= 'Z'); }
