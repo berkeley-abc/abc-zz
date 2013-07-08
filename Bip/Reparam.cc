@@ -212,7 +212,9 @@ void reparamRegion(Wire w_dom, const Params_Reparam& P, ReparamTmps& tmps)
         Wire w = area.list()[i];
         For_Inputs(w, v)
             Add(v);
-        // <<== bound here?
+
+        // Bound the area, just in case:
+        if (area.size() > 1000) return;
     }
     ZZ_PTimer_End(reparam_dom_area);
 
@@ -332,9 +334,11 @@ void reparam(NetlistRef N, const Params_Reparam& P)
         removeAllUnreach(N);
 
         if (!P.quiet){
+            String pis, ands;
+            FWrite(pis) "PIs : %_ -> %_", orig_pis , N.typeCount(gate_PI);
+            FWrite(ands) "ANDs : %_ -> %_", orig_ands , N.typeCount(gate_And);
             WriteLn "CPU-time: %t", cpuTime() - T0;
-            WriteLn "PIs : %_ -> %_", orig_pis , N.typeCount(gate_PI);
-            WriteLn "ANDs: %_ -> %_", orig_ands, N.typeCount(gate_And);
+            WriteLn "%<24%_ %_", pis, ands;
         }
     }
 
