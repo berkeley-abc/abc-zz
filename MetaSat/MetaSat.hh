@@ -42,6 +42,10 @@ namespace GlucoRed {
     struct SolRed;
 }
 
+namespace MiniRed {
+    struct SolRed;
+}
+
 
 namespace ZZ {
 using namespace std;
@@ -261,6 +265,22 @@ private:
 };
 
 
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct MiniRedSat : MetaSat {
+    MiniRedSat();
+    virtual ~MiniRedSat();
+
+    MetaSat_OVERRIDES
+
+private:
+    ::MiniRed::SolRed* S;
+    Lit true_lit;
+    minisat2_vec_data tmp_lits;
+};
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // 'MultiSat' -- Dynamically become anyone of the wrapped solvers:
 
@@ -273,6 +293,7 @@ enum SolverType {
     sat_Abc,        // ABC's MiniSat
     sat_Glu,        // Glucose 2.2
     sat_Glr,        // GlucoRed by Siert Wieringa
+    sat_Msr,        // MiniRed by Siert Wieringa
 };
 
 
@@ -316,13 +337,14 @@ inline void MultiSat::selectSolver(SolverType type)
     if (S) delete S;
 
     switch (type){
-    case sat_NULL: S = NULL           ; break;
-    case sat_Zz:   S = new ZzSat()    ; break;
-    case sat_Msc:  S = new MiniSat2() ; break;
-    case sat_Mss:  S = new MiniSat2s(); break;
-    case sat_Abc:  S = new AbcSat()   ; break;
-    case sat_Glu:  S = new GluSat()   ; break;
-    case sat_Glr:  S = new GlrSat()   ; break;
+    case sat_NULL: S = NULL            ; break;
+    case sat_Zz:   S = new ZzSat()     ; break;
+    case sat_Msc:  S = new MiniSat2()  ; break;
+    case sat_Mss:  S = new MiniSat2s() ; break;
+    case sat_Abc:  S = new AbcSat()    ; break;
+    case sat_Glu:  S = new GluSat()    ; break;
+    case sat_Glr:  S = new GlrSat()    ; break;
+    case sat_Msr:  S = new MiniRedSat(); break;
     default: assert(false); }
 }
 

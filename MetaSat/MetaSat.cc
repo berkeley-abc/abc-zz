@@ -15,7 +15,7 @@
 #include "MetaSat.hh"
 #include "minisat2.hh"
 #include "abcSat.hh"
-#include "GlucoRed.hh"
+#include "SiertSat.hh"
 #include "ZZ_MiniSat.hh"
 #include "ZZ/Generics/Sort.hh"
 
@@ -23,6 +23,7 @@ namespace MS = ::Minisat;
 namespace AS = ::abc_sat;
 namespace GL = ::Glucose;
 namespace GR = ::GlucoRed;
+namespace MR = ::MiniRed;
 
 namespace ZZ {
 using namespace std;
@@ -1146,6 +1147,198 @@ void GlrSat::setVerbosity(int verb_level)
 
 
 bool GlrSat::exportCnf(const String& filename)
+{
+    assert(false);
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// MiniRed wrapper:
+
+
+//typedef MR::vec<MR::Lit> MR_litvec;
+typedef MR::vec<MR::Lit> MR_litvec;
+
+macro Lit fromMr(MR::Lit p) { Lit ret; ret.id = MR::var(p); ret.sign = MR::sign(p); return ret; }
+macro MR::Lit toMr(Lit p) { return MR::mkLit(p.id, p.sign); }
+
+macro lbool fromMr(MR::lbool v) { return (v == (MR::lbool((uint8_t)0)))  ? l_True : (v == (MR::lbool((uint8_t)1))) ? l_False : l_Undef; }
+
+
+MiniRedSat::MiniRedSat()
+{
+    MR_litvec& tmp  = *(MR_litvec*)(void*)&tmp_lits;
+    new (&tmp) MR_litvec;
+
+    S = new MR::SolRed;
+
+    Lit null_lit = addLit(); assert(null_lit.id == 0);
+    true_lit = addLit();
+    MetaSat::addClause(true_lit);
+}
+
+
+MiniRedSat::~MiniRedSat()
+{
+    if (S) delete S;
+}
+
+
+void MiniRedSat::clear(bool dealloc)
+{
+    S->~SolRed();
+    new (S) MR::SolRed;
+
+    Lit null_lit = addLit(); assert(null_lit.id == 0);
+    Lit true_lit = addLit();
+    MetaSat::addClause(true_lit);
+}
+
+
+Lit MiniRedSat::True() const
+{
+    return true_lit;
+}
+
+
+Lit MiniRedSat::addLit()
+{
+    return fromMr(MR::mkLit(S->newVar()));
+}
+
+
+void MiniRedSat::addClause_(const Vec<Lit>& ps)
+{
+    MR_litvec& tmp = *(MR_litvec*)(void*)&tmp_lits;
+    tmp.clear();
+    for (uint i = 0; i < ps.size(); i++)
+        tmp.push(toMr(ps[i]));
+
+    S->addClause(tmp);
+}
+
+
+void MiniRedSat::recycleLit(Lit p)
+{
+    S->addClause(toMr(p));    // -- not supported, just set 'p' to TRUE.
+}
+
+
+void MiniRedSat::setConflictLim(uint64 n_confl)
+{
+    S->setConfBudget(n_confl);
+}
+
+
+lbool MiniRedSat::solve_(const Vec<Lit>& assumps)
+{
+    MR_litvec& tmp = *(MR_litvec*)(void*)&tmp_lits;
+    tmp.clear();
+    for (uint i = 0; i < assumps.size(); i++)
+        tmp.push(toMr(assumps[i]));
+
+    lbool ret = fromMr(S->solveLimited(tmp));
+    S->budgetOff();
+    return ret;
+}
+
+
+void MiniRedSat::randomizeVarOrder(uint64 seed)
+{
+    /*nothing yet*/
+}
+
+
+bool MiniRedSat::okay() const
+{
+    return S->okay();
+}
+
+
+lbool MiniRedSat::value_(uint x) const
+{
+    return fromMr(S->modelValue(x));
+}
+
+
+void MiniRedSat::getModel(Vec<lbool>& m) const
+{
+    m.setSize(nVars());
+    for (uint i = 0; i < nVars(); i++)
+        m[i] = fromMr(S->modelValue(i));
+}
+
+
+void MiniRedSat::getConflict(Vec<Lit>& confl)
+{
+    confl.clear();
+    for (int i = 0; i < S->conflict.size(); i++)
+        confl.push(~fromMr(S->conflict[i]));
+}
+
+
+double MiniRedSat::getActivity(uint x) const
+{
+    return S->activity[x] / S->var_inc;
+}
+
+
+uint MiniRedSat::nClauses() const
+{
+    return S->nClauses();
+}
+
+
+uint MiniRedSat::nLearnts() const
+{
+    return S->nLearnts();
+}
+
+
+uint MiniRedSat::nConflicts() const
+{
+    return S->conflicts;
+}
+
+
+uint MiniRedSat::nVars() const
+{
+    return S->nVars();
+
+}
+
+
+void MiniRedSat::freeze(uint x)
+{
+    /*nothing*/
+}
+
+
+void MiniRedSat::thaw(uint x)
+{
+    /*nothing*/
+}
+
+
+void MiniRedSat::preprocess(bool /*final_call*/)
+{
+    /*nothing*/
+}
+
+
+void MiniRedSat::getCnf(Vec<Lit>& out_cnf)
+{
+    assert(false);  // <<== later
+}
+
+
+void MiniRedSat::setVerbosity(int verb_level)
+{
+    S->verbosity = verb_level;
+}
+
+
+bool MiniRedSat::exportCnf(const String& filename)
 {
     assert(false);
 }

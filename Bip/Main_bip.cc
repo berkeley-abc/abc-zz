@@ -893,7 +893,7 @@ int main(int argc, char** argv)
     cli_bmc.add("st", "bool", "no", "Simple binary Tseitin clausification.");
     cli_bmc.add("la", "int[1:]", "1", "Number of look-ahead frames.");
     cli_bmc.add("la-decay", "ufloat", "0.8", "Smaller numbers mean later frames are given less time. '1' = all frames have equal time.");
-    cli_bmc.add("sat", "{zz, msc, abc, glu, glr}", "msc", "SAT-solver to use.");
+    cli_bmc.add("sat", "{zz, msc, abc, glu, glr, msr}", "msc", "SAT-solver to use.");
 
     cli.addCommand("bmc", "Bounded model checking", &cli_bmc);
 
@@ -1403,7 +1403,8 @@ int main(int argc, char** argv)
                        (cli.get("sat").enum_val == 1) ? sat_Msc :
                        (cli.get("sat").enum_val == 2) ? sat_Abc :
                        (cli.get("sat").enum_val == 3) ? sat_Glu :
-                       (cli.get("sat").enum_val == 4) ? sat_Glr : (assert(false), sat_NULL);
+                       (cli.get("sat").enum_val == 4) ? sat_Glr :
+                       (cli.get("sat").enum_val == 5) ? sat_Msr : (assert(false), sat_NULL);
 
         EffortCB_Timeout cb(vtimeout, timeout);
         Cex   cex;

@@ -1,0 +1,234 @@
+#!/usr/bin/env python
+
+import sys
+import os
+import re
+import shutil
+import tempfile
+
+
+module_name = "SiertSat"
+
+src_files = [
+    'glucose/core/Solver.cc',
+    'glucose/utils/System.cc',
+    'glucose/utils/Options.cc',
+
+    'minisat/core/Solver.cc',
+    'minisat/utils/System.cc',
+    'minisat/utils/Options.cc',
+
+    'minired/MiniRed-Search.cc',
+    'minired/ExtSolver.cc',
+    'minired/Reducer.cc',
+    'minired/SolRed.cc',
+    'minired/Work.cc',
+
+    'glucored/GlucoRed-Search.cc',
+    'glucored/ExtSolver.cc',
+    'glucored/Reducer.cc',
+    'glucored/SolRed.cc',
+    'glucored/Work.cc'
+]
+
+
+##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+## Helpers:
+
+
+def pr(text):
+    sys.stdout.write(text)
+    sys.stdout.flush()
+
+
+def abort(message):
+    pr("ERROR! %s\n" % message)
+    exit(255)
+
+
+def z(var):
+    return os.environ["ZB_" + var]
+
+
+def up_to_date(src, dst):
+    return os.path.exists(dst) and os.stat(dst).st_mtime + 0.001 > os.stat(src).st_mtime
+
+
+def files_in_dir(dir):
+    return [f for f in os.listdir(dir) if os.path.isfile(dir+"/"+f)]
+
+
+##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+## Build library:
+
+
+def build():
+
+    # Setup makefile variables:
+    flags = []
+    pri   = z("PRI_TYPE")
+    secs  = z("SEC_TYPES")
+
+    # <<== something to handle non-threaded compilation (dynamic message?)
+
+    flags.append("-D__STDC_LIMIT_MACROS")
+    flags.append("-D__STDC_CONSTANT_MACROS")
+    flags.append("-D__STDC_FORMAT_MACROS")
+    flags.append("-DMinisat=SiertMS")
+    flags.append("-ffloat-store")
+
+    if pri == "r": flags.append("-O3 -fomit-frame-pointer")
+    if pri == "p": flags.append("-O1 -pg")
+    if pri == "d": flags.append("-O1")
+    if pri == "q": flags.append("-O0")
+
+    if "t" in secs: flags.append("-pthread")
+    if "a" in secs: flags.append("-DNDEBUG")
+    if "s" not in secs: flags.append("-ggdb")
+
+    suffix = "_" + ''.join(sorted(set(pri))) + "_" + ''.join(sorted(set(secs)))
+
+    # Compile .cc files:
+    obj_files = []
+    changed = False
+    for f in src_files:
+        obj = f[:-3] + suffix + ".o"
+        obj_files.append(obj)
+        if not up_to_date(f, obj):
+            cmd = "g++ -c %s %s -o %s" % (" ".join(flags), f, obj)
+            if f.startswith("glucose") or f.startswith("glucored"): cmd += " -I glucose -DGLUCORED"
+            if f.startswith("minisat") or f.startswith("minired"):  cmd += " -I minisat -DMINIRED"
+
+            if z("VERBOSE") == "1": print "COMPILE:", cmd
+            if os.system(cmd) != 0: abort("Compilation failed")
+            changed = True
+
+    # Create library:
+    local_target = "lib" + module_name + suffix + ".a"
+    if changed or not os.path.exists(local_target):
+        # Link:
+        public_target = z("LIB_DIR") + "/lib" + module_name + ".a"
+        local_target = "lib" + module_name + suffix + ".a"
+        cmd = "ar cqs %s %s 2>&1" % (local_target, " ".join(obj_files))
+        if z("VERBOSE") == "1": print "LINK:", cmd
+        if os.system(cmd) != 0: abort("Linking failed")
+
+        # Copy results:
+        if not up_to_date(local_target, public_target):
+            shutil.copy2(local_target, public_target)
+            print "`` Produced library: lib" + module_name + ".a"
+
+
+##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+## Create header file:
+
+
+def skip_line(line, remove_protected):
+    if line.startswith("#include \""): return True
+    if line.startswith("#include\""): return True
+    if remove_protected and line == "protected:\n": return True   # (remove "protected:" from 'Solver.h')
+    if line.startswith("#define var_Undef (-1)"): return True
+    if line.startswith("#define l_"): return True
+    if line.startswith("#define GLUCORED"): return True
+    if line.startswith("#define MINIRED"): return True
+    if line.startswith("#define") and line.endswith("_h\n"): return True
+    return False
+
+
+def subst_defines(line):
+    line = re.sub(r"var_Undef", "(-1)", line)
+    line = re.sub(r"l_True", "(lbool((uint8_t)0))", line)
+    line = re.sub(r"l_False", "(lbool((uint8_t)1))", line)
+    line = re.sub(r"l_Undef", "(lbool((uint8_t)2))", line)
+    line = re.sub(r"Minisat", "SiertMS", line)
+    line = re.sub(r"#ifndef.*_h", "#if 1", line)
+    return line
+
+
+def create_header():
+    order = [
+             "glucose/core/Constants.h",
+             "glucose/mtl/XAlloc.h",
+             "glucose/mtl/Alloc.h",
+             "glucose/mtl/Vec.h",
+             "glucose/mtl/Queue.h",
+             "glucose/mtl/Sort.h",
+             "glucose/mtl/IntTypes.h",
+             "glucose/mtl/Heap.h",
+             "glucose/mtl/Map.h",
+             "glucose/mtl/Alg.h",
+             "glucose/utils/ParseUtils.h",
+             "glucose/utils/Options.h",
+             "glucose/core/SolverTypes.h",
+             "glucose/core/BoundedQueue.h",
+             "glucose/core/Solver.h",
+             "glucose/utils/System.h",
+             "glucored/Work.h",
+             "glucored/Version.h",
+             "glucored/ExtSolver.h",
+             "glucored/Reducer.h",
+             "glucored/SolRed.h",
+             "minisat/mtl/XAlloc.h",
+             "minisat/mtl/Alloc.h",
+             "minisat/mtl/Vec.h",
+             "minisat/mtl/Queue.h",
+             "minisat/mtl/Sort.h",
+             "minisat/mtl/IntTypes.h",
+             "minisat/mtl/Heap.h",
+             "minisat/mtl/Map.h",
+             "minisat/mtl/Alg.h",
+             "minisat/utils/ParseUtils.h",
+             "minisat/utils/Options.h",
+             "minisat/core/SolverTypes.h",
+             "minisat/core/Solver.h",
+             "minisat/utils/System.h",
+             "minired/Work.h",
+             "minired/Version.h",
+             "minired/ExtSolver.h",
+             "minired/Reducer.h",
+             "minired/SolRed.h"
+            ]
+
+    out_filename = z("INCLUDE_DIR") + "/"+ module_name + ".hh"
+    tmp_filename = z("INCLUDE_DIR") + "/"+ module_name + ".hh.tmp"
+    out = open(tmp_filename, "wt")
+
+    for filename in order:
+        remove_protected = (filename.endswith("Solver.h"))
+        if filename.startswith("glucored"): out.write("#define GLUCORED\n")
+        if filename.startswith("minired"):  out.write("#define MINIRED\n")
+        with open(filename) as f:
+            for line in f:
+                if not skip_line(line, remove_protected):
+                    out.write(subst_defines(line))
+        if filename.startswith("glucored"): out.write("#undef GLUCORED\n")
+        if filename.startswith("minired"):  out.write("#undef MINIRED\n")
+    out.close()
+
+    # Report file creation only if different:
+    if not os.path.exists(out_filename) or os.system("diff " + out_filename + " " + tmp_filename + " >/dev/null") != 0:
+        os.system("mv " + tmp_filename + " " + out_filename)
+        print "`` Created header: " + module_name + ".hh"
+
+
+##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+## Clean up:
+
+
+def clean_up():
+    os.system("rm -rvf lib" + module_name + ".a */*.o")
+
+
+##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+## Main:
+
+
+def main():
+    os.chdir(module_name)
+    if   z("CMD") == "build" : build()
+    elif z("CMD") == "header": create_header()
+    elif z("CMD") == "clean" : clean_up()
+    else:
+        abort("Unknown command: " + z("CMD"))
+
+main()
