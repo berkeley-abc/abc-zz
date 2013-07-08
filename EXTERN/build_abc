@@ -111,6 +111,12 @@ def create_header():        # -- assumes we are in directory 'ZZ/EXTERN/'
 
 
 def main():
+    try:
+        os.chdir("abc")
+        os.chdir("..")
+    except:
+        os.system("./checkout_abc")
+
     if z("CMD") == "build":
         os.chdir("abc")
         build(z("PRI_TYPE") + z("SEC_TYPES"), False)
