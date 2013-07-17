@@ -48,7 +48,7 @@ float fullLookup(const SC_Surface& S, float slew, float load)
 }
 
 
-// First two timing arguments are on input side, last three on output side (and last two of those are 
+// First two timing arguments are on fanin side, last three on fanout side (and last two of those are 
 // updated): arr[v], slew[v], load[w], arr(w), slew(w) (with v == w[k] for some pin# k).
 //
 void timeGate(const SC_Timing& t, TValues arr_in, TValues slew_in, TValues load, uint approx, TValues& arr, TValues& slew)

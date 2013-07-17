@@ -66,11 +66,12 @@ struct Params_ContSize {
 
 
 struct Params_DelayOpt {
-    uint approx;
-    bool forget_sizes;
-    bool filter_groups;
-    uint prebuf_lo;         // -- 0 means no pre-buffering
-    uint prebuf_grace;
+    float req_time;
+    uint  approx;
+    bool  forget_sizes;
+    bool  filter_groups;
+    uint  prebuf_lo;         // -- 0 means no pre-buffering
+    uint  prebuf_grace;
     Params_ContSize C;
 
     uint verbosity;
@@ -79,6 +80,7 @@ struct Params_DelayOpt {
     uint prebuf_hi;
 
     Params_DelayOpt() :
+        req_time(0),
         approx(0),
         forget_sizes(true),
         filter_groups(true),

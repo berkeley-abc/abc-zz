@@ -212,6 +212,13 @@ template <class S, size_t len>
 fts_macro bool eq(cchar t[len], const S& s) {
     return eq(s, t); }
 
+macro bool pfx_(cchar* text, cchar* pre) {
+    for (; *pre; text++, pre++)
+        if (*text != *pre) return false;
+    return true; }
+macro bool pfx(char*  text, cchar* pre) { return pfx_(text, pre); }
+macro bool pfx(cchar* text, cchar* pre) { return pfx_(text, pre); }
+
 template <class S>
 fts_macro bool pfx(const S& text, cchar* pfx) {
     for (uind i = 0; pfx[i]; i++)

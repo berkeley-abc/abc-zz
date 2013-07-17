@@ -234,6 +234,7 @@ class DelayOpt {
     void     contNudge(float eval, Wire w, float step);
     double   contEval(Wire w0, const WSeen& crit, float delta);
     void     continuousResizing();
+    void     alternativeResizing(float req_time);
 
     // Major methods:
     void  legalize();
@@ -1194,6 +1195,114 @@ void DelayOpt::continuousResizing()
 }
 
 
+//=================================================================================================
+// -- Experimental:
+
+
+class FlowMap {
+    WMap<uint> moff;    // -- 'flow[moff[w] + pin]' gives flow for input pin 
+    Vec<TValues> flow;
+
+public:
+    FlowMap(NetlistRef N){
+        uint offC = 0;
+        For_Gates(N, w){
+            moff(w) = offC;
+            offC += w.size();
+        }
+        flow.growTo(offC, TValues(0, 0));
+    }
+
+    TValues* operator[](Wire w) { return &flow[moff[w]]; }
+};
+
+
+void DelayOpt::alternativeResizing(float req_time)
+{
+    if (P.verbosity >= 1){
+        WriteLn "\a/_______________________________________________________________________________\a/";
+        WriteLn "\a/||\a/  \a*Flow-Based Gate-Sizing\a*";
+        NewLine;
+    }
+
+    Auto_Pob(N, dyn_fanouts);
+
+    For_Gatetype(N, gate_Uif, w)
+        alt(w) = altNo(w);
+
+    float crit_len_cont = maxOf(arr);
+
+    // an edge is rise or fall between the output pins of two gates, one feeding into the other
+
+    req_time = crit_len_cont * 0.9;     // <<== for now
+    float total_flow = 100;
+    float lambda = 1.0;
+
+    // Setup flow map:
+    FlowMap     flow(N);
+    WMap<float> in_flow;
+
+    // Seed flow at POs:
+    For_Gatetype(N, gate_PO, w){
+        flow[w][0].rise += (arr[w].rise - req_time) * lambda;
+        flow[w][0].fall += (arr[w].fall - req_time) * lambda;
+    }
+
+#if 0
+    double pos_flow;
+    For_Gatetype(N, gate_PO, w){
+        if (arr[w].rise > req_time) neg_slack += arr[w].rise - req_time;
+        if (arr[w].fall > req_time) neg_slack += arr[w].fall - req_time;
+    }
+
+    float norm = total_flow / neg_slack;
+    For_Gatetype(N, gate_PO, w){
+        if (arr[w].rise > req_time) in_flow(w) += (arr[w].rise - req_time) * norm;
+        if (arr[w].fall > req_time) in_flow(w) += (arr[w].fall - req_time) * norm;
+    }
+
+    // Distribute flow:
+    for (uint i = order.size(); i > 0;){ i--;
+        Wire w = order[i] + N;
+        if (in_flow[w] == 0.0) continue;
+
+        ContCell cc = contCell(w, alt[w]);
+        for (uint pin = 0; pin < w.size(); pin++){
+            TValues arr_out, slew_out;
+            contTimeGate(cc, /*out_pin*/0, pin, arr[w[pin]], slew[w[pin]], load[w/*pin here*/], P.approx, arr_out, slew_out);
+
+            TValues len = dep[w] + arr_out;
+            neg_slack = len - req_time
+static
+void contTimeGate(const ContCell& cc, uint out_pin, uint in_pin,
+                  TValues arr_in, TValues slew_in, TValues load, uint approx, TValues& arr, TValues& slew)
+
+//
+//        float neg_slack = (arr[w].rise + dep[w].rise) - req_time;   
+//        
+//            uint cell_idx = attr_Uif(w).sym;
+//            const SC_Cell& cell = L.cells[cell_idx];
+//            if (cell.n_outputs > 1) continue;
+//
+//            const SC_Pin& pin = cell.outPin(0); // -- assume single output gate
+//        // v = input of w
+//                const SC_Timings& ts = pin.rtiming[Iter_Var(v)];
+//                if (ts.size() == 0) continue;
+//                assert(ts.size() == 1);
+//                const SC_Timing& t = ts[0];
+//
+//        timeGate(const SC_Timing& t, Wire w, Wire v, const TMap& load, uint approx, TMap& arr, TMap& slew) {
+//        
+        // distr. flow between children according to criticality (or in later phase, nudge in that direction with constant lambda)
+
+    }
+#endif
+
+    // Resize gates locally:
+
+}
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Main:
 
@@ -1245,7 +1354,8 @@ void DelayOpt::run()
     area = getTotalArea(N, L);
 
     /**/signal(SIGINT, SIGINT_handler2);
-    continuousResizing();
+//    continuousResizing();
+    alternativeResizing(P.req_time);
 
     // If using approximations, output table based evaluation for comparison:
     if (P.verbosity >= 1 && P.approx != 0){
@@ -1287,6 +1397,7 @@ void addCli_DelayOpt(CLI& cli)
     String approx_types   = "{none, lin, satch, quad}";
     String approx_default = select(approx_types, P.approx);
 
+    cli.add("req"   , "ufloat"    , S(P.req_time)     , "Required time (used with 'alternative' engine only).");
     cli.add("apx"   , approx_types, approx_default    , "Approximation to use for timing; 'none' uses Liberty tables.");
     cli.add("forget", "bool"      , B(P.forget_sizes) , "Forget current gate sizes.");
     cli.add("filter", "bool"      , B(P.filter_groups), "Filter cell groups for smoother sizing.");
@@ -1323,6 +1434,7 @@ void addCli_DelayOpt(CLI& cli)
 void setParams(const CLI& cli, Params_DelayOpt& P)
 {
     // GLOBAL:
+    P.req_time      = cli.get("req").float_val;
     P.approx        = cli.get("apx").int_val;
     P.forget_sizes  = cli.get("forget").bool_val;
     P.filter_groups = cli.get("filter").bool_val;

@@ -258,6 +258,7 @@ void MiniSat2::recycleLit(Lit p)
 
 void MiniSat2::setConflictLim(uint64 n_confl)
 {
+    newMin(n_confl, (uint64)INT64_MAX);
     S->setConfBudget(n_confl);
 }
 
@@ -441,6 +442,7 @@ void MiniSat2s::recycleLit(Lit p)
 
 void MiniSat2s::setConflictLim(uint64 n_confl)
 {
+    newMin(n_confl, (uint64)INT64_MAX);
     S->setConfBudget(n_confl);
 }
 

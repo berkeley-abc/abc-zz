@@ -14,7 +14,7 @@
 #include "Prelude.hh"
 #include "Abstraction.hh"
 #include "ZZ_Netlist.hh"
-#include "ZZ_MiniSat.hh"
+#include "ZZ_MetaSat.hh"
 #include "ZZ_Bip.Common.hh"
 #include "ZZ/Generics/OrdSet.hh"
 #include "ParClient.hh"
@@ -38,16 +38,6 @@ struct SatCB_data {
 };
 
 
-static
-bool satCb(uint64 /*work*/, void* data)
-{
-    SatCB_data& d = *static_cast<SatCB_data*>(data);
-    return d.S.statistics().conflicts   < d.max_conflicts
-        && d.S.statistics().inspections < d.max_inspects
-        && cpuTime()                    < d.cpu_time;
-}
-
-
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Abstraction Trace:
 
@@ -57,7 +47,7 @@ class AbsTrace {
     Netlist             F;          // Unrolled design
     WZetL               abstr_;     // Current abstraction (set of flops)
 
-    SatStd              S;          // SAT environment
+    MiniSat2            S;          // SAT environment
     Vec<WMap<GLit> >    n2f;        // Map '(frame, wire)' to wire in 'F'.
     WZet                keep_f;     // Gates in 'F' that we hypothesize are best kept as SAT variables
     WMap<Lit>           f2s;        // Map gate in 'F' to SAT literal.
@@ -65,7 +55,7 @@ class AbsTrace {
     WMapL<Lit>          act_lits;   // Activation literals for the flops
 
     Vec<lbool>          last_model;
-    Clausify<SatStd>    C;
+    Clausify<MiniSat2>  C;
 
     IntSet<Var>         rem;        // [TEMPORARY]. Used in 'solve()'.
     uint64              seed;
@@ -92,7 +82,6 @@ public:
     void  getCex(uint depth, Cex& out_cex, bool final = false);
 
     uint  nClauses  () const { return (uint)S.nClauses(); }
-    uint  nConflicts() const { return (uint)S.statistics().conflicts; }
 
     void  ensureFrame(uint d) { n2f.growTo(d + 1); }
 
@@ -201,7 +190,7 @@ void AbsTrace::insertFlop(int frame, Wire w, Wire ret)
 
     Lit  a = act_lits[w];
     if (a == lit_Undef){
-        a = Lit(S.addVar());
+        a = S.addLit();
         act_lits(w) = a;
     }
 
@@ -296,7 +285,7 @@ lbool AbsTrace::solve(Vec<Wire>& f_assumps)
     assert(f_assumps.size() > 0);     // -- doesn't make sense to have no assumptions (always SAT)
 
     Vec<Lit> disj;
-    Lit act = Lit(S.addVar());
+    Lit act = S.addLit();
     disj.push(~act);
     for (uind i = 0; i < f_assumps.size(); i++)
         disj.push(clausify(f_assumps[i]));
@@ -309,11 +298,8 @@ lbool AbsTrace::solve(Vec<Wire>& f_assumps)
             assumps.push(act_lits[w]);
     }
 
-    S.verbosity = sat_verbosity;
-    SatCB_data cb_data(S, max_inspects, max_conflicts, cpu_time);
-    S.timeout = VIRT_TIME_QUANTA;
-    S.timeout_cb = satCb;
-    S.timeout_cb_data = &cb_data;
+    S.setVerbosity(sat_verbosity);
+    S.setConflictLim(max_conflicts);
     lbool ret = S.solve(assumps);
 
     if (ret == l_Undef)
@@ -330,8 +316,10 @@ lbool AbsTrace::solve(Vec<Wire>& f_assumps)
         rem.clear();
         for (uind i = 1; i < assumps.size(); i++)
             rem.add(var(assumps[i]));
-        for (uind i = 0; i < S.conflict.size(); i++)
-            rem.exclude(var(S.conflict[i]));
+        Vec<Lit> conflict;
+        S.getConflict(conflict);
+        for (uind i = 0; i < conflict.size(); i++)
+            rem.exclude(var(conflict[i]));
 
         For_Gatetype(N, gate_Flop, w){
             if (rem.has(var(act_lits[w]))){
