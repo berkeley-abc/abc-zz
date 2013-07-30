@@ -892,7 +892,7 @@ static
 bool removeCstyleComments(Array<char> text)
 {
     char* p   = &text[0];
-    char* end = &text.end();
+    char* end = &text.end_();
 
     while (p != end){
         if (*p == '/' && p+1 != end && p[1] == '/'){
@@ -984,7 +984,7 @@ void sifTokenize(Str text, Vec<SifToken>& elems)
 
     cchar* p   = &text[0];
     cchar* p0  = &text[0];
-    cchar* end = &text.end();
+    cchar* end = &text.end_();
     uind line_no = 1;
 
     for(;;){

@@ -93,7 +93,7 @@ struct Array {
     T&       operator[](uind i)         const { assert_debug(i <= sz); return data[i]; }    // -- intentionally allow for one-beyond-last addressing
     T&       operator[](ReverseIndex r) const { uind i = this->sz - r.off; assert_debug(i <= sz); return data[i]; }
 
-    T&       end () const { return data[sz]; }
+    T&       end_() const { return data[sz]; }
     T&       last() const { return data[sz-1]; }
     void     pop ()       { sz--; }
     void     shrinkTo(uind size) { if (sz > size) sz = size; }   // (will do nothing if already smaller)
@@ -102,6 +102,13 @@ struct Array {
 
     Array<T> slice(uind start = 0)       const { return Array<T>(&data[start], sz - start); }
     Array<T> slice(uind start, uind end) const { return Array<T>(&data[start], end - start); }
+
+  #if (__cplusplus == 201103L)
+    const T* end   (uind i = 0) const { return &this->data[this->sz-i]; }
+    T*       end   (uind i = 0)       { return &this->data[this->sz-i]; }
+    const T* begin () const           { return &this->data[0]; }
+    T*       begin ()                 { return &this->data[0]; }
+  #endif
 
   //________________________________________
   //  Slice parsing interface:
@@ -200,21 +207,21 @@ macro Array<T> Array_copy(const T& start, const T& end, ALLOC& mem)
 template<template<class> class V, class T>
 macro Array<T> Array_copy(const V<const T>& other)
 {
-    return Array_copy(other[0], other.end());
+    return Array_copy(other[0], other.end_());
 }
 #endif
 
 template<template<class> class V, class T>
 macro Array<T> Array_copy(const V<T>& other)
 {
-    return Array_copy(other[0], other.end());
+    return Array_copy(other[0], other.end_());
 }
 
 
 template<template<class> class V, class T, class ALLOC>
 macro Array<T> Array_copy(const V<T>& other, ALLOC& mem)
 {
-    return Array_copy(other[0], other.end(), mem);
+    return Array_copy(other[0], other.end_(), mem);
 }
 
 

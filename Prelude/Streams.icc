@@ -231,7 +231,7 @@ void Out::flushZ(int libz_flush_level)
         // Extend 'data' with compressed data from libz:
         do{
             data.reserve(data.size() + buf_size);
-            Z->strm.next_out  = (uchar*)&data.end();
+            Z->strm.next_out  = (uchar*)&data.end_();
             Z->strm.avail_out = data.capacity() - data.size();
             int st = deflate(&Z->strm, libz_flush_level); assert(st != Z_STREAM_ERROR);
             data.growTo(data.capacity() - Z->strm.avail_out);       // -- this line relies on the fact that extending a vector of 'char's won't clear the new data.

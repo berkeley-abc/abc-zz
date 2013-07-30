@@ -48,7 +48,7 @@ void format_int64(int64 x, Vec<char>& out)
             out.push('0' + uchar(x % 10));
             x /= 10; }
 
-        reverse(slice(out[i], out.end()));
+        reverse(slice(out[i], out.end_()));
     }
 }
 

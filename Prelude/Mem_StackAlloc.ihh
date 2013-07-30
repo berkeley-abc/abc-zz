@@ -36,7 +36,7 @@ class StackAlloc {
 public:
     typedef T Elem;
 
-    StackAlloc() : data(NULL), index(cap), list(NULL) { static_assert(lim <= cap); }
+    StackAlloc() : data(NULL), index(cap), list(NULL) { static_assert_(lim <= cap); }
    ~StackAlloc() { clear(); }
 
     T*   alloc (size_t n_elems = 1);            // -- Allocate one or more elements.

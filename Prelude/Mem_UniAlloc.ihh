@@ -34,7 +34,7 @@ class UniAlloc {
 public:
     typedef T Elem;
 
-    UniAlloc() : free_list(NULL) { static_assert(sizeof(T) == sizeof(TElem)); }
+    UniAlloc() : free_list(NULL) { static_assert_(sizeof(T) == sizeof(TElem)); }
    ~UniAlloc() { clear(); }
 
     T*   alloc();       // -- Returns a pointer to a 'T'-sized, uninitialized piece of memory.

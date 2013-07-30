@@ -76,6 +76,8 @@ void sendMsg_Reparam(NetlistRef N);
 
 void sendMsg_Abort(String text);
 
+void sendMsg_ClauseInvar(const Vec<int>& clauses);
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }

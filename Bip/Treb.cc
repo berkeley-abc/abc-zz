@@ -169,6 +169,7 @@ class Treb {
     void    extractCex(ProofObl po, Cex& cex);
     uint    invariantSize();
     void    storeInvariant(NetlistRef N_invar);
+    void    sendInvariant();
     void    dumpInvar();
 
     //  Cube Forward Propagation:
@@ -657,6 +658,35 @@ void Treb::storeInvariant(NetlistRef N_invar)
 
     N_invar.add(PO_(), w_conj);
     removeUnreach(N_invar);
+}
+
+
+// If 'par' interface is active, send the invariant as a set of clauses.
+void Treb::sendInvariant()
+{
+    if (!par) return;
+
+    Vec<int> clauses;
+    bool     adding = false;
+    for (uint d = 1; d < F.size(); d++){
+        if (!adding){
+            if (F[d].size() == 0)
+                adding = true;
+        }else{
+            for (uint i = 0; i < F[d].size(); i++){
+                Cube c = F[d][i];
+
+                for (uint j = 0; j < c.size(); j++){
+                    int num = attr_Flop(N[c[j]]).number;
+                    if (!c[j].sign) num = ~num;
+                    clauses.push(num);
+                }
+                clauses.push(INT_MAX);
+            }
+        }
+    }
+
+    sendMsg_ClauseInvar(clauses);
 }
 
 
@@ -1638,6 +1668,7 @@ bool Treb::run(Cex* cex_out, NetlistRef N_invar)
                     showProgress("final");
                     WriteLn "Inductive invariant found (%_ clauses).", invariantSize();
                     if (N_invar) storeInvariant(N_invar);
+                    if (par && P.par_send_invar) sendInvariant();
                     dumpInvar();
                     F.clear();      // -- this will mark "bug free depth" as infinity.
 
@@ -1780,6 +1811,7 @@ void addCli_Treb(CLI& cli)
     cli.add("redund"    , "bool"     , P.redund_cubes?"yes":"no"    , "Store cubes of F[n] at flop output of F[n-1] as well.");
     cli.add("dump-invar", "int[0:2]" , (FMT "%_", P.dump_invar)     , "Dump invariant: 0=no, 1=clause form, 2=PLA form.");
     cli.add("sat"       , sat_types  , sat_default                  , "SAT-solver to use.");
+    cli.add("send-invar", "bool"     , P.par_send_invar?"yes":"no"  , "Send invariant through PAR interface (only in PAR mode).");
 }
 
 
@@ -1809,6 +1841,7 @@ void setParams(const CLI& cli, Params_Treb& P)
     P.hq            = cli.get("hq")        .bool_val;
     P.redund_cubes  = cli.get("redund")    .bool_val;
     P.dump_invar    = cli.get("dump-invar").int_val;
+    P.par_send_invar= cli.get("send-invar").bool_val;
 
     P.sat_solver = (cli.get("sat").enum_val == 0) ? sat_Zz :
                    (cli.get("sat").enum_val == 1) ? sat_Msc :

@@ -36,7 +36,7 @@ using namespace std;
 #define ZZ_Do_Join(X, Y) ZZ_Do_Join2(X,Y)
 #define ZZ_Do_Join2(X, Y) X##Y
 
-#define static_assert(cond) \
+#define static_assert_(cond) \
    typedef ZZ::static_assert_test< sizeof(ZZ::STATIC_ASSERTION_FAILURE<(bool)(cond)>)> \
    ZZ_Join(static_assert_typedef_, __LINE__)
 

@@ -57,7 +57,7 @@ struct Pkg {
 
     uint         size      ()       const { return ptr->sz; }
     const uchar& operator[](uint i) const { return ptr->data[i]; }
-    const uchar& end       ()       const { return ptr->data[ptr->sz]; }
+    const uchar& end_      ()       const { return ptr->data[ptr->sz]; }
 
     bool   null() const { return ptr == NULL; }
     typedef Pkg_Data* Pkg::*bool_type;
@@ -67,7 +67,7 @@ struct Pkg {
         // -- Release this reference and put package in null state.
 
     const uchar*       base () const { return &ptr->data[0]; }
-    Array<const uchar> slice() const { return ::ZZ::slice(this->operator[](0), this->end()); }
+    Array<const uchar> slice() const { return ::ZZ::slice(this->operator[](0), this->end_()); }
 
 protected:
   //________________________________________

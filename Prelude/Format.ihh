@@ -132,10 +132,10 @@ template<> fts_macro void write_(Out& out, cchar* const& text) { cchar* p = text
 template<> fts_macro void write_(Out& out, char*  const& text) { cchar* p = text; while (*p) out.push(*p++); }
 template<size_t sz> fts_macro void write_(Out& out, char  const (&text) [sz]) { cchar* p = text; while (*p) out.push(*p++); }
 
-template<> fts_macro void write_(Out& out, const Array<cchar>& text) { if (text){ cchar* p = text.base(); while (p != &text.end()) out.push(*p++); } else out += "<nil>"; }
-template<> fts_macro void write_(Out& out, const Array<char>&  text) { if (text){ cchar* p = text.base(); while (p != &text.end()) out.push(*p++); } else out += "<nil>"; }
-template<> fts_macro void write_(Out& out, const Vec<cchar>&   text) { cchar* p = text.base(); while (p != &text.end()) out.push(*p++); }
-template<> fts_macro void write_(Out& out, const Vec<char>&    text) { cchar* p = text.base(); while (p != &text.end()) out.push(*p++); }
+template<> fts_macro void write_(Out& out, const Array<cchar>& text) { if (text){ cchar* p = text.base(); while (p != &text.end_()) out.push(*p++); } else out += "<nil>"; }
+template<> fts_macro void write_(Out& out, const Array<char>&  text) { if (text){ cchar* p = text.base(); while (p != &text.end_()) out.push(*p++); } else out += "<nil>"; }
+template<> fts_macro void write_(Out& out, const Vec<cchar>&   text) { cchar* p = text.base(); while (p != &text.end_()) out.push(*p++); }
+template<> fts_macro void write_(Out& out, const Vec<char>&    text) { cchar* p = text.base(); while (p != &text.end_()) out.push(*p++); }
 
 template<> fts_macro void write_(Out& out, const Out& in_mem_buf) { // -- only works for in memory output streams
     uind size = in_mem_buf.vec().size();   // -- we need this if 'out == in_mem_buf'.

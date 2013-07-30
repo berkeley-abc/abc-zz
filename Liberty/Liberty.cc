@@ -747,7 +747,7 @@ void mergeTiming(SC_Timing& a, const SC_Timing& b)
 }
 
 
-// If 'timing_mode' is set to "merge", all tables for the same input/output pair (with different 
+// If 'timing_mode' is set to "merge", all tables for the same input/output pair (with different
 // "when" conditions) are merged into a worst-case table. In this case, the list of tables
 // 'cell.pins[output_pin].rtiming[input_pin]' is always of size 0 or 1. NOTE! No tables mean
 // the output pin doesn't depend on the input pin (e.g. in a multi-output cell or a constant cell).
@@ -914,7 +914,7 @@ uint LibertyParser::getLocation(cchar* pos) const
 static bool removeComments(Array<char>& text)
 {
     char* p   = &text[0];
-    char* end = &text.end();
+    char* end = &text.end_();
 
     while (p != end){
         if (*p == '"'){

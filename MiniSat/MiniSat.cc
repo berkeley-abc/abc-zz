@@ -272,8 +272,8 @@ void MiniSat<pfl>::wlDisposeAll()
 template<bool pfl>
 GClause MiniSat<pfl>::allocClause(bool learnt, const Vec<Lit>& ps)
 {
-    static_assert(sizeof(Lit)   == sizeof(uint));
-    static_assert(sizeof(float) == sizeof(uint));
+    static_assert_(sizeof(Lit)   == sizeof(uint));
+    static_assert_(sizeof(float) == sizeof(uint));
 
     uint offset = mem_lits.size();
     uint n = (1 + ps.size() + (uint)learnt + 1 + uint(pfl)) & ~1u;

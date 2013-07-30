@@ -76,8 +76,8 @@ public:
     void        pushQ (char elem) { vec().pushQ(elem); }
     const char& last  () const    { return vec().last(); }
     char&       last  ()          { return vec().last(); }
-    const char& end   () const    { return vec().end(); }
-    char&       end   ()          { return vec().end(); }
+    const char& end_  () const    { return vec().end_(); }
+    char&       end_  ()          { return vec().end_(); }
 
     // Indexing:
     const char& operator[](uind i) const     { return vec().operator[](i); }

@@ -749,7 +749,7 @@ void receiveMsg_Task(NetlistRef N, String& params)
 
 
     assert(N.empty());
-    streamIn_Netlist(&n.pkg[0], &n.pkg.end(), N);
+    streamIn_Netlist(&n.pkg[0], &n.pkg.end_(), N);
 
     params.setSize(p.pkg.size());
     for (uind i = 0; i < p.pkg.size(); i++)
@@ -760,7 +760,7 @@ void receiveMsg_Task(NetlistRef N, String& params)
 // Send a string tagged with 'type'.
 void sendMsg_Text(uint type, const String& text)
 {
-    sendMsg(type, slice((uchar&)text[0], (uchar&)text.end()));
+    sendMsg(type, slice((uchar&)text[0], (uchar&)text.end_()));
 }
 
 
@@ -798,7 +798,7 @@ void sendMsg_UnreachCube(const Vec<GLit>& s, uint frame)
 void unpack_UCube(Pkg pkg, /*outputs:*/ uint& frame, Vec<GLit>& state)
 {
     const uchar* in  = &pkg[0];
-    const uchar* end = &pkg.end();
+    const uchar* end = &pkg.end_();
 
     frame = getu(in, end);
     state.setSize(getu(in, end));
@@ -866,7 +866,15 @@ void sendMsg_Reparam(NetlistRef N)
 
 void sendMsg_Abort(String text)
 {
-    sendMsg(5/*Abort*/, slice((uchar&)text[0], (uchar&)text.end()));
+    sendMsg(5/*Abort*/, slice((uchar&)text[0], (uchar&)text.end_()));
+}
+
+
+void sendMsg_ClauseInvar(const Vec<int>& clauses)
+{
+    const uchar* base = (const uchar*)&clauses[0];
+    uind size = clauses.size() * sizeof(int);
+    sendMsg(110/*ClauseInvar*/, slice(base[0], base[size]));
 }
 
 
@@ -880,7 +888,7 @@ void testMarshal(NetlistRef N)
     Netlist M;
     Vec<uchar> data;
     streamOut_Netlist(data, N);
-    streamIn_Netlist(&data[0], &data.end(), M);
+    streamIn_Netlist(&data[0], &data.end_(), M);
 
     nameByCurrentId(N);
     nameByCurrentId(M);

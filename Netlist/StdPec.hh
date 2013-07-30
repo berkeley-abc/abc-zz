@@ -59,7 +59,7 @@ private:
 
 template<> fts_macro void write_(Out& out, const Pec_RawData& data) {
     char& start = *(char*)&data[0];
-    char& end   = *(char*)&data.end();
+    char& end   = *(char*)&data.end_();
     write_(out, slice(start, end)); }
 
 

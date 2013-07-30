@@ -796,7 +796,7 @@ void NetlistRef::read(In& in) const
             }
 
             Array<char> lhs = slice(buf[0], buf[eq_i]);
-            Array<char> rhs = slice(buf[eq_i + 1], buf.end());
+            Array<char> rhs = slice(buf[eq_i + 1], buf.end_());
 
             // Split left-hand side into names:   (stored in 'ns[]')
             strictSplitArray(lhs, seps, ns);
@@ -815,7 +815,7 @@ void NetlistRef::read(In& in) const
             uind i = i0;
             for(;;){
                 if (i == rhs.size()){
-                    type_ = slice(rhs[i0], rhs.end());
+                    type_ = slice(rhs[i0], rhs.end_());
                     trimEnd(type_);
                     goto Done;
                 }else if (rhs[i] == '['){

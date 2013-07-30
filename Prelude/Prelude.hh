@@ -65,6 +65,12 @@ Defines that control compilation:
 #include <csignal>
 #include <new>
 
+#if __cplusplus == 201103L
+  #include <functional>
+  template <class F>
+  using Fun = std::function<F>;
+#endif
+
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>

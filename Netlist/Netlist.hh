@@ -144,7 +144,7 @@ public:
 
     template<class GateAttr>
     Wire add(const GateAttr& attr) const {
-        static_assert(GateAttr::n_inputs != DYNAMIC_GATE_INPUTS);
+        static_assert_(GateAttr::n_inputs != DYNAMIC_GATE_INPUTS);
         return add(attr, GateAttr::n_inputs); }
 
     void addDeletedGate() const {     // -- sometimes you want to skip a gate ID
@@ -152,10 +152,10 @@ public:
         deref().type_count[gate_NULL]++; }
 
     // Convenience:
-    template<class GateAttr> Wire add(const GateAttr& attr, GLit in0) const                               { static_assert(GateAttr::n_inputs == 1 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); Wire ret = add(attr, 1); ret.set(0, in0); return ret; }
-    template<class GateAttr> Wire add(const GateAttr& attr, GLit in0, GLit in1) const                     { static_assert(GateAttr::n_inputs == 2 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); Wire ret = add(attr, 2); ret.set(0, in0); ret.set(1, in1); return ret; }
-    template<class GateAttr> Wire add(const GateAttr& attr, GLit in0, GLit in1, GLit in2) const           { static_assert(GateAttr::n_inputs == 3 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); Wire ret = add(attr, 3); ret.set(0, in0); ret.set(1, in1); ret.set(2, in2); return ret; }
-    template<class GateAttr> Wire add(const GateAttr& attr, GLit in0, GLit in1, GLit in2, GLit in3) const { static_assert(GateAttr::n_inputs == 4 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); Wire ret = add(attr, 4); ret.set(0, in0); ret.set(1, in1); ret.set(2, in2); ret.set(3, in3); return ret; }
+    template<class GateAttr> Wire add(const GateAttr& attr, GLit in0) const                               { static_assert_(GateAttr::n_inputs == 1 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); Wire ret = add(attr, 1); ret.set(0, in0); return ret; }
+    template<class GateAttr> Wire add(const GateAttr& attr, GLit in0, GLit in1) const                     { static_assert_(GateAttr::n_inputs == 2 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); Wire ret = add(attr, 2); ret.set(0, in0); ret.set(1, in1); return ret; }
+    template<class GateAttr> Wire add(const GateAttr& attr, GLit in0, GLit in1, GLit in2) const           { static_assert_(GateAttr::n_inputs == 3 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); Wire ret = add(attr, 3); ret.set(0, in0); ret.set(1, in1); ret.set(2, in2); return ret; }
+    template<class GateAttr> Wire add(const GateAttr& attr, GLit in0, GLit in1, GLit in2, GLit in3) const { static_assert_(GateAttr::n_inputs == 4 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); Wire ret = add(attr, 4); ret.set(0, in0); ret.set(1, in1); ret.set(2, in2); ret.set(3, in3); return ret; }
         // -- these methods require all inputs to be set
 
   //________________________________________
@@ -168,14 +168,14 @@ public:
 
     template<class GateAttr>
     void change(Wire w, const GateAttr& attr) const {
-        static_assert(GateAttr::n_inputs != DYNAMIC_GATE_INPUTS);
+        static_assert_(GateAttr::n_inputs != DYNAMIC_GATE_INPUTS);
         return change(w, attr, GateAttr::n_inputs); }
 
     // Convenience:
-    template<class GateAttr> void change(Wire w, const GateAttr& attr, GLit in0) const                               { static_assert(GateAttr::n_inputs == 1 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); change(w, attr, 1); w.set(0, in0); }
-    template<class GateAttr> void change(Wire w, const GateAttr& attr, GLit in0, GLit in1) const                     { static_assert(GateAttr::n_inputs == 2 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); change(w, attr, 2); w.set(0, in0); w.set(1, in1); }
-    template<class GateAttr> void change(Wire w, const GateAttr& attr, GLit in0, GLit in1, GLit in2) const           { static_assert(GateAttr::n_inputs == 3 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); change(w, attr, 3); w.set(0, in0); w.set(1, in1); w.set(2, in2); }
-    template<class GateAttr> void change(Wire w, const GateAttr& attr, GLit in0, GLit in1, GLit in2, GLit in3) const { static_assert(GateAttr::n_inputs == 4 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); change(w, attr, 4); w.set(0, in0); w.set(1, in1); w.set(2, in2); w.set(3, in3); }
+    template<class GateAttr> void change(Wire w, const GateAttr& attr, GLit in0) const                               { static_assert_(GateAttr::n_inputs == 1 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); change(w, attr, 1); w.set(0, in0); }
+    template<class GateAttr> void change(Wire w, const GateAttr& attr, GLit in0, GLit in1) const                     { static_assert_(GateAttr::n_inputs == 2 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); change(w, attr, 2); w.set(0, in0); w.set(1, in1); }
+    template<class GateAttr> void change(Wire w, const GateAttr& attr, GLit in0, GLit in1, GLit in2) const           { static_assert_(GateAttr::n_inputs == 3 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); change(w, attr, 3); w.set(0, in0); w.set(1, in1); w.set(2, in2); }
+    template<class GateAttr> void change(Wire w, const GateAttr& attr, GLit in0, GLit in1, GLit in2, GLit in3) const { static_assert_(GateAttr::n_inputs == 4 || GateAttr::n_inputs == DYNAMIC_GATE_INPUTS); change(w, attr, 4); w.set(0, in0); w.set(1, in1); w.set(2, in2); w.set(3, in3); }
         // -- this method require all inputs to be set
 
   //________________________________________

@@ -55,7 +55,8 @@ struct Params_Treb {
     uint    dump_invar;         // Dump invariant (0=no, 1=clauses, 2=PLA).
     SolverType sat_solver;      // SAT-solver to use
     bool    quiet;              // Suppress output.
-    bool    par_send_result;    // If FALSE; CEX or invariant is not reported in PAR mode.
+    bool    par_send_result;    // If FALSE; CEX or unsat result is not reported in PAR mode.
+    bool    par_send_invar;     // If TRUE, invariant is reported (as clauses) in PAR mode.
 
     Params_Treb() :
         seed(0),
@@ -82,7 +83,8 @@ struct Params_Treb {
         dump_invar(0),
         sat_solver(sat_Msc),
         quiet(false),
-        par_send_result(true)
+        par_send_result(true),
+        par_send_invar(false)
     {}
 };
 

@@ -58,6 +58,9 @@ void SIGINT_handler2(int signum)
 // Helper functions:
 
 
+macro double sq(double x) { return x * x; }
+
+
 static
 float maxOf(const TMap& ts)
 {
@@ -140,6 +143,24 @@ struct LevQueue_lt {
 
     LevQueue_lt(NetlistRef N_, const WMap<uint>& level_) : N(N_), level(level_) {}
     bool operator()(GLit x, GLit y) const { return level[x + N] < level[y + N]; }
+};
+
+
+class FlowMap {
+    WMap<uint> moff;    // -- 'flow[moff[w] + pin]' gives flow for input pin 
+    Vec<TValues> flow;
+
+public:
+    FlowMap(NetlistRef N){
+        uint offC = 0;
+        For_Gates(N, w){
+            moff(w) = offC;
+            offC += w.size();
+        }
+        flow.growTo(offC, TValues(0, 0));
+    }
+
+    TValues* operator[](Wire w) { return &flow[moff[w]]; }
 };
 
 
@@ -235,6 +256,9 @@ class DelayOpt {
     double   contEval(Wire w0, const WSeen& crit, float delta);
     void     continuousResizing();
     void     alternativeResizing(float req_time);
+
+    float    flowEvalGate(Wire w, FlowMap& flow);
+    void     flowResizeGate(Wire w, FlowMap& flow);
 
     // Major methods:
     void  legalize();
@@ -537,6 +561,13 @@ void DelayOpt::preBuffer()
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Continuous sizing:
+
+
+static
+float contGateArea(const ContCell& cc)
+{
+    return cc.cell0.area * (1 - cc.frac) + cc.cell1.area * cc.frac;
+}
 
 
 static
@@ -1199,24 +1230,6 @@ void DelayOpt::continuousResizing()
 // -- Experimental:
 
 
-class FlowMap {
-    WMap<uint> moff;    // -- 'flow[moff[w] + pin]' gives flow for input pin 
-    Vec<TValues> flow;
-
-public:
-    FlowMap(NetlistRef N){
-        uint offC = 0;
-        For_Gates(N, w){
-            moff(w) = offC;
-            offC += w.size();
-        }
-        flow.growTo(offC, TValues(0, 0));
-    }
-
-    TValues* operator[](Wire w) { return &flow[moff[w]]; }
-};
-
-
 void DelayOpt::alternativeResizing(float req_time)
 {
     if (P.verbosity >= 1){
@@ -1231,75 +1244,216 @@ void DelayOpt::alternativeResizing(float req_time)
         alt(w) = altNo(w);
 
     float crit_len_cont = maxOf(arr);
+    WriteLn "cont-delay: %_", L.ps(crit_len_cont);
 
-    // an edge is rise or fall between the output pins of two gates, one feeding into the other
+    if (req_time == 0)
+        req_time = crit_len_cont * 0.25;     // <<== for now
+    else
+        req_time /= L.ps(1);
+    WriteLn "Required time set to: %_", L.ps(req_time);
 
-    req_time = crit_len_cont * 0.9;     // <<== for now
-    float total_flow = 100;
+    float total_flow = 100000;
     float lambda = 1.0;
 
     // Setup flow map:
     FlowMap     flow(N);
-    WMap<float> in_flow;
+    for (uint iter = 0; iter < 50; iter++){
+        if (ctrl_c_pressed){ WriteLn "\n**** CTRL-C pressed, aborting ****"; return; }
 
-    // Seed flow at POs:
-    For_Gatetype(N, gate_PO, w){
-        flow[w][0].rise += (arr[w].rise - req_time) * lambda;
-        flow[w][0].fall += (arr[w].fall - req_time) * lambda;
+        lambda = 0.1 / (iter + 3);
+        WMap<float> in_flow;
+
+        //req_time = crit_len_cont * 0.95;     // <<== for now
+
+        // Update flow map:
+        For_Gates(N, w){
+            if (type(w) == gate_PO){
+                flow[w][0].rise += (arr[w[0]].rise - req_time) * lambda;
+                flow[w][0].fall += (arr[w[0]].fall - req_time) * lambda;
+                //**/WriteLn "%_ -- arr: %_   req: %_", w, arr[w[0]], req_time;
+            }else if (type(w) == gate_Uif){
+                ContCell cc = contCell(w, alt[w]);
+                assert(cc.cell0.n_outputs == 1);    // <<== for now, we only handle single output gates
+
+                for (uint pin = 0; pin < w.size(); pin++){
+                    TValues arr_out, slew_out;
+                    contTimeGate(cc, /*out_pin*/0, pin, arr[w[pin]], slew[w[pin]], load[w/*pin here*/], P.approx, arr_out, slew_out);
+
+                    TValues len = dep[w] + arr_out;
+                    flow[w][pin].rise += (len.rise - req_time) * lambda;
+                    flow[w][pin].fall += (len.fall - req_time) * lambda;
+                    //**/Dump(w, pin, arr_out, arr[w[pin]], flow[w][pin], arr[w]);
+                }
+            }
+        }
+
+        // Seed flow at fanin of POs:
+        double pos_flow = 0;
+        For_Gatetype(N, gate_PO, w){
+            pos_flow += max_(0.0f, flow[w][0].rise);
+            pos_flow += max_(0.0f, flow[w][0].fall);
+        }
+
+        double norm = total_flow / pos_flow;
+        For_Gatetype(N, gate_PO, w){
+            if (flow[w][0].rise > 0) in_flow(w[0]) += flow[w][0].rise * norm;
+            if (flow[w][0].fall > 0) in_flow(w[0]) += flow[w][0].fall * norm;
+        }
+
+        // Distribute flow:
+        for (uint i = order.size(); i > 0;){ i--;
+            Wire w = order[i] + N;
+            if (type(w) == gate_PO) continue;
+            if (in_flow[w] == 0.0) continue;
+
+            pos_flow = 0;
+            for (uint pin = 0; pin < w.size(); pin++){
+                pos_flow += max_(0.0f, flow[w][pin].rise);
+                pos_flow += max_(0.0f, flow[w][pin].fall);
+            }
+            //**/WriteLn "inflow %_: %_  (pos %_)", w, in_flow[w], pos_flow;
+
+            norm = in_flow[w] / pos_flow;
+            for (uint pin = 0; pin < w.size(); pin++){
+                if (flow[w][pin].rise > 0){
+                    flow[w][pin].rise *= norm;
+                    in_flow(w[pin]) += flow[w][pin].rise;
+                }else
+                    flow[w][pin].rise = 0;
+
+                if (flow[w][pin].fall > 0){
+                    flow[w][pin].fall *= norm;
+                    in_flow(w[pin]) += flow[w][pin].fall;
+                }else
+                    flow[w][pin].fall = 0;
+            }
+        }
+
+#if 0   /*DEBUG*/
+{
+        double sum = 0;
+        For_Gatetype(N, gate_PI, w)
+            sum += in_flow[w];
+        Dump(sum);
+}
+#endif  /*END DEBUG*/
+
+
+    #if 0   /*DEBUG*/
+        For_Gates(N, w){
+            for (uint i = 0; i < w.size(); i++){
+                WriteLn "flow[%_][%_] = %_", w, i, flow[w][i];
+            }
+        }
+
+        nameByCurrentId(N);
+        N.write("N.gig"); WriteLn "Wrote: N.gig";
+
+        For_Gatetype(N, gate_Uif, w)
+            WriteLn "%_ : %_", w, L.cells[attr_Uif(w).sym].name;
+    #endif  /*END DEBUG*/
+
+        // Resize gates locally: (disregarding fanin side)
+        for (uint i = order.size(); i > 0;){ i--;
+            Wire w = order[i] + N;
+            if (type(w) == gate_Uif)
+                flowResizeGate(w, flow);
+        }
+
+        contStaticTiming();
+        crit_len_cont = maxOf(arr);
+        WriteLn "cont-delay: %_", L.ps(crit_len_cont);
     }
 
-#if 0
-    double pos_flow;
-    For_Gatetype(N, gate_PO, w){
-        if (arr[w].rise > req_time) neg_slack += arr[w].rise - req_time;
-        if (arr[w].fall > req_time) neg_slack += arr[w].fall - req_time;
+
+    // Final discretization:
+    For_Gatetype(N, gate_Uif, w)
+        setAltNo(w, (uint)floor(alt[w] + 0.5));
+
+    // Static timing:
+    load.clear(); arr.clear(); dep.clear(); slew.clear();
+    computeLoads(N, L, wire_cap, load);
+    staticTiming(N, L, load, order, P.approx, arr, slew);
+    revStaticTiming(N, L, load, slew, order, P.approx, dep);
+    area = getTotalArea(N, L);
+
+    if (P.verbosity >= 1){
+        NewLine;
+        WriteLn "FINAL   delay \a/%.2f ps\a/   area \a/%,d\a/ ", L.ps(maxOf(arr)), (uint64)(area + 0.5);
+        WriteLn "\a/_______________________________________________________________________________\a/";
+    }
+}
+
+
+float DelayOpt::flowEvalGate(Wire w, FlowMap& flow)
+{
+    ContCell cc = contCell(w, alt[w]);
+    double cost = 0;
+    for (uint pin = 0; pin < w.size(); pin++){
+        if (flow[w][pin].rise > 0 || flow[w][pin].fall > 0){
+            TValues arr_in(0, 0);
+            TValues arr_out, slew_out;
+            contTimeGate(cc, /*out_pin*/0, pin, arr_in, slew[w[pin]], load[w/*pin here*/], P.approx, arr_out, slew_out);
+
+            if (flow[w][pin].rise > 0) cost += /*sq*/(arr_out.rise * flow[w][pin].rise);
+            if (flow[w][pin].fall > 0) cost += /*sq*/(arr_out.fall * flow[w][pin].fall);
+        }
     }
 
-    float norm = total_flow / neg_slack;
-    For_Gatetype(N, gate_PO, w){
-        if (arr[w].rise > req_time) in_flow(w) += (arr[w].rise - req_time) * norm;
-        if (arr[w].fall > req_time) in_flow(w) += (arr[w].fall - req_time) * norm;
-    }
+#if 1
+    Wire w0 = w;
+    For_Inputs(w0, w){
+        if (type(w) != gate_Uif) continue;
 
-    // Distribute flow:
-    for (uint i = order.size(); i > 0;){ i--;
-        Wire w = order[i] + N;
-        if (in_flow[w] == 0.0) continue;
-
+        contComputeGateLoad(w);
         ContCell cc = contCell(w, alt[w]);
         for (uint pin = 0; pin < w.size(); pin++){
-            TValues arr_out, slew_out;
-            contTimeGate(cc, /*out_pin*/0, pin, arr[w[pin]], slew[w[pin]], load[w/*pin here*/], P.approx, arr_out, slew_out);
+            if (flow[w][pin].rise > 0 || flow[w][pin].fall > 0){
+                TValues arr_in(0, 0);
+                TValues arr_out, slew_out;
+                contTimeGate(cc, /*out_pin*/0, pin, arr_in, slew[w[pin]], load[w/*pin here*/], P.approx, arr_out, slew_out);
 
-            TValues len = dep[w] + arr_out;
-            neg_slack = len - req_time
-static
-void contTimeGate(const ContCell& cc, uint out_pin, uint in_pin,
-                  TValues arr_in, TValues slew_in, TValues load, uint approx, TValues& arr, TValues& slew)
-
-//
-//        float neg_slack = (arr[w].rise + dep[w].rise) - req_time;   
-//        
-//            uint cell_idx = attr_Uif(w).sym;
-//            const SC_Cell& cell = L.cells[cell_idx];
-//            if (cell.n_outputs > 1) continue;
-//
-//            const SC_Pin& pin = cell.outPin(0); // -- assume single output gate
-//        // v = input of w
-//                const SC_Timings& ts = pin.rtiming[Iter_Var(v)];
-//                if (ts.size() == 0) continue;
-//                assert(ts.size() == 1);
-//                const SC_Timing& t = ts[0];
-//
-//        timeGate(const SC_Timing& t, Wire w, Wire v, const TMap& load, uint approx, TMap& arr, TMap& slew) {
-//        
-        // distr. flow between children according to criticality (or in later phase, nudge in that direction with constant lambda)
-
+                if (flow[w][pin].rise > 0) cost += /*sq*/(arr_out.rise * flow[w][pin].rise);
+                if (flow[w][pin].fall > 0) cost += /*sq*/(arr_out.fall * flow[w][pin].fall);
+            }
+        }
     }
 #endif
+    cost += /*sq*/(contGateArea(cc));
 
-    // Resize gates locally:
+    return cost;
+}
 
+
+void DelayOpt::flowResizeGate(Wire w, FlowMap& flow)
+{
+    contComputeGateLoad(w);
+
+    float best = flowEvalGate(w, flow);
+    float best_alt = alt[w];
+    float delta = 0.01;
+
+    while (alt[w] + delta <= maxAltNo(w)){      // <<== simlpe minded optimization; improve later!
+        alt(w) = alt[w] + delta;
+        float eval = flowEvalGate(w, flow);
+        //**/WriteLn "+ alt=%_ best=%_ eval=%_", alt[w], best, eval;
+        if (newMin(best, eval))
+            best_alt = alt[w];
+        else
+            break;
+    }
+
+    while (alt[w] - delta >= 0){
+        alt(w) = alt[w] - delta;
+        float eval = flowEvalGate(w, flow);
+        //**/WriteLn "- alt=%_ best=%_ eval=%_", alt[w], best, eval;
+        if (newMin(best, eval))
+            best_alt = alt[w];
+        else
+            break;
+    }
+
+    alt(w) = best_alt;
 }
 
 
@@ -1354,8 +1508,10 @@ void DelayOpt::run()
     area = getTotalArea(N, L);
 
     /**/signal(SIGINT, SIGINT_handler2);
-//    continuousResizing();
-    alternativeResizing(P.req_time);
+    if (getenv("ALT"))
+        alternativeResizing(P.req_time);
+    else
+        continuousResizing();
 
     // If using approximations, output table based evaluation for comparison:
     if (P.verbosity >= 1 && P.approx != 0){

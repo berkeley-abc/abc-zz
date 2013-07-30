@@ -114,8 +114,15 @@ public:
     T&       last  (uind i = 0)       { return this->data[this->sz-i-1]; }
     const T& peek  (uind i = 0) const { return last(i); }   // -- alternative name
     T&       peek  (uind i = 0)       { return last(i); }
-    const T& end   (uind i = 0) const { return this->data[this->sz-i]; }
-    T&       end   (uind i = 0)       { return this->data[this->sz-i]; }
+    const T& end_  (uind i = 0) const { return this->data[this->sz-i]; }
+    T&       end_  (uind i = 0)       { return this->data[this->sz-i]; }
+
+  #if (__cplusplus == 201103L)
+    const T* end   (uind i = 0) const { return &this->data[this->sz-i]; }
+    T*       end   (uind i = 0)       { return &this->data[this->sz-i]; }
+    const T* begin () const           { return &this->data[0]; }
+    T*       begin ()                 { return &this->data[0]; }
+  #endif
 
   //________________________________________
   //  Indexing:

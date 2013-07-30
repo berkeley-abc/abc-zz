@@ -511,7 +511,7 @@ macro double stringToDouble(Str    text, double lo, double hi, bool lo_strict = 
 
 macro void printString(Out& out, cchar* text) { cchar* p = text;         while (*p) out.push(*p++); }
 macro void printString(Out& out, String text) { cchar* p = text.c_str(); while (*p) out.push(*p++); }
-macro void printString(Out& out, Str    text) { cchar* p = text.base();  while (p != &text.end()) out.push(*p++); }
+macro void printString(Out& out, Str    text) { cchar* p = text.base();  while (p != &text.end_()) out.push(*p++); }
 
 void printUInt(Out& out, uint64 num);
 void printInt (Out& out, int64  num);

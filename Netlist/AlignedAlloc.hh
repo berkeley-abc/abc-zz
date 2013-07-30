@@ -60,8 +60,8 @@ public:
 template<size_t sb, size_t bb, size_t skew>
 char* AlignedAlloc<sb,bb,skew>::alloc()
 {
-    static_assert(bb >= 2 * sb - 1);        // 'big_block' must be at least twice the size of 'small_block' (or else we cannot guarantee alignment)
-    static_assert((sb & (sb-1)) == 0);      // 'small_block' must be power of 2
+    static_assert_(bb >= 2 * sb - 1);        // 'big_block' must be at least twice the size of 'small_block' (or else we cannot guarantee alignment)
+    static_assert_((sb & (sb-1)) == 0);      // 'small_block' must be power of 2
 
     if (!curr || curr + sb > end){
         if (profile_aligned_alloc){

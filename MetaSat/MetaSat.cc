@@ -629,7 +629,7 @@ void AbcSat::addClause_(const Vec<Lit>& ps)
     for (uint i = 0; i < ps.size(); i++)
         tmp.push(toAs(ps[i]));
 
-    ok &= AS::sat_solver_addclause(S, &tmp[0], &tmp.end());
+    ok &= AS::sat_solver_addclause(S, &tmp[0], &tmp.end_());
 }
 
 
@@ -659,7 +659,7 @@ lbool AbcSat::solve_(const Vec<Lit>& assumps_)
     for (uint i = 0; i < assumps.size(); i++)
         tmp.push(toAs(assumps[i]));
 
-    lbool result = fromAsLbool(sat_solver_solve(S, &tmp[0], &tmp.end(), (confl_lim == UINT64_MAX) ? 0 : confl_lim, 0, 0, 0));
+    lbool result = fromAsLbool(sat_solver_solve(S, &tmp[0], &tmp.end_(), (confl_lim == UINT64_MAX) ? 0 : confl_lim, 0, 0, 0));
 
     AS::lit* lits;
     if (result == l_False && AS::sat_solver_final(S, &lits) == 0)
