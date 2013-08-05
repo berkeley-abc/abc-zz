@@ -372,7 +372,7 @@ void write_uint(Out& out, uint64 num, Str flags, bool neg)
         for (uint i = 0; i < flags.size()-1; i++){
             if      (flags[i] == ':') use_seps = true;
             else if (flags[i] == '.') Parse_Num(min_size);
-            else                      assert(false);    // -- invalid flags for 'd'
+            else                      assert(false);    // -- invalid flags for 'x'
         }
         assert(min_size <= 16);     // -- otherwise too wide
 

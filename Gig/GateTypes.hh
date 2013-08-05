@@ -93,6 +93,7 @@ template<> fts_macro void write_(Out& out, const GateAttrType& v){
     Macro(Uif) \
     Macro(Delay) \
     Macro(Box) \
+    Macro(Bar) \
     Macro(MFlop) \
     Macro(MemR) \
     Macro(MemW) \
@@ -154,6 +155,7 @@ DEF( WLut     , INF  , Num  )   // FTB also stored in side-table
 DEF( Uif      , INF  , Arg  )   // Combinational box, arg should identify the logic inside the box
 DEF( Delay    , INF  , Arg  )   // Combinational box, logic is lost, arg gives delay of box 
 DEF( Box      , INF  , Arg  )   // Sequential box, all inputs should go to 'Seq' gates. Outputs may go to 'Sel' if more than one output pin.
+DEF( Bar      , 1    , NULL )   // Barrier gate; used to encircle logic that should not be mixed with other logic (strashing will treat Bar gates as PIs essentially)
 
 // Memories:
 DEF( MFlop    , 1    , Enum )

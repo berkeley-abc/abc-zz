@@ -108,7 +108,6 @@ public:
 // Helper functions:
 
 
-
 static
 uint64 computeFtb_(Wire w, const Cut& cut, WZet& in_memo, WMap<uint64>& memo)
 {
@@ -486,8 +485,9 @@ void LutMap::generateCuts(Wire w)
         // Nothing to do.
         break;
 
+    case gate_Bar:
     case gate_Sel:
-        // Treat pin selectors as PIs except for delay:
+        // Treat barriers and pin selectors as PIs except for delay:
         cutmap(w) = Array<Cut>(empty_);
         area_est(w) = 0;
         arrival(w) = arrival[w[0]];

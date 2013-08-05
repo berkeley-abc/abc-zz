@@ -61,13 +61,13 @@ macro void reverse(V& v) {
         swp(v[i], v[j]); }
 
 template<class V, class W>
-macro void append(V& v, W& w) {            // -- append 'w' to 'v' (allows for 'v == w')
+macro void append(V& v, const W& w) {            // -- append 'w' to 'v' (allows for 'v == w')
     uind sz = w.size();
     for (uind i = 0; i < sz; i++)
         v.push(w[i]); }
 
 template<class V, class W>
-macro void vecSet(V& v, W& w) {            // -- clear + append
+macro void vecSet(V& v, const W& w) {            // -- clear + append
     v.clear();
     append(v, w); }
 
