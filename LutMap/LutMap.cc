@@ -837,6 +837,12 @@ LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_, WMapX<GLit>* remap_) :
         }
         if (j != 4)
             w.arg_set(ftb);
+
+        if (ftb == 0 || ftb == 0xFFFF){
+            // Change into a buffer pointing to 'True' or '~True': (mapper cannot handle constant 'Lut4's)
+            w.set(0, N.True() ^ (ftb == 0));
+            w.arg_set(lut4_buf[0]);
+        }
     }
     N.setMutable(mut);
 
@@ -853,11 +859,15 @@ LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_, WMapX<GLit>* remap_) :
 }
 
 
-// If provided, each gate in 'keep' will be the output of a lookup table (not necessarily unique,
-// but they can be duplicated afterwards, if needed). The 'remap' map will map old gates to new
-// gates (with sign, so 'x' can go to '~y'). Naturally, many signals may be gone; these are mapped
-// to 'glit_NULL'. NOTE! Even inputs may be missing from 'remap' if they are not in the transitive
-// fanin of any output.
+// If provided, each gate in 'keep' will be the output of a lookup table, and all the fanout logic
+// of that gate will treat it as if it were a free input (i.e. no assumption is made on its logic
+// function). This allows the LUT to be "forced" (modified to a constant, or indeed any logic)
+// after the mapping phase without old logic on the fanin side leaking through the "keep gate" by
+// means of circuit optimization done during mapping.
+//
+// The 'remap' map will map old gates to new gates (with sign, so 'x' can go to '~y'). Naturally,
+// many signals may be gone; these are mapped to 'glit_NULL'. NOTE! Even inputs may be missing from
+// 'remap' if they are not in the transitive fanin of any output.
 // 
 void lutMap(Gig& N, Params_LutMap P, WSeen* keep, WMapX<GLit>* remap)
 {

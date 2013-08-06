@@ -187,7 +187,7 @@ int main(int argc, char** argv)
         if (quit) return 0;
     }
 
-  #if 1
+  #if 0
     lutMap(N, P);
   #else
     WMapX<GLit> remap;
