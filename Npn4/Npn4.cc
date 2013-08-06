@@ -337,4 +337,24 @@ ZZ_Initializer(npn4, -9500) {
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Ftb6 like interface:
+
+
+uint ftb4_swap_shift[4][4] = {
+    { 0, 1, 3, 7,},
+    { 1, 0, 2, 6,},
+    { 3, 2, 0, 4,},
+    { 7, 6, 4, 0,}
+};
+
+
+ftb4_t ftb4_swap_rmask[4][4] = {
+    {0x0000,0x4444,0x5050,0x5500},
+    {0x4444,0x0000,0x3030,0x3300},
+    {0x5050,0x3030,0x0000,0x0F00},
+    {0x5500,0x3300,0x0F00,0x0000}
+};
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }

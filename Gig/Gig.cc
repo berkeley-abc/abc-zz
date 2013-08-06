@@ -115,7 +115,7 @@ void Gig::clear(bool reinit)
     // Zero members:
     size_ = 0;
     use_freelist = false;
-    frozen = false;
+    frozen = gm_Mutable;
     mode_ = gig_FreeForm;
     mode_mask = ~0ull;
 
@@ -636,7 +636,7 @@ void Gig::compact(GigRemap& remap, bool remove_unreach, bool set_canonical)
 
     // Finish up:
     if (set_canonical)
-        frozen = 2 + (uint)remove_unreach;     // -- now in canonical mode
+        frozen = remove_unreach ? gm_Compact : gm_Canonical;     // -- now in canonical mode
 }
 
 
@@ -650,7 +650,7 @@ void Gig::compact(bool remove_unreach, bool set_canonical) {
 
 
 static const uchar gig_file_tag[] = {0xAC, 0x1D, 0x0FF, 0x1C, 0xEC, 0x0FF, 0xEE, 0x61, 0x60 };
-static const uchar gig_format_version = 2;
+static const uchar gig_format_version = 3;
 
 
 void Gig::flushRle(Out& out, uchar type, uint count, uint end)
@@ -764,10 +764,10 @@ void Gig::load(In& in)
 
     uchar version = getc(in);
     if (version != gig_format_version)
-        Throw(Excp_Msg) "Unsupported version of format: %_ (expected %_)", version, gig_format_version;
+        Throw(Excp_Msg) "Unsupported version of format: %d (expected %d)", version, gig_format_version;
 
     // Read state:
-    frozen = getu(in);
+    frozen = (GigMut)getu(in);
     mode_ = (GigMode)getu(in);
     mode_mask = getu(in);
     strash_mask = getu(in);

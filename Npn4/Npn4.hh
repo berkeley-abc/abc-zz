@@ -107,5 +107,49 @@ static const uchar npn4_cl_BUF  = 21;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Ftb6 like interface:
+
+
+static const uint64 ftb4_proj[2][4] = { // -- 'ftb4_proj [sign] [pin]' ('lut4_buf' and 'lut4_inv' in one table)
+    { 0xAAAA, 0xCCCC, 0xF0F0, 0xFF00 },
+    { 0x5555, 0x3333, 0x0F0F, 0x00FF }
+};
+
+
+extern uint   ftb4_swap_shift[4][4];
+extern ftb4_t ftb4_swap_rmask[4][4];
+
+
+macro ftb4_t ftb4_swap(ftb4_t ftb, uint pin_a, uint pin_b)
+{
+    if (pin_a == pin_b) return ftb;
+
+    ftb4_t rmask = ftb4_swap_rmask[pin_a][pin_b];
+    uint   shift = ftb4_swap_shift[pin_a][pin_b];
+    ftb4_t lmask = rmask >> shift;
+    ftb4_t imask = (rmask | lmask) ^ 0xFFFFFFFFFFFFFFFFull;
+
+    return (ftb & imask) | ((ftb & rmask) >> shift) | ((ftb & lmask) << shift);
+}
+
+
+macro ftb4_t ftb4_neg(ftb4_t ftb, uint pin)
+{
+    ftb4_t mask  = ftb4_proj[0][pin];
+    uint   shift = (1 << pin);
+    return ((ftb &  mask) >> shift)
+         | ((ftb & ~mask) << shift);
+}
+
+
+macro bool ftb4_inSup(ftb4_t ftb, uint pin)
+{
+    ftb4_t mask  = ftb4_proj[0][pin];
+    uint   shift = (1 << pin);
+    return ((ftb & mask) >> shift) != (ftb & ~mask);
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
 #endif

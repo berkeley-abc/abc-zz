@@ -45,7 +45,7 @@ static
 void introduceMuxes(Gig& N)
 {
     Wire sel, d1, d0;
-    N.thaw();
+    N.unfreeze();
     N.setMode(gig_FreeForm);
 
     For_DownOrder(N, w){
@@ -60,7 +60,7 @@ void introduceMuxes(Gig& N)
 
 void makeCombinational(Gig& N)
 {
-    N.thaw();
+    N.unfreeze();
 
     Vec<GLit> ins;
     For_Gates(N, w){
@@ -191,11 +191,11 @@ int main(int argc, char** argv)
     lutMap(N, P);
   #else
     WMapX<GLit> remap;
-    For_Gates(N, w) Dump(w);
+    Write "\a/"; For_Gates(N, w) Dump(w); Write "\a/";
 
     lutMap(N, P, NULL, &remap);
 
-    For_Gates(N, w) Dump(w);
+    Write "\a/"; For_Gates(N, w) Dump(w); Write "\a/";
     WriteLn "== REMAP ==";
     for (uint i = 0; i < remap.base().size(); i++)
         WriteLn "%_ -> %_", Lit(i), remap[Lit(i)];

@@ -15,6 +15,7 @@
 #include "LutMap.hh"
 #include "ZZ_Gig.hh"
 #include "ZZ_BFunc.hh"
+#include "ZZ_Npn4.hh"
 #include "ZZ/Generics/Sort.hh"
 #include "ZZ/Generics/Heap.hh"
 #include "Cut.hh"
@@ -554,6 +555,7 @@ void LutMap::updateFanoutEst(bool instantiate)
     For_Gates(N, w){
         if (isCO(w)){
             ready.add(w);
+            /**/assert(w);
             active(w) = true;
         }
     }
@@ -572,6 +574,8 @@ void LutMap::updateFanoutEst(bool instantiate)
                 area_est(v) = 0;
                 if (!active[v]){
                     ready.add(v);
+                    /**/if (!(v)) Dump(w, w[0], w[1], w[2], w[3]);
+                    /**/assert(v);
                     active(v) = true;
                 }
             }
@@ -580,6 +584,7 @@ void LutMap::updateFanoutEst(bool instantiate)
             For_Inputs(w, v){
                 if (!active[v]){
                     ready.add(v);
+                    /**/assert(v);
                     active(v) = true;
                 }
             }
@@ -697,7 +702,7 @@ void LutMap::updateFanoutEst(bool instantiate)
         }
 
         // Build LUT representation:
-        N.thaw();
+        N.unfreeze();
         N.setMode(gig_FreeForm);
         uint j = 0;
         For_Gates(N, w){
@@ -812,6 +817,30 @@ LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_, WMapX<GLit>* remap_) :
             (*remap)(w) = w;
     }
 
+    // Normalize LUT4s:
+    GigMut mut = N.getMutable();
+    N.unfreeze();
+    For_Gates(N, w){
+        if (w != gate_Lut4) continue;
+
+        ftb4_t ftb = w.arg();
+        uint j = 0;
+        for (uint i = 0; i < 4; i++){
+            if (ftb4_inSup(ftb, i)){
+                if (j < i){
+                    w.set(j, w[i]);
+                    w.set(i, Wire_NULL);
+                    ftb = ftb4_swap(ftb, i, j);
+                }
+                j++;
+            }
+        }
+        if (j != 4)
+            w.arg_set(ftb);
+    }
+    N.setMutable(mut);
+
+    // Run mapper:
     run();
 
     // Free memory:

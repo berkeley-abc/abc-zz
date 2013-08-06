@@ -108,10 +108,19 @@ template<> fts_macro void write_(Out& out, const GigMode& v) { out += GigMode_na
 // Gig data:
 
 
+enum GigMut {
+    gm_Mutable,     // -- netlist may be updated
+    gm_Constant,    // -- netlist is frozen; updates lead to assertion error
+    gm_Canonical,   // -- netlist is frozen and gates sorted in topological order
+    gm_Compact,     // -- netlist is topologically sorted and has no unreachable gates 
+                    // (as defined by transitive fanin of combinational outputs)
+};
+
+
 struct Gig_data {
     SlimAlloc<uint>     mem;
 
-    uint                frozen;         // -- if non-zero, netlist is read-only (1=constant, 2=canonical, 3=canonical + no unreach)
+    GigMut              frozen;         // -- if non-zero, netlist is read-only (1=constant, 2=canonical, 3=canonical + no unreach)
     GigMode             mode_;          // }- restriction on which gate types are allowed (mode
     uint64              mode_mask;      // }  mask will always exlude 'gate_NULL' and 'gate_Const')
     uint64              strash_mask;    // -- Subset of 'mode_mask' that is allowed in strashed mode (excluding strashed gate types)
@@ -209,8 +218,8 @@ public:
     uint  arg() const { assert_debug(attrType() == attr_Arg);     return gate().inl[2]; }
     lbool lb () const { assert_debug(attrType() == attr_LB );     return lbool_new(gate().inl[2]); }
 
-    void  arg_set(uint  v) { assert_debug(((Gig_data*)N)->frozen == 0); assert_debug(attrType() == attr_Arg); gate().inl[2] = v; }
-    void  lb_set (lbool v) { assert_debug(((Gig_data*)N)->frozen == 0); assert_debug(attrType() == attr_LB ); assert_debug(id >= gid_FirstUser); gate().inl[2] = v.value; }
+    void  arg_set(uint  v) { assert_debug(((Gig_data*)N)->frozen == gm_Mutable); assert_debug(attrType() == attr_Arg); gate().inl[2] = v; }
+    void  lb_set (lbool v) { assert_debug(((Gig_data*)N)->frozen == gm_Mutable); assert_debug(attrType() == attr_LB ); assert_debug(id >= gid_FirstUser); gate().inl[2] = v.value; }
 };
 
 
@@ -251,7 +260,7 @@ inline void Wire::set(uint pin, GLit v)
     assert_debug(pin < size());
     assert_debug((1ull << type()) & ((Gig_data*)N)->strash_mask); // -- if this assert fails, you are trying to change inputs of a strashed gate.
     assert_debug(v == GLit_NULL || !Wire(N, v).isRemoved());
-    assert_debug(((Gig_data*)N)->frozen == 0);
+    assert_debug(((Gig_data*)N)->frozen == gm_Mutable);
 
     Vec<GigLis*>& lis = ((Gig_data*)N)->listeners[msgidx_Update];
     if (lis.size() > 0)
@@ -440,12 +449,14 @@ struct Gig : Gig_data, NonCopyable {
   //________________________________________
   //  Mode control:
 
-    void    freeze();
-    void    thaw();
-    bool    isFrozen() const;
-    bool    isCanonical() const; // -- frozen, compacted and topologically sorted (use 'compact()' to get to this state)
-    void    setFrozen(bool state);
-        // -- NOTE! 'freeze/thaw' affects only the gates of the netlist, not Gig objects or listeners.
+    GigMut  getMutable() const      { return frozen; }
+    void    setMutable(GigMut mode) { frozen = mode; }
+        // -- if 'gm_Canonical' or 'gm_Compact' is used; user better be sure netlist adhears to this specification (no checks)
+    void    freeze() { frozen = gm_Constant; }
+    void    unfreeze() { frozen = gm_Mutable; }
+    bool    isFrozen()    const { return frozen >= gm_Constant; }
+    bool    isCanonical() const { return frozen >= gm_Canonical; }
+    bool    isCompact()   const { return frozen >= gm_Compact; }
 
     GigMode mode() const { return mode_; }
     void    setMode(GigMode mode);
@@ -530,6 +541,7 @@ struct Gig : Gig_data, NonCopyable {
         // -- Will topologically order the gates and remove any gaps in the gate tables
         // created by gate removal. By default, unreachable gates (from COs) are first removed.
         // Once done, 'compact()' will leave the netlist in a frozen, canonical mode.
+        // (either 'gm_Compact' (if 'remove_unreach' is TRUE) or 'gm_Canonical')
 
   //________________________________________
   //  Disk:
@@ -560,7 +572,7 @@ macro Wire operator+(GLit p    , const Gig& N) { return N[p];  }
 
 inline Gig::Gig()
 {
-    frozen       = 0;
+    frozen       = gm_Mutable;
     mode_        = gig_FreeForm;
     mode_mask    = 0;
     strash_mask  = 0;
@@ -574,26 +586,6 @@ inline Gig::Gig()
 
 inline Gig::~Gig() {
     clear(false); }
-
-
-//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-
-inline bool Gig::isFrozen() const {
-    return frozen >= 1; }
-
-inline bool Gig::isCanonical() const {
-    return frozen >= 2; }
-
-inline void Gig::freeze() {
-    if (!frozen) frozen = 1; }
-
-inline void Gig::thaw() {
-    frozen = 0; }
-
-inline void Gig::setFrozen(bool state) {
-    if (state) freeze();
-    else       thaw(); }
 
 
 //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
