@@ -3,10 +3,7 @@ Before compiling any files int the ZZ framework, you need to do the following:
   - Set your path to include 'ZZ/BUILD' or, alternatively, make an alias 'zb'
     to point to 'ZZ/BUILD/zb'.
 
-  - In 'ZZ/EXTERN', run 'checkout_abc.sh' to download a compatible version of 
-    ABC.
-
-  - Make sure you have Python 2.6 or later installed.
+  - Make sure you have Python version 2.6 (or later) installed.
 
   - Make sure you have developer header files installed for 'libz'.
 
@@ -14,4 +11,5 @@ Now you can compile any binary by going into the appropriate directory, e.g.
 'ZZ/Bip', and typing 'zb'. Most binaries are put into 'zz/bin/<machine>', but
 some "debug" binaries are put into the local directory. This is determined by
 the contents of 'MODULE.conf' in each directory (where a '@' in front of the
-name in the 'PUBLISH_BIN' line indicates a local installation).
+name in the 'PUBLISH_BIN' line indicates a local installation). For more
+information on the 'zb' tool, see ZZ/BUILD/build_system.txt'.
