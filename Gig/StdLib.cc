@@ -13,6 +13,7 @@
 
 #include "Prelude.hh"
 #include "StdLib.hh"
+#include "ZZ_Npn4.hh"
 
 namespace ZZ {
 using namespace std;
@@ -150,6 +151,136 @@ void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* orde
 
     if (order_ptr && !removed_ptr)
         order.shrinkTo(mark);
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+
+
+// Make sure unused pins are always the uppermost ones. If 'ban_constant_luts' is set, constant
+// LUTs are replaced by buffers pointing to 'True()' or '~True()'.
+void normalizeLut4s(Gig& N, bool ban_constant_luts)
+{
+    GigMut mut = N.getMutable();    // <<= temporary
+    N.unfreeze();
+    For_Gates(N, w){
+        if (w != gate_Lut4) continue;
+
+        ftb4_t ftb = w.arg();
+        uint j = 0;
+        for (uint i = 0; i < 4; i++){
+            if (ftb4_inSup(ftb, i)){
+                if (j < i){
+                    w.set(j, w[i]);
+                    w.set(i, Wire_NULL);
+                    ftb = ftb4_swap(ftb, i, j);
+                }
+                j++;
+            }
+        }
+        if (j != 4)
+            w.arg_set(ftb);
+
+        if (ban_constant_luts){
+            if (ftb == 0 || ftb == 0xFFFF){
+                // Change into a buffer pointing to 'True' or '~True': (mapper cannot handle constant 'Lut4's)
+                w.set(0, N.True() ^ (ftb == 0));
+                w.arg_set(lut4_buf[0]);
+            }
+        }
+    }
+    N.setMutable(mut);
+}
+
+
+// -- Put the netlist into Npn4 form. Will convert the following gate types into 'gate_Npn4':
+// And, Xor, Mux, Maj, Buf, Not, Or, Equiv, Lut4
+void putIntoNpn4(Gig& N)
+{
+    GigMut mut = N.getMutable();    // <<= temporary
+    N.unfreeze();
+
+    uint64 mask = (1ull << (uint64)gate_And)
+                | (1ull << (uint64)gate_Xor)
+                | (1ull << (uint64)gate_Mux)
+                | (1ull << (uint64)gate_Maj)
+                | (1ull << (uint64)gate_Buf)
+                | (1ull << (uint64)gate_Not)
+                | (1ull << (uint64)gate_Or)
+                | (1ull << (uint64)gate_Equiv)
+                | (1ull << (uint64)gate_Lut4);
+
+    WSeen inverted;
+    Wire v[4];
+    For_Gates(N, w){
+        if (((1ull << w.type()) & mask) == 0) continue;
+
+        assert(w.size() <= 4);
+        for (uint i = 0; i < w.size(); i++)
+            v[i] = w[i];
+
+        switch (w.type()){
+        case gate_And:
+            change(w, gate_Npn4, npn4_cl_OR2).init(~v[0], ~v[1]);
+            inverted.add(w);
+            break;
+        case gate_Xor:
+            change(w, gate_Npn4, npn4_cl_EQU2).init(v[0], v[1]);
+            inverted.add(w);
+            break;
+        case gate_Mux:
+            change(w, gate_Npn4, npn4_cl_MUX).init(v[0], v[2], v[1]);
+            break;
+        case gate_Maj:
+            change(w, gate_Npn4, npn4_cl_MAJ).init(v[0], v[1], v[2]);
+            break;
+        case gate_Buf:
+            change(w, gate_Npn4, npn4_cl_BUF).init(v[0]);
+            break;
+        case gate_Not:
+            change(w, gate_Npn4, npn4_cl_BUF).init(v[0]);
+            inverted.add(w);
+            break;
+        case gate_Or:
+            change(w, gate_Npn4, npn4_cl_OR2).init(v[0], v[1]);
+            break;
+        case gate_Equiv:
+            change(w, gate_Npn4, npn4_cl_EQU2).init(v[0], v[1]);
+            break;
+        case gate_Lut4:{
+            uchar   cl = npn4_norm[w.arg()].eq_class;
+            perm4_t p  = npn4_norm[w.arg()].perm;
+            negs4_t n  = npn4_norm[w.arg()].negs;
+            pseq4_t s  = perm4_to_pseq4[p];
+            ushort ftb = npn4_repr[cl];
+            //**/WriteLn "cl=%d  p=%d  n=%d s=%d", cl, p, n, s;
+            //**/WriteLn "ftb=%.4x", ftb;
+            //**/WriteLn "s0=%d", pseq4Get(s, 0);
+            //**/WriteLn "s1=%d", pseq4Get(s, 1);
+            //**/WriteLn "s2=%d", pseq4Get(s, 2);
+            //**/WriteLn "s3=%d", pseq4Get(s, 3);
+
+            change(w, gate_Npn4, cl);
+            for (uint i = 0; i < 4; i++){
+                if (ftb4_inSup(ftb, i))
+                    w.set(i, v[pseq4Get(s, i)] ^ bool(n & (1 << pseq4Get(s, i))));
+                else
+                    w.set(i, Wire_NULL);
+            }
+            if (n & 16)
+                inverted.add(w);
+            break;}
+
+        default: /*nothing*/; }
+    }
+
+    For_Gates(N, w){
+        For_Inputs(w, v)
+            if (inverted.has(v))
+                w.set(Iter_Var(v), ~v);
+    }
+
+    N.setMutable(mut);
 }
 
 

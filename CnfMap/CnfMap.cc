@@ -293,7 +293,8 @@ void CnfMap::updateFanoutEst(bool instantiate)
                     for (uint i = 0; i < cut.size(); i++){
                         uint j = pseq4Get(perm4_to_pseq4[perm], i);
                         //**/WriteLn "cut=%_  cl=%_  perm=%_  i=%_  j=%_", cut, (uint)norm.eq_class, (uint)perm, i, j;
-                        assert(j >= 4 - cut.size());
+//                        assert(j >= 4 - cut.size());
+                        assert(j < cut.size());
                         bool s = (norm.negs >> i) & 1;
                         m.set(j, n2m[cut[i]] ^ s);
                     }

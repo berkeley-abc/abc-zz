@@ -1359,8 +1359,10 @@ bool Pdr2::run()
                 Wire b_in = N.add(SO_());
                 Wire b = N.add(Flop_(), b_in);
                 flop_init(b) = l_False;
-                b_in     .set(0, N.add(Npn4_(npn4_cl_OR2), Wire_NULL, Wire_NULL,  b, ~w_prop_in[0]));
-                w_prop_in.set(0, N.add(Npn4_(npn4_cl_OR2), Wire_NULL, Wire_NULL, ~b,  w_prop_in[0]));
+//                b_in     .set(0, N.add(Npn4_(npn4_cl_OR2), Wire_NULL, Wire_NULL,  b, ~w_prop_in[0]));
+//                w_prop_in.set(0, N.add(Npn4_(npn4_cl_OR2), Wire_NULL, Wire_NULL, ~b,  w_prop_in[0]));
+                b_in     .set(0, N.add(Npn4_(npn4_cl_OR2),  b, ~w_prop_in[0], Wire_NULL, Wire_NULL));
+                w_prop_in.set(0, N.add(Npn4_(npn4_cl_OR2), ~b,  w_prop_in[0], Wire_NULL, Wire_NULL));
 
                 addCube(TCube(Cube(b), 0));
 

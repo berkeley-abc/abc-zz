@@ -1,5 +1,6 @@
 #include "Prelude.hh"
 #include "StdLib.hh"
+#include "ZZ_Npn4.hh"
 
 using namespace ZZ;
 
@@ -48,231 +49,102 @@ String format(Wire w, const Vec<Wire>& inputs, const String& names)
 }
 
 
+void swap(Wire w, ushort& ftb, uint i, uint j)
+{
+    Wire v = w[i];
+    w.set(i, w[j]);
+    w.set(j, v);
+    ftb = ftb4_swap(ftb, i, j);
+}
+
+
 int main(int argc, char** argv)
 {
     ZZ_Init;
 
-    Gig N;
-    Wire a = N.add(gate_PI);
-    Wire b = N.add(gate_PI);
-    WriteLn "%_", (a < b.lit());
-    WriteLn "%_", (b < a.lit());
-    WriteLn "%_", (b != a.lit());
-
-#if 0
-    {
+    for (uint ff = 0; ff < 0x10000; ff++){
         Gig N;
+        Wire a = N.add(gate_PI);
+        Wire b = N.add(gate_PI);
+        Wire c = N.add(gate_PI);
+        Wire d = N.add(gate_PI);
 
-        Wire so = N.add(gate_Seq);
-        Wire si = N.add(gate_FF, 0).init(so);
-        Wire x  = N.add(gate_PI, 0);
-        Wire y  = N.add(gate_PI, 1);
+        printf("%.4x\r", ff); fflush(stdout);
+        ushort ftb0 = ff;
 
-        Wire dummy = N.add(gate_PI);
-        remove(dummy);
+        Wire w = N.add(gate_Lut4).init(a, b, c, d);
+        w.arg_set(ftb0);
+        Wire t = N.add(gate_PO).init(w);
+        putIntoNpn4(N);
 
-        Wire red = N.add(gate_Mux).init(~x, ~y, ~si);
-//        Wire f  = N.add(gate_Lut6).init(N.True(), x); ftb(f) = 0xDEADBEEF;
-        Wire f  = N.add(gate_Maj).init(N.True(), x, y);
-//        Wire g  = N.addDyn(gate_Conj, 2).init(f, si);
-        Wire g  = N.add(gate_And, 2).init(f, si);
-        so.set(0, g);
+        assert(w == gate_Npn4);
+        ushort ftb = npn4_repr[w.arg()];
+        if (+w[1] == +a) swap(w, ftb, 0, 1);
+        if (+w[2] == +a) swap(w, ftb, 0, 2);
+        if (+w[3] == +a) swap(w, ftb, 0, 3);
+        if (+w[0] == +b) swap(w, ftb, 1, 0);
+        if (+w[2] == +b) swap(w, ftb, 1, 2);
+        if (+w[3] == +b) swap(w, ftb, 1, 3);
+        if (+w[0] == +c) swap(w, ftb, 2, 0);
+        if (+w[1] == +c) swap(w, ftb, 2, 1);
+        if (+w[3] == +c) swap(w, ftb, 2, 3);
+        if (+w[0] == +d) swap(w, ftb, 3, 0);
+        if (+w[1] == +d) swap(w, ftb, 3, 1);
+        if (+w[2] == +d) swap(w, ftb, 3, 2);
+        assert(!w[0] || +w[0] == +a);
+        assert(!w[1] || +w[1] == +b);
+        assert(!w[2] || +w[2] == +c);
+        assert(!w[3] || +w[3] == +d);
 
-        Dump(so, si, x, y, red, f, g);
-        Dump(N.count());
-
-        //N.compact();
-        N.setMode(gig_Xig);
-        Add_Gob(N, Strash);
-        N.save("tmp.gnl");
-
-        WriteLn "%_", info(N);
-        For_Gates(N, w){
-            WriteLn "%_:", w;
-            For_Inputs(w, v)
-                WriteLn "  %_", v;
-            NewLine;
+        /**/uint orig_negs = uint(w[0].sign) * 1 + uint(w[1].sign) * 10 + uint(w[2].sign) * 100 + uint(w[3].sign) * 1000 + uint(t.sign) * 10000;
+        /**/Wire v[4]; v[0] = w[0]; v[1] = w[1]; v[2] = w[2]; v[3] = w[3];
+        for (uint i = 0; i < 4; i++){
+            if (w[i].sign){
+                w.set(i, +w[i]);
+                ftb = ftb4_neg(ftb, i);
+            }
+        }
+        if (t[0].sign){
+            t.set(0, +t[0]);
+            ftb = ~ftb;
         }
 
-        WriteLn "===============================================================================";
-    }
-#endif
+        if (ftb != ftb0){
+            Dump(a, w[0]);
+            Dump(b, w[1]);
+            Dump(c, w[2]);
+            Dump(d, w[3]);
 
-#if 0
-    {
-        Gig N;
-        try{
-            //N.load("/home/een/et5cbl/pnl/pan.st.gnl");
-            N.load("tmp.gnl");
-        }catch (Excp_Msg msg){
-            ShoutLn "PARSE ERROR! %_", msg;
+            WriteLn "t=%f  w=%f", t, w;
+            WriteLn "orig in: %_ %_ %_ %_", v[0], v[1], v[2], v[3];
+            WriteLn "ftb0=%.4x   ftb=%.4x   (orig_negs=%.5d)", ftb0, ftb, orig_negs;
             exit(1);
         }
 
-        Dump(N.isCanonical());
-
-        WriteLn "PIs:";
-        For_Gatetype(N, gate_PI, w)
-            WriteLn "  %_", w;
-
-        WriteLn "Lut6s:";
-        For_Gates(N, w){
-            if (w == gate_Lut6)
-                WriteLn "  %_ : %X", w, ftb(w);
-        }
-
-        WriteLn "Has Strash: %_", (bool)Has_Gob(N, Strash);
-
-        return 0;
     }
-#endif
 
 #if 0
-    N.setMode(gig_Xig);
-    Add_Gob(N, Strash);
-
-    Wire t = N.True();
-    Wire x = N.add(gate_PI, 0);
-    Wire y = N.add(gate_PI, 1);
-    Wire z = N.add(gate_PI, 2);
-    Wire f = xig_Mux(x, y, z);
-    remove(f);
-    Wire g = xig_And(x, y);
-    Wire top = N.add(gate_PO, 0);
-
-    Dump(f, g);
-    Gig M;
-    mov(N, M);
-
-    Remove_Gob(M, Strash);
-    (g + M).set(0, z);
-
-    M.clear();
-    M.setMode(gig_Aig);
-    Wire err = M.add(gate_And).init(M.False());
-    Dump(err);
-    M.assertMode();
+    Dump(f);
+    WriteLn "cl=%_", f.arg();
+    WriteLn "ftb=%.4X", npn4_repr[f.arg()];
+    WriteLn "ins :  pin3..0=%c%c%c%c", (f[3].id - a.id) + 'a', (f[2].id - a.id) + 'a', (f[1].id - a.id) + 'a', (f[0].id - a.id) + 'a';
+    WriteLn "negs:  pin3..0=%_%_%_%_  ->  out=%_", f[3].sign, f[2].sign, f[1].sign, f[0].sign, t[0].sign;
 #endif
-
-#if 0
-    {
-        WMap <String> m1(N);
-        WMapS<String> m2(N);
-        WMapX<String> m3(N);
-        WMapN<String> m4(N);
-
-        Wire x = N.add(gate_PI, 2);
-        Wire y = N.add(gate_PI, 0);
-        Wire z = N.add(gate_PI, 1);
-
-        m1(x) = "x";
-        m1(y) = "y";
-        m1(z) = "z";
-
-        m2(x) = "x";
-        m2(y) = "y";
-        m2(z) = "z";
-
-        m3(x) = "x";
-        m3(y) = "y";
-        m3(z) = "z";
-
-        m4(x) = "x";
-        m4(y) = "y";
-        m4(z) = "z";
-
-        Dump(m1.base());
-        Dump(m2.base());
-        Dump(m3.base());
-        Dump(m4.base());
-
-        return 0;
-    }
-#endif
-
-#if 0
-    Vec<Wire> xs;
-    for (uint i = 0; i < 10000; i++)
-        xs.push(N.add(gate_PI, i));
-    uint64 seed = DEFAULT_SEED;
-    for (uint i = 0; i < 5000; i++){
-        Wire f = N.add(gate_And).init(xs[irand(seed, xs.size())], xs[irand(seed, xs.size())]);
-        if (irand(seed, 2))
-            N.add(gate_PO, i).init(f);
-    }
-#endif
-
-#if 0
-    MyLis lis;
-    N.listen(lis, msg_All);
-    N.setMode(gig_Xig);
-
-    N.add(gate_PI, 42);
-    Wire x = N.add(gate_PI, 0);
-    Wire y = N.add(gate_PI, 1);
-    Wire z = N.add(gate_PI, 2);
-    //Wire g = xig_And(x, y);
-    //Wire f = xig_And(x, z);
-    Wire f = N.add(gate_Xor).init(y, x);
-    Wire g = N.add(gate_Xor).init(x, ~y);
-    Wire h = N.add(gate_And).init(y, N.True());
-    N.add(gate_PO, 0).init(f);
-
-    Add_Gob(N, Strash);
-
-    Dump(x, y, z);
-    Dump(f, g);
-
-    Gig M;
-    N.moveTo(M);
-    assert(N.isEmpty());
-    f.nl_set(M);
-
-    /**/WriteLn "M=%p  N=%p", (void*)&M, (void*)&N;
-
-    GigRemap remap;
-    /**/WriteLn "=====[calling COMPACT]=====";
-    M.compact(remap);
-    /**/WriteLn "=====[done with COMPACT]=====";
-    Dump(f.lit(), remap(f));
-
-    Wire hh = xig_And(M.enumGate(gate_PI, 0), M.enumGate(gate_PI, 1));
-    WriteLn "M[10] = %f", M[10];
-    WriteLn "hh    = %f", hh;
-
-    M.save("tmp.gnl");
-#endif
-
-#if 0
-    Vec<Wire> inputs;
-    pusher(inputs), t, ~t, x, ~x, y, ~y, z, ~z;
-
-    String names = "10xXyYzZ";   // -- capital letter = inverted
-
-    for (uint i = 0; i < inputs.size(); i++){
-        for (uint j = 0; j < inputs.size(); j++){
-            for (uint k = 0; k < inputs.size(); k++){
-                Wire a = inputs[i];
-                Wire b = inputs[j];
-                Wire c = inputs[k];
-              #if 0
-                Wire mux = xig_Mux(a, b, c);
-                WriteLn "mux(%>2%_, %>2%_, %>2%_) = %_", F(a), F(b), F(c), F(mux);
-              #else
-                Wire maj = xig_Maj(a, b, c);
-                WriteLn "maj(%>2%_, %>2%_, %>2%_) = %_", F(a), F(b), F(c), F(maj);
-              #endif
-            }
-        }
-    }
-#endif
-    /*
-    Dags att skriva simulator och verifiera att alla MUXar reduceras korrekt...:
-
-      1, ~1, a, b, c, ~a, ~b, ~c
-
-    och att om vi lägger dem i samma XIG så är antalet unika noder rätt...
-    */
 
     return 0;
 }
+
+
+//  : b & c & d
+/*
+orig: 0000 0000 0000 1100    = b & ~c & ~d
+norm: 1111 1110 1111 1110    = a | b | c
+0000 0000 0011 0000
+0000 0000 0010 0010
+
+0 <- 1
+1 <- 2
+2 <- 3
+3 <- 0
+
+*/

@@ -1807,7 +1807,6 @@ void lutClausify_(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized,
                 uint cl = attr_Npn4(w).cl;
                 for (uint i = 0; i < cnfIsop_size(cl); i++){
                     cnfIsop_clause(cl, i, inputs, output, tmp);
-                    //**/Dump(tmp);
                     S.addClause(tmp);
                 }
                 m2s[d](w) = output;

@@ -83,6 +83,8 @@ public:
 // Wrapper function:
 macro void cnfMap(NetlistRef N, Params_CnfMap P, /*outs:*/NetlistRef M, WWMap& n2m) {
     CnfMap dummy(N, P, M, n2m); }
+// -- Supported gate types are: And, PI, PO, Flop. 
+// Output netlist 'M' will contain: Npn4, PI, PO, Flop.  
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

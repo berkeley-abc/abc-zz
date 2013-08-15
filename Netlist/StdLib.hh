@@ -173,7 +173,7 @@ void expandGeneralizedGates(NetlistRef N);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// "Type" controll:
+// "Type" control:
 
 
 void assertAig(NetlistRef N, const String& where_text);

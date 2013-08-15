@@ -66,5 +66,17 @@ macro Wire mkEquiv(Wire x, Wire y)           { return mkMux(x,  y, ~y); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// LUTs:
+
+
+void normalizeLut4s(Gig& N, bool ban_constant_luts = true);
+    // -- Make sure unused pins are always the uppermost ones. Optionally also ban zero-input LUTs.
+
+void putIntoNpn4(Gig& N);
+    // -- Put the netlist into Npn4 form. Will convert the following gate types into 'gate_Npn4':
+    // And, Xor, Mux, Maj, Buf, Not, Or, Equiv, Lut4
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
 #endif

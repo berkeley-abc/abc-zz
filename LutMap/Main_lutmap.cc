@@ -2,6 +2,7 @@
 #include "ZZ_CmdLine.hh"
 #include "ZZ_Gig.IO.hh"
 #include "ZZ_Unix.hh"
+#include "ZZ_Npn4.hh"
 #include "LutMap.hh"
 #include "GigReader.hh"
 
@@ -10,6 +11,7 @@ using namespace ZZ;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Mux optimzation (temporary solution):
 
 
 // Returns TRUE if 'w' is the top AND-gate of a balanced, 3 AND-gate tree making up a MUX.
@@ -56,8 +58,10 @@ void introduceMuxes(Gig& N)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Helpers:
 
 
+static
 void makeCombinational(Gig& N)
 {
     N.unfreeze();
@@ -100,6 +104,213 @@ void makeCombinational(Gig& N)
 }
 
 
+macro uint sizeLut4(Wire w)
+{
+    assert(w == gate_Lut4);
+    uint sz = 0;
+    sz += (uint)ftb4_inSup(w.arg(), 0);
+    sz += (uint)ftb4_inSup(w.arg(), 1);
+    sz += (uint)ftb4_inSup(w.arg(), 2);
+    sz += (uint)ftb4_inSup(w.arg(), 3);
+    return sz;
+}
+
+
+static
+String infoLut4(const Gig& N)
+{
+    uint count[5] = {0, 0, 0, 0, 0};
+    For_Gates(N, w){
+        if (w == gate_Lut4)
+            count[sizeLut4(w)]++;
+    }
+
+    String out;
+    FWrite(out) "#Lut4:0=%_  Lut4:1=%_  Lut4:2=%_  Lut4:3=%_  Lut4:4=%_",
+        count[0], count[1], count[2], count[3], count[4];
+
+    return out;
+}
+
+
+// Replace gate 'w' by two 'And' gates (the top one "changing" 'w').
+static
+void synthAnd3(Wire w, uchar ftb)
+{
+    bool s0 = false;
+    bool s1 = false;
+    bool s2 = false;
+
+    if (ftb <  16){ s0 = true; ftb <<= 4; }
+    if (ftb <  64){ s1 = true; ftb <<= 2; }
+    if (ftb < 128){ s2 = true; ftb <<= 1; }
+    assert(ftb == 128);
+
+    Wire w12 = mkAnd(w[1] ^ s1, w[2] ^ s2);
+    Wire w0 = w[0] ^ s0;
+    change(w, gate_And).init(w0, w12);
+}
+
+
+// Not verified for functional correctness yet!
+static
+void expandLut3s(Gig& N)
+{
+    normalizeLut4s(N);
+
+    uint n_lut3 = 0;
+    uint n_and3 = 0;
+    uint n_or3 = 0;
+    WSeen inverted;
+    For_Gates(N, w){
+        if (w == gate_Lut4 && sizeLut4(w) == 3){
+            ushort ftb = w.arg();
+            assert((ftb & 255) == (w.arg() >> 8));
+
+            // AND3:
+            ftb &= 255;
+            if ((ftb & (ftb-1)) == 0){
+                synthAnd3(w, ftb);
+                n_and3++; }
+
+            // OR3:
+            ftb ^= 255;
+            if ((ftb & (ftb-1)) == 0){
+                synthAnd3(w, ftb);
+                inverted.add(w);
+                n_or3++; }
+            ftb ^= 255;
+
+            // MUX:
+            //...
+
+            n_lut3++;
+        }
+    }
+
+    For_Gates(N, w){
+        For_Inputs(w, v)
+            if (inverted.has(v))
+                w.set(Iter_Var(v), ~v);
+    }
+
+    WriteLn "MELT: %_ out of %_ 3-input Lut4s changed into 'And(x, And(y, z))'.", n_and3 + n_or3, n_lut3;
+
+    //**/Dump(n_lut3, n_and3, n_or3);
+    //**/WriteLn "FTBs:";
+    //**/for (uint i = 0; i < fs.size(); i++)
+    //**/    WriteLn "  %.8b", (fs[i] & 255);
+    //**/exit(0);
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// PNL export:
+
+
+static
+void putu_(Out& out, uint64 val)
+{
+    if (val < 0x20000000){
+        uint    v = (uint)val;
+        if (v < 0x80)
+            out.push(v);
+        else{
+            if (v < 0x2000)
+                out.push(0x80 | (v >> 8)),
+                out.push((uchar)v);
+            else if (v < 0x200000)
+                out.push(0xA0 | (v >> 16)),
+                out.push((uchar)(v >> 8)),
+                out.push((uchar)v);
+            else
+                out.push((v >> 24) | 0xC0),
+                out.push((uchar)(v >> 16)),
+                out.push((uchar)(v >> 8)),
+                out.push((uchar)v);
+        }
+    }else
+        out.push(0xE0),
+        out.push((uchar)(val >> 56)),
+        out.push((uchar)(val >> 48)),
+        out.push((uchar)(val >> 40)),
+        out.push((uchar)(val >> 32)),
+        out.push((uchar)(val >> 24)),
+        out.push((uchar)(val >> 16)),
+        out.push((uchar)(val >> 8)),
+        out.push((uchar)val);
+}
+
+macro uint64 encode64(int64  val) {
+    return (val >= 0) ? (uint64)val << 1 : (((uint64)(~val) << 1) | 1); }
+
+macro void puti_(Out& out, int64 val) {
+    putu_(out, encode64(val)); }
+
+macro void puts_(Out& out, cchar* text) {
+    putu_(out, strlen(text));
+    for (cchar* p = text; *p != 0; p++)
+        out.push(*p);
+}
+
+
+macro void putWire(Out& out, Wire w)
+{
+    uint id;
+    if      (w.id == gid_NULL)  id = 0;
+    else if (w.id == gid_True)  id = 1;
+    else if (w.id == gid_False) id = 2;
+    else{
+        assert(w.id >= gid_FirstUser);
+        id = w.id - gid_FirstUser + 3;
+    }
+
+    putu_(out, (id << 1) | (uint)(bool)w.sign);
+}
+
+
+void writePnlFile(String filename, Gig& N)
+{
+    OutFile out(filename);
+
+    // Format version:
+    putu_(out, 0xAC1D0FF1CEC0FFEEull);   // tag for new format
+    putu_(out, 1); putu_(out, 2);        // version 1.2
+
+    // Gate types:
+    putu_(out, 7);   // -- #gate-types
+    puts_(out, "And");      // 1 from: And
+    puts_(out, "Lut");      // 2 from: Lut4
+    puts_(out, "PI");       // 3 from: PI
+    puts_(out, "PO");       // 4 from: PO
+    puts_(out, "FD01");     // 5 from: Seq
+    puts_(out, "Pin");      // 6 from: Sel
+    puts_(out, "Delay");    // 7 from: Box, Delay
+
+
+    // Save gates:
+    putu_(out, N.size() - gid_FirstUser + 3);
+    for (uint i = gid_FirstUser; i < N.size(); i++){
+        Wire w = N[i];
+        //**/if (i < 20) WriteLn "%f", w;
+        switch (w.type()){
+        case gate_And:   putu_(out, /*gate-type*/1); break;
+        case gate_Lut4:  putu_(out, /*gate-type*/2); putu_(out, w.arg()); break;
+        case gate_PI:    putu_(out, /*gate-type*/3); puti_(out, w.num()); break;
+        case gate_PO:    putu_(out, /*gate-type*/4); puti_(out, w.num()); break;
+        case gate_Seq:   putu_(out, /*gate-type*/5); putu_(out, /*dyn-inputs*/w.size()); break;
+        case gate_Sel:   putu_(out, /*gate-type*/6); puti_(out, w.arg()); break;
+        case gate_Box:   putu_(out, /*gate-type*/7); putu_(out, /*dyn-inputs*/w.size()); puti_(out, 0); break;
+        case gate_Delay: putu_(out, /*gate-type*/7); putu_(out, /*dyn-inputs*/w.size()); puti_(out, w.arg()); break;
+        default: assert(false); }
+
+        // Output fanins:
+        for (uint i = 0; i < w.size(); i++)
+            putWire(out, w[i]);
+    }
+}
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
@@ -107,9 +318,11 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
-    cli.add("input"  , "string", arg_REQUIRED, "Input AIGER.", 0);
+    cli.add("input"  , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
     cli.add("output" , "string", ""          , "Output GNL file (optional).", 1);
+    cli.add("keep"   , "string", ""          , "List of forcable gates (only gor GNL input).");
     cli.add("blif"   , "string", ""          , "Save original input in BLIF format (for debugging only).");
+    cli.add("pnl"    , "string", ""          , "Save original input in PNL format (for debugging only).");
     cli.add("N"      , "uint"  , "10"        , "Cuts to keep per node.");
     cli.add("iters"  , "uint"  , "4"         , "Number of mapping phases.");
     cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
@@ -117,11 +330,13 @@ int main(int argc, char** argv)
     cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (defaul is area).");
     cli.add("comb"   , "bool"  , "no"        , "Remove white/black boxes and sequential elements (may change delay profile).");
     cli.add("mux"    , "bool"  , "yes"       , "Do MUX and XOR extraction first.");
+    cli.add("melt"   , "bool"  , "no"        , "Undo the 3-input LUT mapping of HDL-ICE.");
     cli.parseCmdLine(argc, argv);
 
     String input  = cli.get("input").string_val;
     String output = cli.get("output").string_val;
     String blif   = cli.get("blif").string_val;
+    String pnl    = cli.get("pnl").string_val;
     Params_LutMap P;
     P.cuts_per_node = cli.get("N").int_val;
     P.n_rounds      = cli.get("iters").int_val;
@@ -132,6 +347,8 @@ int main(int argc, char** argv)
     // Read input file:
     double  T0 = cpuTime();
     Gig N;
+    WSeen keep;
+    uint keep_sz = 0;
     try{
         if (hasExtension(input, "aig"))
             readAigerFile(input, N, false);
@@ -150,9 +367,17 @@ int main(int argc, char** argv)
             closeChildIo(io);
             waitpid(pid, NULL, 0);
 
-        }else if (hasExtension(input, "gnl"))
+        }else if (hasExtension(input, "gnl")){
             N.load(input);
-        else if (hasExtension(input, "gig"))
+            if (cli.get("keep").string_val != ""){
+                Str text = readFile(cli.get("keep").string_val);
+                Vec<Str> fs;
+                splitArray(text, " \n", fs);
+                for (uint i = 0; i < fs.size(); i++)
+                    if (!keep.add(N[stringToUInt64(fs[i])]))
+                        keep_sz++;
+            }
+        }else if (hasExtension(input, "gig"))
             readGigForTechmap(input, N);
         else{
             ShoutLn "ERROR! Unknown file extension: %_", input;
@@ -162,6 +387,9 @@ int main(int argc, char** argv)
         ShoutLn "PARSE ERROR! %_", err.msg;
         exit(1);
     }
+
+    if (cli.get("melt").bool_val)
+        expandLut3s(N);
 
     if (cli.get("comb").bool_val)
         makeCombinational(N);
@@ -174,6 +402,10 @@ int main(int argc, char** argv)
     double T1 = cpuTime();
     WriteLn "Parsing: %t", T1-T0;
     WriteLn "Input: %_", info(N);
+    if (N.typeCount(gate_Lut4) > 0)
+        WriteLn "       %_", infoLut4(N);
+    if (keep_sz > 0)
+        WriteLn "       #keeps=%_", keep_sz;
 
     if (blif != ""){
         bool quit = false;
@@ -187,8 +419,20 @@ int main(int argc, char** argv)
         if (quit) return 0;
     }
 
-  #if 0
-    lutMap(N, P);
+    if (pnl != ""){
+        bool quit = false;
+        if (pnl.last() == '@'){
+            quit = true;
+            pnl.pop(); }
+
+        writePnlFile(pnl, N);
+        WriteLn "Wrote: \a*%_\a*", pnl;
+
+        if (quit) return 0;
+    }
+
+  #if 1
+    lutMap(N, P, &keep);
   #else
     WMapX<GLit> remap;
     Write "\a/"; For_Gates(N, w) Dump(w); Write "\a/";

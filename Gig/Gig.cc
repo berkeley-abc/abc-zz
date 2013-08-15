@@ -225,6 +225,7 @@ void Gig::loadGate(GateType type, uint sz)
     // Determine gate id:
     gate_id id;
     id = size_++;
+    type_count[type]++;
   #if defined(ZZ_GIG_PAGED)
     if ((id & (ZZ_GIG_PAGE_SIZE - 1)) == 0)    // -- alloc new page
         pages.push(xmalloc<Gate>(ZZ_GIG_PAGE_SIZE));

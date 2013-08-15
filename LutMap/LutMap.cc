@@ -817,34 +817,7 @@ LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_, WMapX<GLit>* remap_) :
             (*remap)(w) = w;
     }
 
-    // Normalize LUT4s:
-    GigMut mut = N.getMutable();
-    N.unfreeze();
-    For_Gates(N, w){
-        if (w != gate_Lut4) continue;
-
-        ftb4_t ftb = w.arg();
-        uint j = 0;
-        for (uint i = 0; i < 4; i++){
-            if (ftb4_inSup(ftb, i)){
-                if (j < i){
-                    w.set(j, w[i]);
-                    w.set(i, Wire_NULL);
-                    ftb = ftb4_swap(ftb, i, j);
-                }
-                j++;
-            }
-        }
-        if (j != 4)
-            w.arg_set(ftb);
-
-        if (ftb == 0 || ftb == 0xFFFF){
-            // Change into a buffer pointing to 'True' or '~True': (mapper cannot handle constant 'Lut4's)
-            w.set(0, N.True() ^ (ftb == 0));
-            w.arg_set(lut4_buf[0]);
-        }
-    }
-    N.setMutable(mut);
+    normalizeLut4s(N);
 
     // Run mapper:
     run();

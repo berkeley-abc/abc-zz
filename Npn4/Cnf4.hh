@@ -52,7 +52,7 @@ macro uint cnfPrime_sizePos(uint cl) { return cnf4_prime_header[cl].n_pos_clause
 macro uint cnfPrime_sizeNeg(uint cl) { return cnf4_prime_header[cl].n_clauses - cnf4_prime_header[cl].n_pos_clauses; }
 
 
-// Produce the i:tg clause for NPN class 'cl' (in 0..221). Will clear 'clause' first.
+// Produce the i:th clause for NPN class 'cl' (in 0..221). Will clear 'clause' first.
 // Output literal is always first.
 macro void cnfIsop_clause(uint cl, uint i, Lit inputs[4], Lit output, /*out*/Vec<Lit>& clause)
 {

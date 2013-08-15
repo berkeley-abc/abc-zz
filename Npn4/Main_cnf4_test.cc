@@ -109,7 +109,7 @@ int main(int argc, char** argv)
 #endif
 
 
-#if 1
+#if 0
 int main(int argc, char** argv)
 {
     ZZ_Init;
@@ -132,3 +132,62 @@ int main(int argc, char** argv)
     return 0;
 }
 #endif
+
+
+int main(int argc, char** argv)
+{
+    ZZ_Init;
+
+    ftb4_t ftb = 0;
+  #if 0
+    for (uint x = 0; x < 2; x++)
+    for (uint y = 0; y < 2; y++)
+        if (x ^ y)
+            ftb |= (1 << (x + 2*y));
+    ftb |= ftb << 4;
+    ftb |= ftb << 8;
+  #endif
+  #if 0
+    for (uint x = 0; x < 2; x++)
+    for (uint y = 0; y < 2; y++)
+    for (uint z = 0; z < 2; z++)
+        if (x ^ y ^ z)
+            ftb |= (1 << (x + 2*y + 4*z));
+    ftb |= ftb << 8;
+  #endif
+  #if 0
+    for (uint x = 0; x < 2; x++)
+    for (uint y = 0; y < 2; y++)
+    for (uint z = 0; z < 2; z++)
+    for (uint q = 0; q < 2; q++)
+        if (x ^ y ^ z ^ q)
+            ftb |= (1 << (x + 2*y + 4*z + 8*q));
+  #endif
+  #if 0
+    for (uint x = 0; x < 2; x++)
+    for (uint y = 0; y < 2; y++)
+    for (uint z = 0; z < 2; z++)
+        if (x ? z : y)
+            ftb |= (1 << (x + 2*y + 4*z));
+    ftb |= ftb << 8;
+  #endif
+  #if 1
+    for (uint x = 0; x < 2; x++)
+    for (uint y = 0; y < 2; y++)
+    for (uint z = 0; z < 2; z++)
+        if (x + y + z >= 2)
+            ftb |= (1 << (x + 2*y + 4*z));
+    ftb |= ftb << 8;
+  #endif
+
+    WriteLn "FTB: %.4X", ftb;
+    for (uint i = 0; i < 4; i++)
+        if (ftb4_inSup(ftb, i))
+            WriteLn "pin %_ in support", i;
+
+    WriteLn "npn class: %d", npn4_norm[ftb].eq_class;
+    WriteLn "npn perm : %d", npn4_norm[ftb].perm;
+    WriteLn "npn negs : %d", npn4_norm[ftb].negs;
+
+    return 0;
+}

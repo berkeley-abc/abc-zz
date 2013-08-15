@@ -53,6 +53,8 @@ using namespace std;
 // Table declarations:
 
 
+// This table is updatd by 'adjustSupport()' to shift support for <4-input gates
+// to the lower pins.
 ftb4_t npn4_repr[222] = {
     0xFFFF, 0xFFFE, 0xFFFC, 0xFFF9, 0xFFF8, 0xFFF0, 0xFFE9, 0xFFE8, 0xFFE7, 0xFFE6,
     0xFFE4, 0xFFE1, 0xFFE0, 0xFFC3, 0xFFC2, 0xFFC0, 0xFF96, 0xFF94, 0xFF90, 0xFF81,
@@ -79,6 +81,7 @@ ftb4_t npn4_repr[222] = {
     0xC33C, 0x9669
 };
 
+uchar    npn4_repr_sz[222];  // -- size of support
 Npn4Norm npn4_norm[65536];
 
 perm4_t pseq4_to_perm4[256];
@@ -191,6 +194,31 @@ ftb4_t negate4(ftb4_t f, negs4_t negs)
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Table initialization:
+
+
+static
+void adjustSupport()
+{
+    for (uint cl = 0; cl < 222; cl++){
+        ushort ftb = npn4_repr[cl];
+        for(uint n = 0; n < 3; n++){
+            if (!ftb4_inSup(ftb, 0)) ftb = ftb4_swap(ftb, 0, 1);
+            if (!ftb4_inSup(ftb, 1)) ftb = ftb4_swap(ftb, 1, 2);
+            if (!ftb4_inSup(ftb, 2)) ftb = ftb4_swap(ftb, 2, 3);
+        }
+        npn4_repr[cl] = ftb;
+
+        // Store support size:
+        npn4_repr_sz[cl] = 0;
+        for (uint pin = 4; pin > 0;){ pin--;
+            if (ftb4_inSup(ftb, pin)){
+                npn4_repr_sz[cl] = pin + 1;
+                break;
+            }
+        }
+    }
+
+}
 
 
 static
@@ -328,6 +356,7 @@ void genNpnJust()   // -- takes about 1.2 ms
 
 
 ZZ_Initializer(npn4, -9500) {
+    adjustSupport();
     genPseqMaps();
     genApplyPerm();
     genApplyNegs();

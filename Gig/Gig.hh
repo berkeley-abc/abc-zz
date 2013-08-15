@@ -108,6 +108,7 @@ template<> fts_macro void write_(Out& out, const GigMode& v) { out += GigMode_na
 // Gig data:
 
 
+// <<== need to split these concepts into "immutable" and "canonical/compact"
 enum GigMut {
     gm_Mutable,     // -- netlist may be updated
     gm_Constant,    // -- netlist is frozen; updates lead to assertion error
@@ -203,6 +204,7 @@ public:
     Wire  init(GLit v0) { set(0, v0); return *this; }
     Wire  init(GLit v0, GLit v1) { set(0, v0); set(1, v1); return *this; }
     Wire  init(GLit v0, GLit v1, GLit v2) { set(0, v0); set(1, v1); set(2, v2); return *this; }
+    Wire  init(GLit v0, GLit v1, GLit v2, GLit v3) { set(0, v0); set(1, v1); set(2, v2); set(3, v3); return *this; }
         // -- Useful with 'Gig::add()' to immediately set some inputs but still return the new wire.
         // Can also be used to set all inputs of a (small) gate in one go.
 

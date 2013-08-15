@@ -14,6 +14,7 @@
 
 #include "Prelude.hh"
 #include "Cnf4.hh"
+#include "Npn4.hh"
 
 namespace ZZ {
 using namespace std;
@@ -931,6 +932,25 @@ uchar cnf4_prime_data[2305] = {
     0x94,0x64,0x58,0xA8,0x54,0xA4,0x98,0x68,
     0x55,0xA5,0x99,0x69,0x96,0x66,0x5A,0xAA,0x95,0x65,0x59,0xA9,0x56,0xA6,0x9A,0x6A,
 };
+
+
+// We switch from having unused pins being the lower-most to being the upper-most.
+// This code will patch the tables above during initialization.
+ZZ_Initializer(cnf4_adjust_support, -9450)
+{
+    for (uint type = 0; type < 2; type++){
+        Cnf4Head* header = (type == 0) ? cnf4_isop_header : cnf4_prime_header;
+        uchar*    data   = (type == 0) ? cnf4_isop_data   : cnf4_prime_data;
+
+        for (uint cl = 0; cl < 222; cl++){
+            uint adjust = 4 - npn4_repr_sz[cl];
+            if (adjust != 0){
+                for (uint i = header[cl].offset, n = 0; n < header[cl].n_clauses; i++, n++)
+                    data[i] >>= 2 * adjust;
+            }
+        }
+    }
+}
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

@@ -58,8 +58,9 @@ macro bool validPseq4(pseq4_t pseq) {
 static const ftb4_t lut4_buf[4] = { 0xAAAA, 0xCCCC, 0xF0F0, 0xFF00 };
 static const ftb4_t lut4_inv[4] = { 0x5555, 0x3333, 0x0F0F, 0x00FF };
 
-extern Npn4Norm npn4_norm[65536];
-extern ftb4_t   npn4_repr[222];
+extern Npn4Norm npn4_norm   [65536];
+extern ftb4_t   npn4_repr   [222];
+extern uchar    npn4_repr_sz[222];  // -- size of support
 
 extern perm4_t pseq4_to_perm4[256];
 extern pseq4_t inv_pseq4     [256];
@@ -74,10 +75,15 @@ extern uint npn4_just[222][16];     // -- list of minimal justifications for eac
 
 // Some useful NPN classes:
 static const uchar npn4_cl_TRUE = 0;
-static const uchar npn4_cl_OR4  = 1;
-static const uchar npn4_cl_OR3  = 2;
-static const uchar npn4_cl_OR2  = 5;        // -- NOTE! or of pin 2 and 3 (not 0 and 1)
 static const uchar npn4_cl_BUF  = 21;
+static const uchar npn4_cl_OR2  = 5;        // -- NOTE! Now lower pin (0 and 1)
+static const uchar npn4_cl_OR3  = 2;
+static const uchar npn4_cl_OR4  = 1;
+static const uchar npn4_cl_EQU2 = 180;
+static const uchar npn4_cl_XOR3 = 220;
+static const uchar npn4_cl_EQU4 = 221;
+static const uchar npn4_cl_MUX  = 109;      // order: (pin0 ? pin2 : pin1)
+static const uchar npn4_cl_MAJ  = 83;       // pin0 + pin1 + pin2 >= 2
 
 // Compile time 'pseq4_to_perm4':
 #define PERM4_0123 0
