@@ -30,12 +30,14 @@ Furthermore, each build has a target type:
                 
     <target-type> = one of: release, debug, profile, quick
 
-More target types can be added (more about that later), but each
-will be given a unique name. Files compiled with different flags
-will never interfere. 
+These targets can be further sub-typed by a set of boolean options
+(such as "with or without assertions" or "with or without debug
+symbols"). Each target is built inside its own directory and different
+target types (which are compiled with different flags) will never
+interfere.
 
-Example: If you do a 'zb r' in 'ZZ/CmdLine' do build the "release"
-version of CmdLine module, the output will be put into:
+Example: If you do a 'zb r' in 'ZZ/CmdLine' you build the "release"
+version of CmdLine module and the output will be put into:
 
     ZZ/CmdLine/out/Linux-3.8.0-25-generic-x86_64/release/
 
@@ -45,7 +47,7 @@ build script 'zb' itself. So all outputs from 'zb' is put in
  
     out/<qualifier>
     
-inside the current directory from which you run 'zb'.
+of the current directory from which you run 'zb'.
    
 
 ========================================
