@@ -1,3 +1,4 @@
+#if 0
 //_________________________________________________________________________________________________
 //|                                                                                      -- INFO --
 //| Name        : CnfMap_Netlist.cc
@@ -368,3 +369,4 @@ void cnfMap(NetlistRef N, Params_CnfMap P, /*outs:*/NetlistRef M, WWMap& n2m)
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
+#endif

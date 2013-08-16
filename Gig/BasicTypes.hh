@@ -43,6 +43,20 @@ typedef Lit  GLit;      // -- typedef for documentation rather than abstraction
 
 
 // Hate to use defines for this, but GCC just won't generate the right code otherwise....
+enum {
+    gid_NULL       = (0),
+    gid_ERROR      = (1),
+    gid_Unbound    = (2),
+    gid_Conflict   = (3),
+    gid_False      = (4),
+    gid_True       = (5),
+    gid_Reset      = (6),
+    gid_Reserved   = (7),
+    gid_MAX        = (0x7FFFFFFF),
+    gid_FirstLegal = (2),
+    gid_FirstUser  = (8),
+};
+/*
 #define gid_NULL       gate_id(0)
 #define gid_ERROR      gate_id(1)
 #define gid_Unbound    gate_id(2)
@@ -54,6 +68,7 @@ typedef Lit  GLit;      // -- typedef for documentation rather than abstraction
 #define gid_MAX        gate_id(0x7FFFFFFF)
 #define gid_FirstLegal gate_id(2)
 #define gid_FirstUser  gate_id(8)
+*/
 
 #define GLit_NULL      GLit(gid_NULL)
 #define GLit_ERROR     GLit(gid_ERROR)

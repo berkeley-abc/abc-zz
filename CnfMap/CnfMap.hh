@@ -46,7 +46,7 @@ void cnfMap(NetlistRef N, Params_CnfMap P, /*outs:*/NetlistRef M, WWMap& n2m);
     // -- Supported gate types are: And, PI, PO, Flop. 
     // Output netlist 'M' will contain: Npn4, PI, PO, Flop.  
 
-void cnfMap(Gig& N, Params_CnfMap P);
+//void cnfMap(Gig& N, Params_CnfMap P);
     // -- Like 'cnfMap' on 'Netlist's, but in place and supports any non-logic gate.
 
 

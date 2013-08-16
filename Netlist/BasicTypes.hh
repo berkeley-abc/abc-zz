@@ -61,21 +61,23 @@ struct NlLis;
 // Constants:
 
 
+enum {
+    nid_NULL = (UINT_MAX),
+};
+
+enum {
+    gid_NULL       = (0),
+    gid_ERROR      = (1),
+    gid_Unbound    = (2),
+    gid_Conflict   = (3),
+    gid_False      = (4),
+    gid_True       = (5),
+    gid_MAX        = (0x7FFFFFFF),
+    gid_FirstLegal = (2),
+    gid_FirstUser  = (6),
+};
+
 #if defined(ZZ_CONSTANTS_AS_MACROS)
-    // Do these as macros for efficiency (why does 'static const' *still* generate worse code??)
-    #define nid_NULL       ::ZZ::netlist_id(UINT_MAX)
-
-    #define gid_NULL       ::ZZ::gate_id(0)
-    #define gid_ERROR      ::ZZ::gate_id(1)
-    #define gid_Unbound    ::ZZ::gate_id(2)   // -- {0,1}, use this constant value for 'X' in 3-valued simulation
-    #define gid_Conflict   ::ZZ::gate_id(3)   // -- {}, constant for "no satisfying value"
-    #define gid_False      ::ZZ::gate_id(4)   // -- {0}, constant FALSE
-    #define gid_True       ::ZZ::gate_id(5)   // -- {1}, constant TRUE
-    #define gid_MAX        ::ZZ::gate_id(0x7FFFFFFF)
-
-    #define gid_FirstLegal ::ZZ::gate_id(2)   // -- You must not dereference wires pointing to NULL or ERROR.
-    #define gid_FirstUser  ::ZZ::gate_id(6)   // -- Real user gates start at this ID.
-
     #define glit_NULL      ::ZZ::GLit(gid_NULL    , false)
     #define glit_ERROR     ::ZZ::GLit(gid_ERROR   , false)
     #define glit_Unbound   ::ZZ::GLit(gid_Unbound , false)
@@ -83,21 +85,7 @@ struct NlLis;
     #define glit_False     ::ZZ::GLit(gid_False   , false)
     #define glit_True      ::ZZ::GLit(gid_True    , false)
     #define glit_MAX       ::ZZ::GLit(gid_MAX     , false)
-
 #else
-    static const netlist_id nid_NULL = netlist_id(UINT_MAX);
-
-    static const gate_id gid_NULL     = gate_id(0);
-    static const gate_id gid_ERROR    = gate_id(1);
-    static const gate_id gid_Unbound  = gate_id(2);
-    static const gate_id gid_Conflict = gate_id(3);
-    static const gate_id gid_False    = gate_id(4);
-    static const gate_id gid_True     = gate_id(5);
-    static const gate_id gid_MAX      = gate_id(0x7FFFFFFF);
-
-    static const gate_id gid_FirstLegal = gate_id(2);
-    static const gate_id gid_FirstUser  = gate_id(6);
-
     static const GLit glit_NULL     = GLit(gid_NULL    , false);
     static const GLit glit_ERROR    = GLit(gid_ERROR   , false);
     static const GLit glit_Unbound  = GLit(gid_Unbound , false);
