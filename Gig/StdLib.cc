@@ -94,6 +94,7 @@ void upOrderRef(Vec<uchar>& seen, Vec<GLit>& order, Wire w0)
 
 void upOrder(const Gig& N, /*out*/Vec<GLit>& order)
 {
+    N.debugAssertMode();
     Vec<uchar> seen(N.size(), false);
     for (gate_id i = gid_FirstLegal; i < gid_FirstUser; i++)
         seen[i] = true;
@@ -122,6 +123,7 @@ void upOrder(const Gig& N, const Vec<GLit>& sinks, /*out*/Vec<GLit>& order)
 
 void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* order_ptr)
 {
+    N.debugAssertMode();
     Vec<GLit> order_internal;
     Vec<GLit>& order = order_ptr ? *order_ptr : order_internal;
     order.reserve(N.size());
@@ -147,7 +149,7 @@ void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* orde
             upOrder_helper(Q, seen, removed, w);
 
     for (uint i = mark; i < removed.size(); i++){
-        remove(order[i] + N); }
+        remove(removed[i] + N); }
 
     if (order_ptr && !removed_ptr)
         order.shrinkTo(mark);
@@ -161,8 +163,7 @@ void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* orde
 // LUTs are replaced by buffers pointing to 'True()' or '~True()'.
 void normalizeLut4s(Gig& N, bool ban_constant_luts)
 {
-    GigMut mut = N.getMutable();    // <<= temporary
-    N.unfreeze();
+    N.debugAssertMode();
     For_Gates(N, w){
         if (w != gate_Lut4) continue;
 
@@ -189,17 +190,15 @@ void normalizeLut4s(Gig& N, bool ban_constant_luts)
             }
         }
     }
-    N.setMutable(mut);
 }
 
 
 // -- Put the netlist into Npn4 form. Will convert the following gate types into 'gate_Npn4':
 // And, Xor, Mux, Maj, Buf, Not, Or, Equiv, Lut4
+// NOTE! If LUTs have inputs not in the support if it's FTB, those inputs may end up unreachable.
 void putIntoNpn4(Gig& N)
 {
-    GigMut mut = N.getMutable();    // <<= temporary
-    N.unfreeze();
-
+    N.debugAssertMode();
     uint64 mask = (1ull << (uint64)gate_And)
                 | (1ull << (uint64)gate_Xor)
                 | (1ull << (uint64)gate_Mux)
@@ -279,8 +278,6 @@ void putIntoNpn4(Gig& N)
             if (inverted.has(v))
                 w.set(Iter_Var(v), ~v);
     }
-
-    N.setMutable(mut);
 }
 
 

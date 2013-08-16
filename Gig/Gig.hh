@@ -108,20 +108,14 @@ template<> fts_macro void write_(Out& out, const GigMode& v) { out += GigMode_na
 // Gig data:
 
 
-// <<== need to split these concepts into "immutable" and "canonical/compact"
-enum GigMut {
-    gm_Mutable,     // -- netlist may be updated
-    gm_Constant,    // -- netlist is frozen; updates lead to assertion error
-    gm_Canonical,   // -- netlist is frozen and gates sorted in topological order
-    gm_Compact,     // -- netlist is topologically sorted and has no unreachable gates 
-                    // (as defined by transitive fanin of combinational outputs)
-};
-
-
 struct Gig_data {
     SlimAlloc<uint>     mem;
 
-    GigMut              frozen;         // -- if non-zero, netlist is read-only (1=constant, 2=canonical, 3=canonical + no unreach)
+    bool                is_frozen;
+    bool                is_canonical;
+    bool                is_compact;
+    bool                is_reach;
+
     GigMode             mode_;          // }- restriction on which gate types are allowed (mode
     uint64              mode_mask;      // }  mask will always exlude 'gate_NULL' and 'gate_Const')
     uint64              strash_mask;    // -- Subset of 'mode_mask' that is allowed in strashed mode (excluding strashed gate types)
@@ -220,8 +214,8 @@ public:
     uint  arg() const { assert_debug(attrType() == attr_Arg);     return gate().inl[2]; }
     lbool lb () const { assert_debug(attrType() == attr_LB );     return lbool_new(gate().inl[2]); }
 
-    void  arg_set(uint  v) { assert_debug(((Gig_data*)N)->frozen == gm_Mutable); assert_debug(attrType() == attr_Arg); gate().inl[2] = v; }
-    void  lb_set (lbool v) { assert_debug(((Gig_data*)N)->frozen == gm_Mutable); assert_debug(attrType() == attr_LB ); assert_debug(id >= gid_FirstUser); gate().inl[2] = v.value; }
+    void  arg_set(uint  v) { assert_debug(!((Gig_data*)N)->is_frozen); assert_debug(attrType() == attr_Arg); gate().inl[2] = v; }
+    void  lb_set (lbool v) { assert_debug(!((Gig_data*)N)->is_frozen); assert_debug(attrType() == attr_LB ); assert_debug(id >= gid_FirstUser); gate().inl[2] = v.value; }
 };
 
 
@@ -262,7 +256,7 @@ inline void Wire::set(uint pin, GLit v)
     assert_debug(pin < size());
     assert_debug((1ull << type()) & ((Gig_data*)N)->strash_mask); // -- if this assert fails, you are trying to change inputs of a strashed gate.
     assert_debug(v == GLit_NULL || !Wire(N, v).isRemoved());
-    assert_debug(((Gig_data*)N)->frozen == gm_Mutable);
+    assert_debug(!((Gig_data*)N)->is_frozen);
 
     Vec<GigLis*>& lis = ((Gig_data*)N)->listeners[msgidx_Update];
     if (lis.size() > 0)
@@ -451,18 +445,20 @@ struct Gig : Gig_data, NonCopyable {
   //________________________________________
   //  Mode control:
 
-    GigMut  getMutable() const      { return frozen; }
-    void    setMutable(GigMut mode) { frozen = mode; }
-        // -- if 'gm_Canonical' or 'gm_Compact' is used; user better be sure netlist adhears to this specification (no checks)
-    void    freeze() { frozen = gm_Constant; }
-    void    unfreeze() { frozen = gm_Mutable; }
-    bool    isFrozen()    const { return frozen >= gm_Constant; }
-    bool    isCanonical() const { return frozen >= gm_Canonical; }
-    bool    isCompact()   const { return frozen >= gm_Compact; }
+    // There are four booleans in the base class 'Gig_data' that can be read/modified directly:
+    //  - bool is_frozen      -- if set, netlist cannot be modified (assertion is raised)
+    //  - bool is_canonical   -- if set, is topologically sorted (not enforced, so make sure your code is correct)
+    //  - bool is_compact     -- if set, there are no deleted gates (gaps in the vector of gates; also not enforced)  
+    //  - bool is_reach       -- if set, all gates are reachable from combinational outputs (also not enforced)  
 
     GigMode mode() const { return mode_; }
     void    setMode(GigMode mode);
     void    assertMode() const;                 // -- validate the current mode, abort program if fails
+  #if defined(ZZ_DEBUG)
+    void    debugAssertMode() const { assertMode(); }
+  #else
+    void    debugAssertMode() const {}
+  #endif
 
   //________________________________________
   //  Special gates: (always present)
@@ -538,12 +534,12 @@ struct Gig : Gig_data, NonCopyable {
         // numbering scheme (which by default provides numbers in reverse order of freeing due to
         // the freelist implementation).
 
-    void  compact(bool remove_unreach = true, bool set_canonical = true);
+    void  compact(bool remove_unreach = true, bool set_frozen = true);
     void  compact(GigRemap& remap, bool remove_unreach = true, bool set_canonical = true);
         // -- Will topologically order the gates and remove any gaps in the gate tables
         // created by gate removal. By default, unreachable gates (from COs) are first removed.
-        // Once done, 'compact()' will leave the netlist in a frozen, canonical mode.
-        // (either 'gm_Compact' (if 'remove_unreach' is TRUE) or 'gm_Canonical')
+        // Once done, 'compact()' will leave the netlist in a frozen mode (unless 'set_frozen' 
+        // is FALSE).
 
   //________________________________________
   //  Disk:
@@ -574,7 +570,10 @@ macro Wire operator+(GLit p    , const Gig& N) { return N[p];  }
 
 inline Gig::Gig()
 {
-    frozen       = gm_Mutable;
+    is_frozen    = false;
+    is_canonical = false;
+    is_compact   = false;
+    is_reach     = false;
     mode_        = gig_FreeForm;
     mode_mask    = 0;
     strash_mask  = 0;

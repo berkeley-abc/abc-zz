@@ -115,7 +115,10 @@ void Gig::clear(bool reinit)
     // Zero members:
     size_ = 0;
     use_freelist = false;
-    frozen = gm_Mutable;
+    is_frozen    = false;
+    is_canonical = false;
+    is_compact   = false;
+    is_reach     = false;
     mode_ = gig_FreeForm;
     mode_mask = ~0ull;
 
@@ -389,6 +392,58 @@ void Gig::assertMode() const
             }
         }
     }
+
+    if (is_canonical){
+        WSeen seen;
+        for (uint id = 0; id < gid_FirstUser; id++)
+            seen.add(GLit(id));
+        For_Gates(*this, w){
+            For_Inputs(w, v){
+                if (v == gate_Seq) continue;
+                if (!seen.has(v)){
+                    ShoutLn "INTERNAL ERROR! Non-canonical netlist detected while 'is_canonical' is set.";
+                    ShoutLn "  Gate '%_' has lower ID than input %_: '%_'.", w, Input_Pin(v), v;
+                    assert(false); }
+            }
+            seen.add(w);
+        }
+    }
+
+    if (is_compact){
+        if (this->nRemoved() > 0){
+            ShoutLn "INTERNAL ERROR! Gate vector has gaps while 'is_compact' is set (removed gates: %_).", this->nRemoved();
+            assert(false); }
+    }
+
+    if (is_reach){
+        WZet reach;
+        for (uint id = 0; id < gid_FirstUser; id++)
+            reach.add(id + *this);
+        For_Gates(*this, w)
+            if (isCO(w))
+                reach.add(w);
+        for (uint i = gid_FirstUser; i < reach.size(); i++)
+            For_Inputs(reach[i] + *this, v)
+                if (v != gate_Seq)
+                    reach.add(v);
+
+        if (reach.size() < this->size() - this->nRemoved()){
+            ShoutLn "INTERNAL ERROR! Unreachable gates exist while 'is_reach' is set.";
+            uint count = 0;
+            For_Gates(*this, w){
+                if (!reach.has(w)){
+                    Shout "  %_", w;
+                    count++;
+                    if (count == 10){
+                        Shout "...";
+                        break;
+                    }
+                }
+            }
+            ShoutLn "";
+            assert(false);
+        }
+    }
 }
 
 
@@ -468,7 +523,10 @@ void Gig::moveTo(Gig& M)
 
     // Migrate state:
     mem.moveTo(M.mem, false);
-    mov(frozen      , M.frozen);
+    mov(is_frozen   , M.is_frozen);
+    mov(is_canonical, M.is_canonical);
+    mov(is_compact  , M.is_compact);
+    mov(is_reach    , M.is_reach);
     mov(mode_       , M.mode_);
     mov(mode_mask   , M.mode_mask);
   #if defined(ZZ_GIG_PAGED)
@@ -507,9 +565,12 @@ void Gig::copyTo(Gig& M) const
     M.clear(false);
 
     // Copy state:
-    cpy(frozen   , M.frozen);
-    cpy(mode_    , M.mode_);
-    cpy(mode_mask, M.mode_mask);
+    cpy(is_frozen   , M.is_frozen);
+    cpy(is_canonical, M.is_canonical);
+    cpy(is_compact  , M.is_compact);
+    cpy(is_reach    , M.is_reach);
+    cpy(mode_       , M.mode_);
+    cpy(mode_mask   , M.mode_mask);
 
   #if defined(ZZ_GIG_PAGED)
     M.pages.growTo(pages.size());
@@ -550,11 +611,12 @@ void Gig::copyTo(Gig& M) const
 // -- Compaction:
 
 
-void Gig::compact(GigRemap& remap, bool remove_unreach, bool set_canonical)
+void Gig::compact(GigRemap& remap, bool remove_unreach, bool set_frozen)
 {
-    if (frozen){
-        assert(frozen != 1);    // -- can't change the netlist, but it has no guarantees
-        assert(frozen == 3 || !remove_unreach);     // -- 'frozen == 3' means unreachable gates are already removed, otherwise we cannot require it
+    if (is_frozen){
+        assert(is_canonical && is_compact);
+        if (remove_unreach)
+            assert(is_reach);
         return;
     }
 
@@ -636,8 +698,12 @@ void Gig::compact(GigRemap& remap, bool remove_unreach, bool set_canonical)
         listeners[msgidx_Compact][j]->compacting(remap);
 
     // Finish up:
-    if (set_canonical)
-        frozen = remove_unreach ? gm_Compact : gm_Canonical;     // -- now in canonical mode
+    is_canonical = true;
+    is_compact = true;
+    if (remove_unreach)
+        is_reach = true;
+    if (set_frozen)
+        is_frozen = true;
 }
 
 
@@ -651,7 +717,7 @@ void Gig::compact(bool remove_unreach, bool set_canonical) {
 
 
 static const uchar gig_file_tag[] = {0xAC, 0x1D, 0x0FF, 0x1C, 0xEC, 0x0FF, 0xEE, 0x61, 0x60 };
-static const uchar gig_format_version = 3;
+static const uchar gig_format_version = 4;
 
 
 void Gig::flushRle(Out& out, uchar type, uint count, uint end)
@@ -688,7 +754,10 @@ void Gig::save(Out& out)
     putc(out, gig_format_version);
 
     // Write state:
-    putu(out, frozen);
+    putu(out, is_frozen);
+    putu(out, is_canonical);
+    putu(out, is_compact);
+    putu(out, is_reach);
     putu(out, (uint)mode_);
     putu(out, mode_mask);
     putu(out, strash_mask);
@@ -764,11 +833,23 @@ void Gig::load(In& in)
             Throw(Excp_Msg) "Not a .gnl file.";
 
     uchar version = getc(in);
-    if (version != gig_format_version)
+    if (version != 3 && version != gig_format_version)
         Throw(Excp_Msg) "Unsupported version of format: %d (expected %d)", version, gig_format_version;
 
     // Read state:
-    frozen = (GigMut)getu(in);
+    if (version == 3){
+        // Old format:
+        is_frozen = is_canonical = is_compact = is_reach = 0;
+        uint mut = getu(in);
+        if (mut >= 1) is_frozen = true;
+        if (mut >= 2) is_canonical = is_reach = true;
+        if (mut >= 3) is_compact = true;
+    }else{
+        is_frozen    = getu(in);
+        is_canonical = getu(in);
+        is_compact   = getu(in);
+        is_reach     = getu(in);
+    }
     mode_ = (GigMode)getu(in);
     mode_mask = getu(in);
     strash_mask = getu(in);

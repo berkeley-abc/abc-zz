@@ -281,6 +281,11 @@ public:
     Vec<GLit>&       list()             { return set.list(); }
     const Vec<GLit>& list() const       { return set.list(); }
     void compact()                      { set.compact(); }
+
+    // Vector interface:
+    bool push(GLit p) { return add(p); }
+    bool push(Wire w) { return add(w); }
+    GLit operator[](uint i) const { return set.list()[i]; }
 };
 
 

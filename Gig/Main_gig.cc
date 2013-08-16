@@ -58,6 +58,7 @@ void swap(Wire w, ushort& ftb, uint i, uint j)
 }
 
 
+#if 0
 int main(int argc, char** argv)
 {
     ZZ_Init;
@@ -133,7 +134,28 @@ int main(int argc, char** argv)
 
     return 0;
 }
+#endif
 
+
+int main(int argc, char** argv)
+{
+    ZZ_Init;
+
+    Gig N;
+    N.is_reach = true;
+
+    Wire a = N.add(gate_PI);
+    Wire b = N.add(gate_PI);
+    Wire f = N.add(gate_And).init(a, b);
+    Wire c = N.add(gate_PI);
+    f.set(1, c);
+    remove(b);
+    N.add(gate_PO).init(f);
+
+    N.assertMode();
+
+    return 0;
+}
 
 //  : b & c & d
 /*

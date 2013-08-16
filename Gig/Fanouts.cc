@@ -40,7 +40,7 @@ void GigObj_Fanouts::copyTo(GigObj& dst_) const
 
 void GigObj_Fanouts::init()
 {
-    assert(N->isFrozen());
+    assert(N->is_frozen);
     clear();
 
     // Count number of fanouts for each node:

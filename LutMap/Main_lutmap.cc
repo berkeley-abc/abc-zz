@@ -47,7 +47,7 @@ static
 void introduceMuxes(Gig& N)
 {
     Wire sel, d1, d0;
-    N.unfreeze();
+    N.is_frozen = false;
     N.setMode(gig_FreeForm);
 
     For_DownOrder(N, w){
@@ -64,7 +64,8 @@ void introduceMuxes(Gig& N)
 static
 void makeCombinational(Gig& N)
 {
-    N.unfreeze();
+    N.is_frozen = false;
+    N.setMode(gig_FreeForm);
 
     Vec<GLit> ins;
     For_Gates(N, w){

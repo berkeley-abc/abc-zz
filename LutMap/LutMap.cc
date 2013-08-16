@@ -702,7 +702,7 @@ void LutMap::updateFanoutEst(bool instantiate)
         }
 
         // Build LUT representation:
-        N.unfreeze();
+        N.is_frozen = false;
         N.setMode(gig_FreeForm);
         uint j = 0;
         For_Gates(N, w){
@@ -798,7 +798,7 @@ LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_, WMapX<GLit>* remap_) :
     if (Has_Gob(N, Strash))
         Remove_Gob(N, Strash);
 
-    if (!N.isCanonical()){
+    if (!N.is_canonical){
         WriteLn "Compacting... %_", info(N);
 
         gate_id orig_sz = N.size();
