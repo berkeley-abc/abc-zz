@@ -1,6 +1,6 @@
 //_________________________________________________________________________________________________
 //|                                                                                      -- INFO --
-//| Name        : CnfMap.cc
+//| Name        : CnfMap_Netlist.cc
 //| Author(s)   : Niklas Een
 //| Module      : CnfMap
 //| Description : Techmap for CNF generation
@@ -15,6 +15,8 @@
 #include "CnfMap.hh"
 #include "ZZ_Npn4.hh"
 #include "ZZ/Generics/Sort.hh"
+
+#define CnfMap CnfMap_Netlist       // -- avoid linker problems
 
 namespace ZZ {
 using namespace std;
@@ -78,6 +80,48 @@ bool applySubsumptionAndAddCut(const Cut& cut, Vec<Cut>& out)
         return true;
     }
 }
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// 'CnfMap' class:
+
+
+class CnfMap {
+    // Input:
+    const Params_CnfMap& P;
+    NetlistRef           N;
+
+    // State:
+    SlimAlloc<Cut>    mem;
+    WMap<Array<Cut> > cutmap;
+    WMap<float>       area_est;
+    WMap<float>       fanout_est;
+    WMap<uint>        level;
+
+    uint              round;
+    uint64            mapped_area;
+    uint64            mapped_luts;
+    uint64            cuts_enumerated;
+
+    // Output:
+    WWMap&      n2m;
+    NetlistRef  M;
+
+    // Internal methods:
+    float evaluateCuts(Array<Cut> cuts);
+    void  generateCuts_And(Wire w, Vec<Cut>& out);
+    void  generateCuts(Wire w);
+    void  updateFanoutEst(bool instantiate);
+    void  run();
+
+    // Temporaries:
+    Vec<Cut>   tmp_cuts;
+    Vec<float> tmp_cut_area;
+    Vec<Pair<uint,float> > tmp_cut_level;
+
+public:
+    CnfMap(NetlistRef N, Params_CnfMap P, /*outs:*/NetlistRef M, WWMap& n2m);
+};
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -371,6 +415,12 @@ CnfMap::CnfMap(NetlistRef N_, Params_CnfMap P_, /*outs:*/NetlistRef M_, WWMap& n
 
     area_est  .clear(true);
     fanout_est.clear(true);
+}
+
+
+void cnfMap(NetlistRef N, Params_CnfMap P, /*outs:*/NetlistRef M, WWMap& n2m)
+{
+    CnfMap dummy(N, P, M, n2m);
 }
 
 
