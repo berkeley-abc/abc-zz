@@ -142,17 +142,21 @@ int main(int argc, char** argv)
     ZZ_Init;
 
     Gig N;
-    N.is_reach = true;
+    //N.is_reach = true;
 
-    Wire a = N.add(gate_PI);
-    Wire b = N.add(gate_PI);
-    Wire f = N.add(gate_And).init(a, b);
-    Wire c = N.add(gate_PI);
-    f.set(1, c);
-    remove(b);
-    N.add(gate_PO).init(f);
+    Wire a ___unused = N.add(gate_PI);
+    Wire b ___unused = N.add(gate_PI);
+    Wire c ___unused = N.add(gate_PI);
+    Wire f ___unused = N.add(gate_And).init(b, c);
+    Wire t ___unused = N.add(gate_PO).init(f);
 
-    N.assertMode();
+    For_Gatetype(N, gate_PI, w)
+        WriteLn "%_ : %_", w, w.num();
+
+    WriteLn "----------------------------------------";
+    removeUnreach(N);
+    For_Gatetype(N, gate_PI, w)
+        WriteLn "%_ : %_", w, w.num();
 
     return 0;
 }

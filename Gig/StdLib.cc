@@ -22,6 +22,35 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+bool isMux(Wire w, Wire& sel, Wire& d1, Wire& d0)
+{
+    assert(!w.sign);
+    if (w != gate_And)
+        return false;
+
+    Wire x = w[0];
+    Wire y = w[1];
+    if (x != gate_And || y != gate_And)
+        return false;
+    if (!x.sign || !y.sign)
+        return false;
+
+    Wire xx = x[0];
+    Wire yx = x[1];
+    Wire xy = y[0];
+    Wire yy = y[1];
+    if      (xx == ~xy){ sel = xx, d1 = ~yx, d0 = ~yy; return true; }
+    else if (yx == ~xy){ sel = yx, d1 = ~xx, d0 = ~yy; return true; }
+    else if (xx == ~yy){ sel = xx, d1 = ~yx, d0 = ~xy; return true; }
+    else if (yx == ~yy){ sel = yx, d1 = ~xx, d0 = ~xy; return true; }
+
+    return false;
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+
+
 String info(const Gig& N)
 {
     Out out;
@@ -29,11 +58,11 @@ String info(const Gig& N)
     for (uint t = (uint)gate_Const + 1; t < GateType_size; t++){
         GateType type = GateType(t);
         if (N.typeCount(type) > 0)
-            out += '#', GateType_name[type], '=', N.typeCount(type), "  ";
+            FWrite(out) "#%_=%,d  ", GateType_name[type], N.typeCount(type);
     }
     if (N.nRemoved() > 0)
-        out += "Deleted=", N.nRemoved(), "  ";
-    out += "TOTAL=", N.size();
+        FWrite(out) "Deleted=%,d  ", N.nRemoved();
+    FWrite(out) "TOTAL=%,d", N.size();
 
     return String(out.vec());
 }
@@ -157,6 +186,28 @@ void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* orde
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+
+
+void introduceMuxes(Gig& N)
+{
+    if (N.mode() == gig_Aig)
+        N.setMode(gig_Xig);
+    else
+        assert(N.mode() == gig_Xig || N.mode() == gig_FreeForm);
+
+    Wire sel, d1, d0;
+    For_DownOrder(N, w){
+        if (isMux(w, sel, d1, d0)){
+            if (d0 == ~d1)
+                change(w, gate_Xor).init(sel, d0);
+            else
+                change(w, gate_Mux).init(sel, d1, d0);
+        }
+    }
+
+    N.is_reach = false;
+    N.is_compact = false;
+}
 
 
 // Make sure unused pins are always the uppermost ones. If 'ban_constant_luts' is set, constant

@@ -2,7 +2,7 @@
 //|                                                                                      -- INFO --
 //| Name        : CnfMap.hh
 //| Author(s)   : Niklas Een
-//| Module      : CnfMap
+//| Module      : Gig.CnfMap
 //| Description : Techmap for CNF generation
 //| 
 //| (C) Copyright 2010-2012, The Regents of the University of California
@@ -11,10 +11,10 @@
 //| 
 //|________________________________________________________________________________________________
 
-#ifndef ZZ__CnfMap__CnfMap_hh
-#define ZZ__CnfMap__CnfMap_hh
+#ifndef ZZ__Gig__CnfMap__CnfMap_hh
+#define ZZ__Gig__CnfMap__CnfMap_hh
 
-#include "ZZ_Netlist.hh"
+#include "ZZ_Gig.hh"
 #include "Cut.hh"
 
 namespace ZZ {
@@ -28,11 +28,13 @@ using namespace std;
 struct Params_CnfMap {
     uint    cuts_per_node;      // How many cuts should we store at most per node?
     uint    n_rounds;           // #iterations in techmapper. First iteration will always be depth optimal, later phases will use area recovery.
+    bool    intro_muxes;        // Introduces MUXes first (faster and often better quality)
     bool    quiet;
 
     Params_CnfMap() :
-        cuts_per_node(10),
+        cuts_per_node(8),
         n_rounds(4),
+        intro_muxes(true),
         quiet(false)
     {}
 };
@@ -42,9 +44,9 @@ struct Params_CnfMap {
 // CNF generatation:
 
 
-void cnfMap(NetlistRef N, Params_CnfMap P, /*outs:*/NetlistRef M, WWMap& n2m);
-    // -- Supported gate types are: And, PI, PO, Flop. 
-    // Output netlist 'M' will contain: Npn4, PI, PO, Flop.  
+void cnfMap(Gig& N, Params_CnfMap P);
+    // -- Maps the 'And', 'Xor' and 'Mux' gates of 'N' into 'Lut4's.
+    // PRE-CONDITION: 'N' must be in canonical mode.
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

@@ -613,12 +613,11 @@ void Gig::copyTo(Gig& M) const
 
 void Gig::compact(GigRemap& remap, bool remove_unreach, bool set_frozen)
 {
-    if (is_frozen){
-        assert(is_canonical && is_compact);
-        if (remove_unreach)
-            assert(is_reach);
-        return;
+    if (is_compact && is_compact){
+        if (!remove_unreach || is_reach)
+            return;
     }
+    assert(!is_frozen);
 
     Gig& N = *this;
 

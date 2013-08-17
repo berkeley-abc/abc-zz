@@ -4,11 +4,11 @@
 //| Author(s)   : Niklas Een
 //| Module      : Netlist
 //| Description : Second version of the generic netlist datatype.
-//| 
+//|
 //| (C) Copyright 2010-2012, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #ifndef ZZ__Gig__Gig_hh
@@ -111,10 +111,10 @@ template<> fts_macro void write_(Out& out, const GigMode& v) { out += GigMode_na
 struct Gig_data {
     SlimAlloc<uint>     mem;
 
-    bool                is_frozen;
-    bool                is_canonical;
-    bool                is_compact;
-    bool                is_reach;
+    bool                is_frozen;      // -- no updates allowed to netlist (except netlist objects)
+    bool                is_canonical;   // -- gates are topologically sorted
+    bool                is_compact;     // -- no gaps in gate vector
+    bool                is_reach;       // -- all gates reachable from COs
 
     GigMode             mode_;          // }- restriction on which gate types are allowed (mode
     uint64              mode_mask;      // }  mask will always exlude 'gate_NULL' and 'gate_Const')

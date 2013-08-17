@@ -4,7 +4,7 @@
 //| Author(s)   : Niklas Een
 //| Module      : Gig
 //| Description : Collection of small, commonly useful functions operating on a Gig.
-//| 
+//|
 //| (C) Copyright 2010-2012, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
@@ -21,6 +21,14 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Misc:
+
+
+String info(const Gig& N);
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Simple predicates:
 
 
 macro bool isCO(Wire w) { return combOutput(w.type()); }
@@ -31,11 +39,14 @@ macro bool isSI(Wire w) { return seqInput (w.type()); }
 
 macro bool isSeqElem(Wire w) { return seqElem(w.type()); }
 
+bool isMux(Wire w, Wire& sel, Wire& d1, Wire& d0);
+    // -- Returns TRUE if 'w' is the top AND-gate of a balanced, 3 AND-gate tree making up a MUX.
+    // Note that XOR is a special case.
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Topological orders:
 
-
-String info(const Gig& N);
 
 void upOrder(const Gig& N, /*out*/Vec<GLit>& order);
 void upOrder(const Gig& N, const Vec<GLit>& sinks, /*out*/Vec<GLit>& order);
@@ -68,6 +79,10 @@ macro Wire mkEquiv(Wire x, Wire y)           { return mkMux(x,  y, ~y); }
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // LUTs:
 
+
+void introduceMuxes(Gig& N);
+    // -- introduce 'Mux' and 'Xor' gates for 3-input 'And's matching those functions. 
+    // Netlist will be in 'gig_Xig' or 'gig_FreeForm' mode afterwards. 
 
 void normalizeLut4s(Gig& N, bool ban_constant_luts = true);
     // -- Make sure unused pins are always the uppermost ones. Optionally also ban zero-input LUTs.
