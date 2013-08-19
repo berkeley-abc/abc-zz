@@ -51,7 +51,7 @@ class GigObj_Strash : public GigObj, public GigLis {
     Set<GLit,GateHash<ght_Bin> >  xor_nodes;
     Set<GLit,GateHash<ght_Tri> >  mux_nodes;
     Set<GLit,GateHash<ght_Tri> >  maj_nodes;
-    Set<GLit,GateHash<ght_Lut> >  npn_nodes;
+    Set<GLit,GateHash<ght_Lut> >  lut_nodes;
 
     bool initializing;      // -- Set during execution of 'strashNetlist()' to modify the behavior of 'removing()'
 
@@ -69,7 +69,7 @@ public:
     GLit add_Xor (GLit u, GLit v);
     GLit add_Mux (GLit s, GLit tt, GLit ff);
     GLit add_Maj (GLit u, GLit v , GLit w );
-    GLit add_Npn4(GLit d0, GLit d1, GLit d2, GLit d3, uchar eq_class);
+    GLit add_Lut4(GLit d0, GLit d1, GLit d2, GLit d3, ushort ftb);
 
   //________________________________________
   //  GigObj interface:
@@ -112,9 +112,21 @@ macro Wire xig_Or   (Wire x, Wire y) { return ~xig_And(~x, ~y); }
 macro Wire xig_Equiv(Wire x, Wire y) { return ~xig_Xor( x , y); }
 
 
-// NPN:
+// LUT4:
 //
-Wire npn4_Lut(Wire w0, Wire w1, Wire w2, Wire w3, uchar eq_class);
+Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4]);
+
+macro Wire lut4_Lut(Gig& N, ushort ftb, GLit w0 = GLit_NULL, GLit w1 = GLit_NULL, GLit w2 = GLit_NULL, GLit w3 = GLit_NULL) {
+    GLit w[4];
+    w[0] = w0; w[1] = w1; w[2] = w2; w[3] = w3;
+    return lut4_Lut(N, ftb, w); }
+
+// Note that constant LUTs are not allowed (use 'N.True()'), hence at least one input is required.
+// Also, netlist is retrieved from 'w0'.
+macro Wire lut4_Lut(ushort ftb, Wire w0, Wire w1 = Wire_NULL, Wire w2 = Wire_NULL, Wire w3 = Wire_NULL) {
+    GLit w[4];
+    w[0] = w0; w[1] = w1; w[2] = w2; w[3] = w3;
+    return lut4_Lut(*w0.gig(), ftb, w); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

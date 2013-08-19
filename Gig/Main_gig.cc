@@ -137,6 +137,7 @@ int main(int argc, char** argv)
 #endif
 
 
+#if 0
 int main(int argc, char** argv)
 {
     ZZ_Init;
@@ -160,9 +161,68 @@ int main(int argc, char** argv)
 
     return 0;
 }
+#endif
+
+
+int main(int argc, char** argv)
+{
+    ZZ_Init;
+
+    Gig N;
+    N.setMode(gig_Lut4);
+    Add_Gob(N, Strash);
+
+    Wire a ___unused = N.add(gate_PI);
+    Wire b ___unused = N.add(gate_PI);
+    Wire c ___unused = N.add(gate_PI);
+    Wire d ___unused = N.add(gate_PI);
+
+    ftb4_t ftb = 0xFFF0;
+    Wire f = lut4_Lut(N, ftb, d, c, b, ~a);
+    WriteLn "FTB before: %:.16b   pin3..0=abcd", ftb;
+
+    if (f != gate_Lut4)
+        Dump(f);
+    else{
+        Write   "FTB after : %:.16b   pin3..0=", f.arg();
+        for (uint i = 4; i > 0;){ i--;
+            if      (f[i] ==  a) Write  "a";
+            else if (f[i] == ~a) Write "~a";
+            else if (f[i] ==  b) Write  "b";
+            else if (f[i] == ~b) Write "~b";
+            else if (f[i] ==  c) Write  "c";
+            else if (f[i] == ~c) Write "~c";
+            else if (f[i] ==  d) Write  "d";
+            else if (f[i] == ~d) Write "~d";
+            else                 Write  "-";
+        }
+    }
+
+#if 0
+    Write   "FTB care  : ";
+    for (uint d = 0; d < 2; d++)
+    for (uint c = 0; c < 2; c++){
+        for (uint b = 0; b < 2; b++)
+        for (uint a = 0; a < 2; a++)
+            if (a == !b) Write "*";
+            else        Write "-";
+        if (c != 1 || d != 1) Write ":";
+    }
+    NewLine;
+#endif
+
+    return 0;
+}
+
 
 //  : b & c & d
 /*
+
+FTB before: 0001:0010:
+            0011:0100
+FTB after : 0001:0000:0000:0100
+
+
 orig: 0000 0000 0000 1100    = b & ~c & ~d
 norm: 1111 1110 1111 1110    = a | b | c
 0000 0000 0011 0000

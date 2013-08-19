@@ -26,12 +26,14 @@ using namespace std;
 
 
 struct Params_CnfMap {
+    bool    map_to_luts;        // If FALSE, maps to 'gate_Npn4's instead
     uint    cuts_per_node;      // How many cuts should we store at most per node?
     uint    n_rounds;           // #iterations in techmapper. First iteration will always be depth optimal, later phases will use area recovery.
-    bool    intro_muxes;        // Introduces MUXes first (faster and often better quality)
+    bool    intro_muxes;        // Introduces MUXes first (faster, and often better quality)
     bool    quiet;
 
     Params_CnfMap() :
+        map_to_luts(true),
         cuts_per_node(8),
         n_rounds(4),
         intro_muxes(true),

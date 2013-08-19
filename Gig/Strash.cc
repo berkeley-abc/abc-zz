@@ -3,7 +3,7 @@
 //| Name        : Strash.cc
 //| Author(s)   : Niklas Een
 //| Module      : Gig
-//| Description : Structural hashing of AIGs, XIGs, Lut4 and Npn4 netlists.
+//| Description : Structural hashing of AIGs, XIGs, and Lut4 netlists.
 //| 
 //| (C) Copyright 2010-2012, The Regents of the University of California
 //|________________________________________________________________________________________________
@@ -14,6 +14,7 @@
 #include "Prelude.hh"
 #include "Strash.hh"
 #include "StdLib.hh"
+#include "ZZ_Npn4.hh"
 
 namespace ZZ {
 using namespace std;
@@ -84,7 +85,7 @@ GigObj_Strash::GigObj_Strash(Gig& N_) :
     xor_nodes(GateHash<ght_Bin>(*this)),
     mux_nodes(GateHash<ght_Tri>(*this)),
     maj_nodes(GateHash<ght_Tri>(*this)),
-    npn_nodes(GateHash<ght_Lut>(*this)),
+    lut_nodes(GateHash<ght_Lut>(*this)),
     initializing(false)
 {
     // Setup 'strash_mask' for the netlist:
@@ -92,8 +93,8 @@ GigObj_Strash::GigObj_Strash(Gig& N_) :
         N->strash_mask = N->mode_mask & ~(1ull << gate_And);
     }else if (N->mode() == gig_Xig){
         N->strash_mask = N->mode_mask & ~(1ull << gate_And) & ~(1ull << gate_Xor) & ~(1ull << gate_Mux) & ~(1ull << gate_Maj);
-    }else if (N->mode() == gig_Npn4){
-        N->strash_mask = N->mode_mask & ~(1ull << gate_Npn4);
+    }else if (N->mode() == gig_Lut4){
+        N->strash_mask = N->mode_mask & ~(1ull << gate_Lut4);
     }else{
         ShoutLn "INTERNAL ERROR! Trying to strash a netlist in mode '%_'.", N->mode_;
         assert(false);      // -- cannot strash current mode
@@ -121,7 +122,7 @@ void GigObj_Strash::rehashNetlist()
     xor_nodes.clear();
     mux_nodes.clear();
     maj_nodes.clear();
-    npn_nodes.clear();
+    lut_nodes.clear();
 
     For_UpOrder(*N, w){
         switch (w.type()){
@@ -129,7 +130,7 @@ void GigObj_Strash::rehashNetlist()
         case gate_Xor:  { bool ok = !xor_nodes.add(w); assert(ok); break; }
         case gate_Mux:  { bool ok = !mux_nodes.add(w); assert(ok); break; }
         case gate_Maj:  { bool ok = !maj_nodes.add(w); assert(ok); break; }
-        case gate_Npn4: { bool ok = !npn_nodes.add(w); assert(ok); break; }
+        case gate_Lut4: { bool ok = !lut_nodes.add(w); assert(ok); break; }
         default: ;/*nothing*/ }
     }
 }
@@ -149,7 +150,7 @@ void GigObj_Strash::removing(Wire w, bool)
     case gate_Xor:  { bool ok = xor_nodes.exclude(w); assert(ok); break; }
     case gate_Mux:  { bool ok = mux_nodes.exclude(w); assert(ok); break; }
     case gate_Maj:  { bool ok = maj_nodes.exclude(w); assert(ok); break; }
-    case gate_Npn4: { bool ok = npn_nodes.exclude(w); assert(ok); break; }
+    case gate_Lut4: { bool ok = lut_nodes.exclude(w); assert(ok); break; }
     default: assert(false); }
 }
 
@@ -179,6 +180,20 @@ fts_macro GLit lookup_helper(SET& nodes, Gig& N, GLit d0, GLit d1, GLit d2, uind
     while (cell){
         Wire w = nodes.key(cell) + N;
         if (w[0] == d0 && w[1] == d1 && w[2] == d2)
+            return w;
+        cell = nodes.nextCell(cell);
+    }
+    return Wire_NULL;
+}
+
+
+template<class SET>
+fts_macro GLit lookup_helper(SET& nodes, Gig& N, GLit d0, GLit d1, GLit d2, GLit d3, uint arg, uind idx)
+{
+    void* cell = nodes.firstCell(idx);
+    while (cell){
+        Wire w = nodes.key(cell) + N;
+        if (w[0] == d0 && w[1] == d1 && w[2] == d2 && w[3] == d3 && w.arg() == arg)
             return w;
         cell = nodes.nextCell(cell);
     }
@@ -217,6 +232,24 @@ fts_macro GLit add_Tri(SET& nodes, GateType type, Gig& N, GLit p, GLit q, GLit r
 }
 
 
+template<class SET>
+fts_macro GLit add_Lut(SET& nodes, GateType type, Gig& N, GLit p, GLit q, GLit r, GLit s, uint arg)
+{
+    uind   idx = nodes.index_(prehash_Lut(p, q, r, s, arg));
+    GLit   w   = lookup_helper(nodes, N, p, q, r, s, arg, idx);
+    if (!w){
+        w = GLit(N.addInternal(type, 4, arg, true));
+        N[w].set_unchecked(0, p);
+        N[w].set_unchecked(1, q);
+        N[w].set_unchecked(2, r);
+        N[w].set_unchecked(3, s);
+        N[w].arg_set(arg);
+        nodes.newEntry(idx, w);
+    }
+    return w;
+}
+
+
 inline GLit GigObj_Strash::add_And(GLit u, GLit v) {
     return add_Bin(and_nodes, gate_And, *N, u, v); }
 
@@ -229,8 +262,8 @@ inline GLit GigObj_Strash::add_Mux(GLit s, GLit d1, GLit d0) {
 inline GLit GigObj_Strash::add_Maj(GLit p, GLit q, GLit r) {
     return add_Tri(maj_nodes, gate_Maj, *N, p, q, r); }
 
-inline GLit GigObj_Strash::add_Npn4(GLit d0, GLit d1, GLit d2, GLit d3, uchar eq_class) {
-    assert(false); return Wire_NULL; }
+inline GLit GigObj_Strash::add_Lut4(GLit p, GLit q, GLit r, GLit s, ushort ftb) {
+    return add_Lut(lut_nodes, gate_Lut4, *N, p, q, r, s, ftb); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -401,13 +434,105 @@ Wire xig_Maj(Wire x, Wire y, Wire z)
 
 
 //=================================================================================================
-// -- Npn4:
+// -- Lut4:
 
 
-Wire npn4_Lut(Wire w0, Wire w1, Wire w2, Wire w3, uchar eq_class) {
-    // <<== later
-    assert(false);
-    return Wire_NULL; }
+macro bool isConst(GLit p)
+{
+    static_assert_(gid_True == gid_False + 1);
+    return (p.data() - 2*gid_False) < 4;
+}
+
+
+Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4])
+{
+    #define Pop(i)                              \
+        sz--,                                   \
+        ftb = ftb4_swap(ftb, i, sz),            \
+        swp(w[i], w[sz]);
+
+    // Move NULLs to the end:
+    uint sz = 4;
+    for (uint i = 4; i > 0;){ i--;
+        if (w[i] == GLit_NULL){
+            assert(!ftb4_inSup(ftb, i));    // -- FTB must not depend on disconnected inputs
+            Pop(i);
+        }
+    }
+
+    // Remove duplicate inputs from FTB:
+    for (uint i = 0; i < sz-1; i++){
+        if (w[i] == GLit_NULL) continue;
+        for (uint j = i+1; j < sz; j++){
+            if (w[j] == GLit_NULL) continue;
+
+            if (+w[i] == +w[j]){
+                uint shift = (1u << i);
+                ftb4_t mask0, mask1;
+                if (w[i] == w[j]){
+                    mask0 = ftb4_proj[0][i] & ftb4_proj[0][j];
+                    mask1 = ftb4_proj[1][i] & ftb4_proj[1][j];
+                }else{
+                    mask0 = ftb4_proj[0][i] & ftb4_proj[1][j];
+                    mask1 = ftb4_proj[1][i] & ftb4_proj[0][j];
+                }
+                ftb = (ftb & mask0) | (ftb & mask1) | ((ftb & mask0) >> shift) | ((ftb & mask1) << shift);
+            }
+        }
+    }
+
+    // Propagate constants:
+    for (uint i = sz; i > 0;){ i--;
+        if (!isConst(w[i])) continue;
+
+        Pop(i);
+        if (w[i] == GLit_True || w[i] == ~GLit_False){
+            ftb &= ftb4_proj[0][sz];
+            ftb |= ftb >> (1u << sz);
+        }else{
+            ftb &= ftb4_proj[1][sz];
+            ftb |= ftb << (1u << sz);
+        }
+    }
+
+    // Remove inputs not in support:
+    for (uint i = sz; i > 0;){ i--;
+        if (!ftb4_inSup(ftb, i))
+            Pop(i);
+    }
+
+    // Remove negations on inputs:
+    for (uint i = 0; i < sz; i++){
+        if (w[i].sign){
+            ftb = ftb4_neg(ftb, i);
+            w[i] = +w[i];
+        }
+    }
+
+    // Handle size 0 or 1 specially:
+    if (sz == 0){
+        if (ftb == 0xFFFF) return N.True();
+        else{ assert(ftb == 0); return ~N.True(); }
+    }else if (sz == 1){
+        if (ftb == 0xAAAA) return w[0] + N;
+        else{ assert(ftb == 0x5555); return ~w[0] + N; }
+    }
+
+    // Sort inputs:
+    for (uint i = 0; i < sz-1; i++){
+        uint best_j = 0;
+        for (uint j = i+1; j < sz; j++){
+            if (w[j] < w[best_j])
+                best_j = j;
+        }
+        ftb = ftb4_swap(ftb, i, best_j);
+        swp(w[i], w[best_j]);
+    }
+
+    // Hash it:
+    GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
+    return H.add_Lut4(w[0], w[1], w[2], w[3], ftb) + N;
+}
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -446,7 +571,7 @@ void GigObj_Strash::strashNetlist()
     xlat.initBuiltins();
 
     Wire  w0, w1, w2, w3, w_new;
-    uchar eq_class;
+    ushort ftb;
     For_UpOrder(*N, w){
         // Translate inputs:
         For_Inputs(w, v)
@@ -483,12 +608,12 @@ void GigObj_Strash::strashNetlist()
             w_new = xig_Maj(w0, w1, w2);
             break;
 
-        case gate_Npn4:
-            assert_debug(N->mode() == gig_Npn4);
+        case gate_Lut4:
+            assert_debug(N->mode() == gig_Lut4);
             w0 = w[0]; w1 = w[1]; w2 = w[2]; w3 = w[3];
-            eq_class = w.arg();
+            ftb = w.arg();
             remove(w);
-            w_new = npn4_Lut(w0, w1, w2, w3, eq_class);
+            w_new = lut4_Lut(ftb, w0, w1, w2, w3);
             break;
 
         default:

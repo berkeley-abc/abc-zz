@@ -116,7 +116,7 @@ static const uchar npn4_cl_MAJ  = 83;       // pin0 + pin1 + pin2 >= 2
 // Ftb6 like interface:
 
 
-static const uint64 ftb4_proj[2][4] = { // -- 'ftb4_proj [sign] [pin]' ('lut4_buf' and 'lut4_inv' in one table)
+static const ftb4_t ftb4_proj[2][4] = { // -- 'ftb4_proj [sign] [pin]' ('lut4_buf' and 'lut4_inv' in one table)
     { 0xAAAA, 0xCCCC, 0xF0F0, 0xFF00 },
     { 0x5555, 0x3333, 0x0F0F, 0x00FF }
 };

@@ -296,20 +296,26 @@ void CnfMap::updateFanoutEst(bool instantiate)
         For_Gates(N, w){
             if (isLogic(w)){
                 if (fanouts[w] > 0){
-                    // Build normalized 4-input LUT:
-                    const Cut&      cut  = cutmap[w][0];
-                    const Npn4Norm& norm = npn4_norm[cut.ftb];
-                    perm4_t         perm = inv_perm4[norm.perm];
+                    const Cut& cut  = cutmap[w][0];
+                    if (P.map_to_luts){
+                        Wire m = change(w, gate_Lut4, cut.ftb);
+                        for (uint i = 0; i < cut.size(); i++)
+                            m.set(i, cut[i]);
+                    }else{
+                        // Build normalized 4-input LUT:
+                        const Npn4Norm& norm = npn4_norm[cut.ftb];
+                        perm4_t         perm = inv_perm4[norm.perm];
 
-                    Wire m = change(w, gate_Npn4, norm.eq_class);
-                    for (uint i = 0; i < cut.size(); i++){
-                        uint j = pseq4Get(perm4_to_pseq4[perm], i);
-                        assert(j < cut.size());
-                        bool s = (norm.negs >> i) & 1;
-                        m.set(j, cut[i] ^ s);
+                        Wire m = change(w, gate_Npn4, norm.eq_class);
+                        for (uint i = 0; i < cut.size(); i++){
+                            uint j = pseq4Get(perm4_to_pseq4[perm], i);
+                            assert(j < cut.size());
+                            bool s = (norm.negs >> i) & 1;
+                            m.set(j, cut[i] ^ s);
+                        }
+                        if ((norm.negs >> 4) & 1)
+                            inverted.add(w);
                     }
-                    if ((norm.negs >> 4) & 1)
-                        inverted.add(w);
                 }
             }
         }
