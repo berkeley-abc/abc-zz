@@ -91,6 +91,9 @@ void putIntoNpn4(Gig& N);
     // -- Put the netlist into Npn4 form. Will convert the following gate types into 'gate_Npn4':
     // And, Xor, Mux, Maj, Buf, Not, Or, Equiv, Lut4
 
+void putIntoLut4(Gig& N);
+    // -- Same as 'putIntoNpn4()' but for 'gate_Lut4' instead of 'gate_Npn4'.
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }

@@ -400,6 +400,12 @@ inline void write_Wire(Out& out, const Wire& v)
         FWrite(out) "%Cw%_:%_", v.sign?'~':0, v.id, v.type();
         if (isNumbered(v.type()))
             FWrite(out) "<%_>", v.num();
+        else if (v.attrType() == attr_Arg){
+            if (v == gate_Lut4)
+                FWrite(out) "[ftb=0x%.4X]", v.arg();
+            else
+                FWrite(out) "[arg=%_]", v.arg();
+        }
     }
 }
 
@@ -479,7 +485,12 @@ struct Gig : Gig_data, NonCopyable {
         // NOTE! In strashed mode, gates controlled by strashing (e.g. AND-gates) should be
         // constructed by functions in 'Strash.hh' ('aig_And()', 'xig_Mux()' etc.).
 
-    void  remove(gate_id id, bool recreate = false);    // -- 'recreate' is for internal use, don't set
+    void  remove(gate_id id, bool recreate = false);
+        // -- 'recreate' is for internal use, don't set
+    void  changeType(gate_id id, GateType new_type);
+        // -- Mostly internal. Can only change between types with the same number of inputs,
+        // neither of which must be numbered (attribute 'attr_Num' or 'attr_Enum').
+        // No listener functions will be called.
 
   //________________________________________
   //  Gate access:
@@ -489,6 +500,7 @@ struct Gig : Gig_data, NonCopyable {
 
     Wire  enumGate(GateType type, uint num) const { return Wire(this, GLit(type_list[type][num])); }
     uint  enumSize(GateType type)           const { return type_list[type].size(); }
+        // -- Loop through enumerable gates of a specific type.
 
   //________________________________________
   //  Gate count:
@@ -626,6 +638,20 @@ inline Wire Gig::addDyn(GateType type, uint sz, uint attr)
 }
 
 
+inline void Gig::changeType(gate_id id, GateType new_type)
+{
+    Wire w = Wire(this, GLit(id));
+    GateType old_type = w.type();
+    assert(gatetype_attr[new_type] == gatetype_attr[old_type]);
+    assert(gatetype_size[new_type] == gatetype_size[old_type]);
+    assert(!isNumbered(old_type));
+    assert(old_type > gate_Reset);      // -- 'Const' and 'Reset' gates are reserved
+    w.gate().type = new_type;
+    type_count[old_type]--;
+    type_count[new_type]++;
+}
+
+
 //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
@@ -648,9 +674,11 @@ inline void Gig::tell_subst(GLit w_old, GLit w_new)
 macro Gig& gig(Wire w) {
     return *w.gig(); }
 
-
 macro void remove(Wire w) {
     w.gig()->remove(w.id); }
+
+macro void changeType(Wire w, GateType new_type) {
+    w.gig()->changeType(w.id, new_type); }
 
 
 #define Wrap(expr)                              \

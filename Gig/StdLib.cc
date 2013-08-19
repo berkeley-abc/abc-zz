@@ -250,6 +250,8 @@ void normalizeLut4s(Gig& N, bool ban_constant_luts)
 void putIntoNpn4(Gig& N)
 {
     N.debugAssertMode();
+    N.setMode(gig_FreeForm);
+
     uint64 mask = (1ull << (uint64)gate_And)
                 | (1ull << (uint64)gate_Xor)
                 | (1ull << (uint64)gate_Mux)
@@ -303,12 +305,6 @@ void putIntoNpn4(Gig& N)
             negs4_t n  = npn4_norm[w.arg()].negs;
             pseq4_t s  = perm4_to_pseq4[p];
             ushort ftb = npn4_repr[cl];
-            //**/WriteLn "cl=%d  p=%d  n=%d s=%d", cl, p, n, s;
-            //**/WriteLn "ftb=%.4x", ftb;
-            //**/WriteLn "s0=%d", pseq4Get(s, 0);
-            //**/WriteLn "s1=%d", pseq4Get(s, 1);
-            //**/WriteLn "s2=%d", pseq4Get(s, 2);
-            //**/WriteLn "s3=%d", pseq4Get(s, 3);
 
             change(w, gate_Npn4, cl);
             for (uint i = 0; i < 4; i++){
@@ -325,10 +321,41 @@ void putIntoNpn4(Gig& N)
     }
 
     For_Gates(N, w){
-        For_Inputs(w, v)
+        For_Inputs(w, v){
             if (inverted.has(v))
-                w.set(Iter_Var(v), ~v);
+                w.set(Input_Pin(v), ~v);
+            else if (+v.lit() == GLit_False)
+                w.set(Input_Pin(v), ~N.True() ^ v.sign);
+        }
     }
+
+    N.setMode(gig_Npn4);
+}
+
+
+void putIntoLut4(Gig& N)
+{
+    // Temporary version using 'putIntoNpn4()':
+    putIntoNpn4(N);
+    N.setMode(gig_FreeForm);
+
+    For_Gates(N, w){
+        if (w == gate_Npn4){
+            uint   cl  = w.arg();
+            ftb4_t ftb = npn4_repr[cl];
+            uint   sz  = npn4_repr_sz[cl];
+            for (uint i = 0; i < sz; i++){
+                if (w[i].sign){
+                    w.set(i, +w[i]);
+                    ftb = ftb4_neg(ftb, i);
+                }
+            }
+            changeType(w, gate_Lut4);
+            w.arg_set(ftb);
+        }
+    }
+
+    N.setMode(gig_Lut4);
 }
 
 

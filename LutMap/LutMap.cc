@@ -703,6 +703,7 @@ void LutMap::updateFanoutEst(bool instantiate)
 
         // Build LUT representation:
         N.is_frozen = false;
+        N.is_reach = false;
         N.setMode(gig_FreeForm);
         uint j = 0;
         For_Gates(N, w){

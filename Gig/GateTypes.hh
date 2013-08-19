@@ -206,6 +206,9 @@ macro bool isNumbered(GateType type) {
 macro bool seqElem(GateType t) { return t == gate_FF || t == gate_Box || t == gate_MFlop; }
     // -- these are the gates that should have 'Seq' gates on their input side
 
+macro bool logicElem(GateType t) { return t >= gate_And && t <= gate_WLut; }
+    // -- these are the gates that are restricted by the netlist's "mode".
+
 macro bool combInput (GateType t) { return (t >= gate_FF && t <= gate_PPI) || seqElem(t); }
 macro bool combOutput(GateType t) { return t >= gate_PO && t <= gate_Seq; }
 
@@ -213,11 +216,11 @@ macro bool seqInput (GateType t) { return t >= gate_PI && t <= gate_PPI; }
 macro bool seqOutput(GateType t) { return t >= gate_PO && t <= gate_OrigFF; }
     // -- excludes 'FF' and 'Seq' from combinational inputs/outputs.
 
-macro bool aigGate (GateType t) { return t <= gate_And; }
-macro bool xigGate (GateType t) { return t <= gate_Maj; }
-macro bool npn4Gate(GateType t) { return t <= gate_Seq || t == gate_Npn4; }
-macro bool lut4Gate(GateType t) { return t <= gate_Seq || t == gate_Lut4; }
-macro bool lut6Gate(GateType t) { return t <= gate_Seq || t == gate_Lut6; }
+macro bool aigGate (GateType t) { return !logicElem(t) || t == gate_And; }
+macro bool xigGate (GateType t) { return !logicElem(t) || t <= gate_Maj; }
+macro bool npn4Gate(GateType t) { return !logicElem(t) || t == gate_Npn4; }
+macro bool lut4Gate(GateType t) { return !logicElem(t) || t == gate_Lut4; }
+macro bool lut6Gate(GateType t) { return !logicElem(t) || t == gate_Lut6; }
     // -- for efficiency, we allow 'gate_NULL' here.
 
 

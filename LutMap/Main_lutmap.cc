@@ -11,54 +11,22 @@ using namespace ZZ;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Mux optimzation (temporary solution):
-
-
-// Returns TRUE if 'w' is the top AND-gate of a balanced, 3 AND-gate tree making up a MUX.
-// Note that XOR is a special case.
-static
-bool isMux(Wire w, Wire& sel, Wire& d1, Wire& d0)
-{
-    assert(!w.sign);
-    if (w != gate_And)
-        return false;
-
-    Wire x = w[0];
-    Wire y = w[1];
-    if (x != gate_And || y != gate_And)
-        return false;
-    if (!x.sign || !y.sign)
-        return false;
-
-    Wire xx = x[0];
-    Wire yx = x[1];
-    Wire xy = y[0];
-    Wire yy = y[1];
-    if      (xx == ~xy){ sel = xx, d1 = ~yx, d0 = ~yy; return true; }
-    else if (yx == ~xy){ sel = yx, d1 = ~xx, d0 = ~yy; return true; }
-    else if (xx == ~yy){ sel = xx, d1 = ~yx, d0 = ~xy; return true; }
-    else if (yx == ~yy){ sel = yx, d1 = ~xx, d0 = ~xy; return true; }
-
-    return false;
-}
+// Helpers:
 
 
 static
-void introduceMuxes(Gig& N)
+void introduceMuxesAsLuts(Gig& N)
 {
-    Wire sel, d1, d0;
     N.is_frozen = false;
     N.setMode(gig_FreeForm);
 
+    Wire sel, d1, d0;
     For_DownOrder(N, w){
         if (isMux(w, sel, d1, d0))
             change(w, gate_Lut4, 0xCACA).init(d0, d1, sel);     // <<== unverified + need to remove signs
     }
 }
 
-
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Helpers:
 
 
 static
@@ -389,6 +357,18 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+#if 1
+    N.is_frozen = false;
+    WriteLn "Info: %_", info(N);
+    WriteLn "Putting into Lut4 form.";
+    putIntoLut4(N);
+    WriteLn "Strashing";
+    Add_Gob(N, Strash);
+    WriteLn "Info: %_", info(N);
+    Remove_Gob(N, Strash);
+    N.setMode(gig_FreeForm);
+#endif
+
     if (cli.get("melt").bool_val)
         expandLut3s(N);
 
@@ -396,7 +376,7 @@ int main(int argc, char** argv)
         makeCombinational(N);
 
     if (cli.get("mux").bool_val)
-        introduceMuxes(N);
+        introduceMuxesAsLuts(N);
 
     N.compact();
 

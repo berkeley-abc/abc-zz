@@ -169,16 +169,39 @@ int main(int argc, char** argv)
     ZZ_Init;
 
     Gig N;
-    N.setMode(gig_Lut4);
-    Add_Gob(N, Strash);
+    N.setMode(gig_FreeForm);
 
     Wire a ___unused = N.add(gate_PI);
     Wire b ___unused = N.add(gate_PI);
     Wire c ___unused = N.add(gate_PI);
     Wire d ___unused = N.add(gate_PI);
 
+    Wire f = N.add(gate_Maj).init(a, b, c);
+    Wire g = N.add(gate_Maj).init(c, d, N.True());
+    Wire h = N.add(gate_Or).init(c, d);
+    Wire f_out = N.add(gate_PO).init(f);
+    Wire g_out = N.add(gate_PO).init(g);
+    Wire h_out = N.add(gate_PO).init(h);
+    putIntoLut4(N);
+
+    WriteLn "Before strashing:";
+    For_Gates(N, w)
+        WriteLn "%f", w;
+
+    NewLine;
+    WriteLn "After strashing:";
+    Add_Gob(N, Strash);
+    For_Gates(N, w)
+        WriteLn "%f", w;
+
+#if 0
     ftb4_t ftb = 0xFFF0;
     Wire f = lut4_Lut(N, ftb, d, c, b, ~a);
+
+    Dump(f, f.arg());
+    changeType(f, gate_Npn4);
+    Dump(f, f.arg());
+
     WriteLn "FTB before: %:.16b   pin3..0=abcd", ftb;
 
     if (f != gate_Lut4)
@@ -197,6 +220,7 @@ int main(int argc, char** argv)
             else                 Write  "-";
         }
     }
+#endif
 
 #if 0
     Write   "FTB care  : ";

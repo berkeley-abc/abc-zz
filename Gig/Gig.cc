@@ -449,6 +449,8 @@ void Gig::assertMode() const
 
 void Gig::setMode(GigMode m)
 {
+    assert(!hasObj(gigobj_Strash));
+
     static uint64 mode_masks[GigMode_size] = { 0ull,  0ull,  0ull,  0ull,  0ull };
 
     if (m != mode_){
@@ -505,6 +507,7 @@ void Gig::setMode(GigMode m)
             mode_mask = mode_masks[m];
 
         strash_mask = mode_mask;
+        // <<== är detta rätt om vi redan är i strashat mode?
     }
 
   #if defined(ZZ_DEBUG)
@@ -529,6 +532,7 @@ void Gig::moveTo(Gig& M)
     mov(is_reach    , M.is_reach);
     mov(mode_       , M.mode_);
     mov(mode_mask   , M.mode_mask);
+    mov(strash_mask , M.strash_mask);
   #if defined(ZZ_GIG_PAGED)
     mov(pages       , M.pages);
   #else
@@ -571,6 +575,7 @@ void Gig::copyTo(Gig& M) const
     cpy(is_reach    , M.is_reach);
     cpy(mode_       , M.mode_);
     cpy(mode_mask   , M.mode_mask);
+    cpy(strash_mask , M.strash_mask);
 
   #if defined(ZZ_GIG_PAGED)
     M.pages.growTo(pages.size());
@@ -613,7 +618,7 @@ void Gig::copyTo(Gig& M) const
 
 void Gig::compact(GigRemap& remap, bool remove_unreach, bool set_frozen)
 {
-    if (is_compact && is_compact){
+    if (is_compact && is_canonical){
         if (!remove_unreach || is_reach)
             return;
     }

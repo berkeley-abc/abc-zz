@@ -79,6 +79,22 @@ inline bool GateHash<ght_Lut>::equal(GLit p, GLit q) const
 // Strash:
 
 
+void updateStrashMode(Gig& N)
+{
+    // Setup 'strash_mask' for the netlist:
+    if (N.mode() == gig_Aig){
+        N.strash_mask = N.mode_mask & ~(1ull << gate_And);
+    }else if (N.mode() == gig_Xig){
+        N.strash_mask = N.mode_mask & ~(1ull << gate_And) & ~(1ull << gate_Xor) & ~(1ull << gate_Mux) & ~(1ull << gate_Maj);
+    }else if (N.mode() == gig_Lut4){
+        N.strash_mask = N.mode_mask & ~(1ull << gate_Lut4);
+    }else{
+        ShoutLn "INTERNAL ERROR! Trying to strash a netlist in mode '%_'.", N.mode_;
+        assert(false);      // -- cannot strash current mode
+    }
+}
+
+
 GigObj_Strash::GigObj_Strash(Gig& N_) :
     GigObj(N_),
     and_nodes(GateHash<ght_Bin>(*this)),
@@ -88,17 +104,7 @@ GigObj_Strash::GigObj_Strash(Gig& N_) :
     lut_nodes(GateHash<ght_Lut>(*this)),
     initializing(false)
 {
-    // Setup 'strash_mask' for the netlist:
-    if (N->mode() == gig_Aig){
-        N->strash_mask = N->mode_mask & ~(1ull << gate_And);
-    }else if (N->mode() == gig_Xig){
-        N->strash_mask = N->mode_mask & ~(1ull << gate_And) & ~(1ull << gate_Xor) & ~(1ull << gate_Mux) & ~(1ull << gate_Maj);
-    }else if (N->mode() == gig_Lut4){
-        N->strash_mask = N->mode_mask & ~(1ull << gate_Lut4);
-    }else{
-        ShoutLn "INTERNAL ERROR! Trying to strash a netlist in mode '%_'.", N->mode_;
-        assert(false);      // -- cannot strash current mode
-    }
+    updateStrashMode(*N);
 
     // Add listener:
     N->listen(*this, msg_Remove);
@@ -455,6 +461,7 @@ Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4])
     uint sz = 4;
     for (uint i = 4; i > 0;){ i--;
         if (w[i] == GLit_NULL){
+            /**/if (!(!ftb4_inSup(ftb, i))) WriteLn "ftb=%.4x  ws=%_ %_ %_ %_", ftb, w[0], w[1], w[2], w[3];
             assert(!ftb4_inSup(ftb, i));    // -- FTB must not depend on disconnected inputs
             Pop(i);
         }
@@ -493,6 +500,7 @@ Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4])
             ftb &= ftb4_proj[1][sz];
             ftb |= ftb << (1u << sz);
         }
+        w[sz] = Wire_NULL;
     }
 
     // Remove inputs not in support:
@@ -566,6 +574,8 @@ void GigObj_Strash::strashNetlist()
     bool recyc = N->isRecycling();
     N->setRecycling(true);
     initializing = true;
+    uint64 strash_mask0 = N->strash_mask;
+    N->strash_mask = N->mode_mask;
 
     WMapX<GLit> xlat;
     xlat.initBuiltins();
@@ -573,6 +583,13 @@ void GigObj_Strash::strashNetlist()
     Wire  w0, w1, w2, w3, w_new;
     ushort ftb;
     For_UpOrder(*N, w){
+      #if 0   /*DEBUG*/
+        For_Inputs(w, v){
+            /**/if (!(!v.isRemoved() || xlat[v])) Dump(v);
+            assert(!v.isRemoved() || xlat[v]);
+        }
+      #endif  /*END DEBUG*/
+
         // Translate inputs:
         For_Inputs(w, v)
             if (v != xlat[v])
@@ -625,6 +642,8 @@ void GigObj_Strash::strashNetlist()
 
     N->setRecycling(recyc);
     initializing = false;
+    N->strash_mask = strash_mask0;
+    N->is_compact = false;          // -- gates may have been removed
 
     // Turn on listeners again and send 'msg_Compact':
     for (uint i = 0; i < GigMsgIdx_size; i++)
