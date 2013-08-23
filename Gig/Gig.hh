@@ -90,7 +90,7 @@ template<> fts_macro void write_(Out& out, const GigMsgIdx& v) { out += GigMsgId
 
 
 enum GigMode {
-    gig_FreeForm,   // Any gate type can be used 
+    gig_FreeForm,   // Any gate type can be used
     gig_Aig,        // Seq, CI, CO, And
     gig_Xig,        // Seq, CI, CO, And, Xor, Mux, Maj
     gig_Npn4,       // Seq, CI, CO, Npn4
@@ -454,8 +454,8 @@ struct Gig : Gig_data, NonCopyable {
     // There are four booleans in the base class 'Gig_data' that can be read/modified directly:
     //  - bool is_frozen      -- if set, netlist cannot be modified (assertion is raised)
     //  - bool is_canonical   -- if set, is topologically sorted (not enforced, so make sure your code is correct)
-    //  - bool is_compact     -- if set, there are no deleted gates (gaps in the vector of gates; also not enforced)  
-    //  - bool is_reach       -- if set, all gates are reachable from combinational outputs (also not enforced)  
+    //  - bool is_compact     -- if set, there are no deleted gates (gaps in the vector of gates; also not enforced)
+    //  - bool is_reach       -- if set, all gates are reachable from combinational outputs (also not enforced)
 
     GigMode mode() const { return mode_; }
     void    setMode(GigMode mode);
@@ -547,7 +547,7 @@ struct Gig : Gig_data, NonCopyable {
         // the freelist implementation).
 
     void  compact(bool remove_unreach = true, bool set_frozen = true);
-    void  compact(GigRemap& remap, bool remove_unreach = true, bool set_canonical = true);
+    void  compact(GigRemap& remap, bool remove_unreach = true, bool set_frozen = true);
         // -- Will topologically order the gates and remove any gaps in the gate tables
         // created by gate removal. By default, unreachable gates (from COs) are first removed.
         // Once done, 'compact()' will leave the netlist in a frozen mode (unless 'set_frozen' 

@@ -3,6 +3,7 @@
 #include "ZZ_Gig.IO.hh"
 #include "ZZ_Unix.hh"
 #include "ZZ_Npn4.hh"
+#include "ZZ_BFunc.hh"
 #include "LutMap.hh"
 #include "GigReader.hh"
 #include "ZZ/Generics/Map.hh"
@@ -172,6 +173,17 @@ void expandLut3s(Gig& N)
     //**/for (uint i = 0; i < fs.size(); i++)
     //**/    WriteLn "  %.8b", (fs[i] & 255);
     //**/exit(0);
+}
+
+
+static
+uint supSize(uint64 ftb)
+{
+    uint sz = 0;
+    for (uint i = 0; i < 6; i++)
+        if (ftb6_inSup(ftb, i))
+            sz++;
+    return sz;
 }
 
 
@@ -381,7 +393,7 @@ int main(int argc, char** argv)
     if (cli.get("mux").bool_val)
         introduceMuxesAsLuts(N);
 
-    N.compact();
+    N.compact(true, false);
 
     double T1 = cpuTime();
     WriteLn "Parsing: %t", T1-T0;
@@ -472,6 +484,18 @@ int main(int argc, char** argv)
 
         WriteLn "Wrote: \a*%_\a*", cli.get("ftbs").string_val;
     }
+
+    // Print some statistics:
+    Vec<uint> sizeC(7, 0);
+    For_Gates(N, w){
+        if (w == gate_Lut6)
+            sizeC[supSize(ftb(w))]++;
+    }
+
+    WriteLn "Statistics:";
+    for (uint i = 0; i <= 6; i++)
+        if (sizeC[i] > 0)
+            WriteLn "    LUT %_: %>11%,d  (%.1f %%)", i, sizeC[i], double(sizeC[i]) / N.typeCount(gate_Lut6) * 100;
 
     return 0;
 }

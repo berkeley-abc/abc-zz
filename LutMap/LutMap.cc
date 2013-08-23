@@ -796,6 +796,8 @@ void LutMap::run()
 LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_, WMapX<GLit>* remap_) :
     P(P_), N(N_), keep(keep_), remap(remap_)
 {
+    assert(!N.is_frozen);
+
     if (Has_Gob(N, Strash))
         Remove_Gob(N, Strash);
 
