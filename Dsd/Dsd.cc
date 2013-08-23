@@ -14,6 +14,8 @@
 #include "Prelude.hh"
 #include "ZZ_BFunc.hh"
 
+#define USE_TERNARY_FUNCTIONS
+
 namespace ZZ {
 using namespace std;
 
@@ -22,23 +24,36 @@ using namespace std;
 
 
 /*
+========================================
+3-input functions up to NPN:
+========================================
 
+There are 10 3-input functions up to NPN equivalence (and 4 with less than 3 inputs).
 
-ABCD
+Decomposable:
 
+    a & b & c
+    a ^ b ^ c
+    (a | b) & c
+    (a ^ b) & c
+    (a & b) ^ c
 
-0001
-0011
-0111
+Non-decomposable, symmetric:
 
-f = 4-input function; look for a*b
+    ONE(a, b, c)   -- exactly one input is true
+    MAJ(a, b, c)   -- at least two inputs are true
+    GAMB(a, b, c)  -- all or none of the inputs are true
 
-FEDC:BA98:7654:3210
-^^^^
+Non-decomposable, asymmetric:
 
-(p3 & p2)  -- om endast två sorters sanningstabeller finns för kvartärerna (1-3 för AND/OR 2-2 för XOR)
+    MUX(a, b, c)   -- a ? b : c
+    X2AND(a,b,c)   -- a^b | abc
 
-
+Smaller functions:
+    
+    2-inputs: AND, XOR
+    1-input : BUF
+    0-inputs: TRUE
 */
 
 
@@ -164,12 +179,12 @@ xz     -- xor
 // Pull out single outputs from FTB ('a & G', 'a | G', 'a ^ G') then recurse.
 uchar DsdState::pullOutputs()
 {
-#if 1
     if (n_inputs == 1){
         assert_debug(ftb == 0xAAAAAAAAAAAAAAAAull || ftb == 0x5555555555555555ull);
         return lit(inputs[0], ftb == 0x5555555555555555ull);
     }
 
+    // F(atom, comp) -> comp
     for (uint i = n_inputs; i > 0;){ i--;
         uint   x = inputs[i];     //  pin -> in; i -> pin
         uint64 mask = ftb6_proj[0][i];
@@ -225,8 +240,26 @@ uchar DsdState::pullOutputs()
             prog += (uchar)dsd_Xor, lit(x), p;
             return lit(++last_internal, s);
         }
-    }
+
+#if 0
+  #if 1   /*DEBUG*/
+        Write "Support hi: "; for (uint i = 0; i < 6; i++) if (ftb6_inSup(hi, i)) Write " %_", i; NewLine;
+        Write "Support lo: "; for (uint i = 0; i < 6; i++) if (ftb6_inSup(lo, i)) Write " %_", i; NewLine;
+  #endif  /*END DEBUG*/
+
+        // Extract MUX with input selector:
+        bool disjoint = true;
+        for (uint j = 0; j < n_inputs; j++){
+            if (i != j && ftb6_inSup(hi, j) && ftb6_inSup(lo, j)){
+                disjoint = false;
+                break; } }
+
+        if (disjoint){
+            /**/WriteLn "Top-level MUX with selector inputs[%_]=%_", i, (uint)inputs[i];
+
+        }
 #endif
+    }
 
     pullInputs();   // -- will add to program and update 'ftb' and 'inputs'
 
@@ -282,7 +315,7 @@ void DsdState::pullInputs()
                     //**/WriteLn "PULLED OUT XOR(%_,%_)", i, j;
                     prog += (uchar)dsd_Xor, lit(inputs[i]), lit(inputs[j]);
                     Pull(v2, v3);       // -- correct
-//                    Pull(v3, v2);
+//                    Pull(v3, v2);       // -- introduce BUG to debug debugging code
 
                 }else if (v0 == v1){
                     if (v0 == v2){                  // Xyyy
@@ -308,12 +341,149 @@ void DsdState::pullInputs()
             }
         }
 
+#if defined(USE_TERNARY_FUNCTIONS)
+        // Ternary functions:
+        for (uint i = n_inputs; i > 2;){ i--;
+            uint64 mask = ftb6_proj[0][i];
+            uint   shift = 1u << i;
+            uint64 hi = ftb & mask;
+            uint64 lo = (ftb << shift) & mask;
+
+            for (uint j = i; j > 1;){ j--;
+                uint64 mask2 = ftb6_proj[0][j];
+                uint   shift2 = 1u << j;
+                uint64 v3 = hi & mask2;                 // hi_of_hi 
+                uint64 v2 = (hi << shift2) & mask2;     // lo_of_hi 
+                uint64 v1 = lo & mask2;                 // hi_of_lo 
+                uint64 v0 = (lo << shift2) & mask2;     // lo_of_lo 
+
+                for (uint k = j; k > 0;){ k--;
+                    uint64 mask3 = ftb6_proj[0][k];
+                    uint   shift3 = 1u << k;
+                    uint64 q[8];
+                    q[0] = (v0 << shift3) & mask3;     // lo_of_lo_of_lo
+                    q[1] = v0 & mask3;                 // hi_of_lo_of_lo
+                    q[2] = (v1 << shift3) & mask3;     // lo_of_hi_of_lo
+                    q[3] = v1 & mask3;                 // hi_of_hi_of_lo
+                    q[4] = (v2 << shift3) & mask3;     // lo_of_lo_of_hi
+                    q[5] = v2 & mask3;                 // hi_of_lo_of_hi
+                    q[6] = (v3 << shift3) & mask3;     // lo_of_hi_of_hi
+                    q[7] = v3 & mask3;                 // hi_of_hi_of_hi
+
+                    uint64 a = q[0];
+                    uint64 b;
+                    uint n;
+                    for (n = 1; n < 8; n++){
+                        if (q[n] != a){
+                            b = q[n];
+                            break;
+                        }
+                    }
+                    if (n != 8){
+                        bool ternary = true;
+                        for (uint m = n+1; m < 8; m++){
+                            if (q[m] != a && q[m] != b){
+                                ternary = false;
+                                break;
+                            }
+                        }
+
+                        if (ternary){
+                            uchar box = 0;
+                            for (n = 0; n < 8; n++){
+                                if (q[n] == a)
+                                    box |= 1 << n;
+                            }
+                            prog += (uchar)dsd_Box3, lit(inputs[k]), lit(inputs[j]), lit(inputs[i]), box;
+
+                            ftb = a | (b >> shift3);
+                            ftb |= ftb >> shift2;
+                            ftb |= ftb >> shift;
+                            swapLast(i);
+                            swapLast(j);
+                            inputs[k] = ++last_internal;
+
+                            i--;
+                            changed = true;
+                            goto Break;
+                        }
+                    }
+                }
+            }
+          Break:;
+        }
+#endif
+
         if (!changed) break;
     }
 
     #undef Pull
+
+
+
+/*
+        ONE
+000_
+001_X 
+010_X 
+011_
+100_X 
+101_ 
+110_ 
+111_
+
+        MAJ
+000_
+001_
+010_
+011_X
+100_
+101_X
+110_X
+111_X
+
+        GAMB
+000_X
+001_
+010_
+011_
+100_
+101_
+110_
+111_X
+
+        MUX (npn-equivalent)
+000_
+001_
+010_X
+011_X
+100_
+101_X
+110_
+111_X
+
+
+        X2AND (npn-equivalent)
+000_
+001_X
+010_X
+011_
+100_
+101_X
+110_X
+111_X
+
+    ONE(a, b, c)   -- exactly one input is true
+    MAJ(a, b, c)   -- at least two inputs are true
+    GAMB(a, b, c)  -- all or none of the inputs are true
+    MUX(a, b, c)   -- a ? b : c
+    X2AND(a,b,c)   -- a^b | abc
+*/
 }
 
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Testing:
 
 
 // Debug:
@@ -454,6 +624,24 @@ uint64 eval(const Vec<uchar>& prog)
 }
 
 
+bool hasBox(const Vec<uchar>& prog)
+{
+    uint i = 0;
+    for(;;){
+        switch (prog[i]){
+        case dsd_End:    return false;
+        case dsd_And:    i += 3; break;
+        case dsd_Xor:    i += 3; break;
+        case dsd_Mux:    i += 4; break;
+        case dsd_Box3:   i += 5; break;     // -- doesn't count
+        case dsd_Box4:
+        case dsd_Box5:
+        case dsd_Box6:   return true;
+        default: assert(false); }
+    }
+}
+
+
 void testDsd()
 {
 #if 0
@@ -467,7 +655,7 @@ void testDsd()
     //ftb = ~ftb;
 #endif
 
-#if 0
+#if 1
     uint64 x0 ___unused = ftb6_proj[0][0];
     uint64 x1 ___unused = ftb6_proj[0][1];
     uint64 x2 ___unused = ftb6_proj[0][2];
@@ -475,12 +663,16 @@ void testDsd()
     uint64 x4 ___unused = ftb6_proj[0][4];
     uint64 x5 ___unused = ftb6_proj[0][5];
 //    uint64 ftb = (x0 ^ x1 ^ x2) | (x3 ^ x4 ^ x5);
-    uint64 ftb = 0x1212121212121212ull ^ 0xff0000ffffff00ffull;
+//    uint64 ftb = 0x1212121212121212ull ^ 0xff0000ffffff00ffull;
 //    uint64 ftb = 0x8b71a45f91e45c19ull;
 //    uint64 ftb = 0x8b71a45f8b71a45full;
+//    uint64 ftb = (x0 ^ x1 ^ x2) | ((x3 & x4) | (~x3 & x5));
+    uint64 g = (x0 & x1) | (x0 & x2) | (x0 & x3) | (x1 & x2) | (x1 & x3) | (x2 & x3);
+    uint64 h = (x0 & x1 & x2 & x3) | (~x0 & ~x1 & ~x2 & ~x3);
+    uint64 ftb = (x4 & g) | (~x4 & h);
 #endif
 
-#if 0
+#if 1
     WriteLn "ftb: %x", ftb;
 
     Vec<uchar> prog;
@@ -518,7 +710,16 @@ void testDsd()
     }
 #endif
 
-#if 1
+#if 0
+    /*
+    Non-decomposable functions:
+    
+    159,765 FTBs in total
+    116,707 single output, double input extraction
+     74,793 single output, double input extraction, excluding Box3
+     57,092 single output, triple input extraction
+    */
+
     InFile in("/home/een/ZZ/LutMap/ftbs_n1.txt");
     Vec<char> buf;
     while (!in.eof()){
@@ -540,6 +741,14 @@ void testDsd()
             dumpDsd(prog);
             exit(0);
         }
+
+      #if 1
+        if (hasBox(prog)){
+            WriteLn "Non-decomposable FTB: %.16x", ftb;
+            dumpDsd(prog);
+            //exit(0);
+        }
+      #endif
     }
 #endif
 }
