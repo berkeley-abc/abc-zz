@@ -5,6 +5,8 @@
 #include "ZZ_Npn4.hh"
 #include "LutMap.hh"
 #include "GigReader.hh"
+#include "ZZ/Generics/Map.hh"
+#include "ZZ/Generics/Sort.hh"
 
 
 using namespace ZZ;
@@ -292,6 +294,7 @@ int main(int argc, char** argv)
     cli.add("keep"   , "string", ""          , "List of forcable gates (only gor GNL input).");
     cli.add("blif"   , "string", ""          , "Save original input in BLIF format (for debugging only).");
     cli.add("pnl"    , "string", ""          , "Save original input in PNL format (for debugging only).");
+    cli.add("ftbs"   , "string", ""          , "Write all FTBs to a file (for analysis).");
     cli.add("N"      , "uint"  , "10"        , "Cuts to keep per node.");
     cli.add("iters"  , "uint"  , "4"         , "Number of mapping phases.");
     cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
@@ -444,6 +447,30 @@ int main(int argc, char** argv)
             ShoutLn "ERROR! Unknown file extension: %_", output;
             exit(1);
         }
+    }
+
+    if (cli.get("ftbs").string_val != ""){
+        Map<uint64,uint> ftbs;
+        uint* res;
+        For_Gates(N, w){
+            if (w == gate_Lut6){
+                if (ftbs.get(ftb(w), res))
+                    *res += 1;
+                else
+                    *res = 1;
+            }
+        }
+
+        Vec<Pair<uint, uint64> > list;
+        For_Map(ftbs)
+            list.push(tuple(Map_Value(ftbs), Map_Key(ftbs)));
+        sort_reverse(list);
+
+        OutFile out(cli.get("ftbs").string_val);
+        for (uint i = 0; i < list.size(); i++)
+            FWriteLn(out) "%.16x %_", list[i].snd, list[i].fst;
+
+        WriteLn "Wrote: \a*%_\a*", cli.get("ftbs").string_val;
     }
 
     return 0;

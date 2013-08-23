@@ -168,6 +168,24 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
+    const uint N = 10000000;
+    double T0 = cpuTime();
+    for (uint n = 0; n < N; n++){
+        Vec<uint> v;
+        v.push(42);
+    }
+    double T1 = cpuTime();
+    WriteLn "Time: %t", (T1 - T0) / N;
+
+    Gig G;
+    for (uint n = 0; n < N; n++){
+        G.clear();
+        G.add(gate_PI);
+    }
+    double T2 = cpuTime();
+    WriteLn "Time: %t", (T2 - T1) / N;
+
+#if 0
     Gig N;
     N.setMode(gig_FreeForm);
 
@@ -193,6 +211,7 @@ int main(int argc, char** argv)
     Add_Gob(N, Strash);
     For_Gates(N, w)
         WriteLn "%f", w;
+#endif
 
 #if 0
     ftb4_t ftb = 0xFFF0;
