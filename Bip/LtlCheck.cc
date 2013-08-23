@@ -125,9 +125,8 @@ Wire monitorSynth(NetlistRef M, Wire w, WMapS<GLit>& delay_memo, WWMap& memo,
 
         case 'F':
             accept = BUF;
-            //pending = (z & ~a) | Y(~accept);
-            pending = (z | Y(~accept)) & ~a;
-            accept <<= ~pending | a;
+            pending = (z | Y(pending)) & ~a;
+            accept <<= ~pending;
             break;
 
         case 'G':
