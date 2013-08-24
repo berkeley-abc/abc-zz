@@ -87,6 +87,7 @@ void Gig::clear(bool reinit)
     // Free pages:
     for (uint i = 0; i < pages.size(); i++)
         xfree(pages[i]);
+    pages.clear(true);
   #else
     gates.clear(true);
   #endif

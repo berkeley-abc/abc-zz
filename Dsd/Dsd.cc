@@ -13,6 +13,7 @@
 
 #include "Prelude.hh"
 #include "ZZ_BFunc.hh"
+#include "ZZ_Npn4.hh"
 
 #define USE_TERNARY_FUNCTIONS
 
@@ -61,8 +62,14 @@ enum DsdOp {
     dsd_End,    // -- 1 input, the top of the formula
     dsd_And,    // -- 2 inputs
     dsd_Xor,    // -- 2 inputs, second argument always unsigned
-    dsd_Mux,    // -- 3 inputs
-    dsd_Box3,   // -- 3 inputs followed by a 1-byte FTB   
+    dsd_Maj,    // -- 3 inputs: at least two inputs are true 
+    dsd_One,    // -- 3 inputs: exactly one input is true
+    dsd_Gamb,   // -- 3 inputs: all or none of the inputs are true
+    // Non-symmetric:
+    dsd_Mux,    // -- 3 inputs: selector, true-branch, false-branch
+    dsd_Dot,    // -- 3 inputs: a^b | abc ("diff-or-true")
+    // Boxes:
+    dsd_Box3,   // -- 3 inputs followed by a 1-byte FTB 
     dsd_Box4,   // -- 4 inputs followed by a 2-byte FTB
     dsd_Box5,   // -- 5 inputs followed by a 4-byte FTB
     dsd_Box6,   // -- 6 inputs followed by a 8-byte FTB
@@ -97,7 +104,7 @@ struct DsdState {
         ftb = ftb_;
     }
 
-    void run();
+    uchar run();
 
 private:
     uchar  inputs[6];
@@ -126,11 +133,12 @@ private:
 void dsd6(uint64 ftb, Vec<uchar>& prog)
 {
     DsdState dsd(ftb, prog);
-    dsd.run();
+    uchar p = dsd.run();
+    prog += dsd_End, p;
 }
 
 
-void DsdState::run()
+uchar DsdState::run()
 {
     // Remove inputs not in (semantic) support:
     uint j = 0;
@@ -147,15 +155,11 @@ void DsdState::run()
     n_inputs = j;
 
     // Degenerate case:
-    if (n_inputs == 0){
-        prog += (uchar)dsd_End;
-        prog += lit(CONST_TRUE, ftb != 0);
-        return;
-    }
+    if (n_inputs == 0)
+        return lit(CONST_TRUE, ftb != 0);
 
     // Compute DSD:
-    uchar p = pullOutputs();
-    prog += dsd_End, p;
+    return pullOutputs();
 }
 
 
@@ -241,12 +245,17 @@ uchar DsdState::pullOutputs()
             return lit(++last_internal, s);
         }
 
-#if 0
-  #if 1   /*DEBUG*/
-        Write "Support hi: "; for (uint i = 0; i < 6; i++) if (ftb6_inSup(hi, i)) Write " %_", i; NewLine;
-        Write "Support lo: "; for (uint i = 0; i < 6; i++) if (ftb6_inSup(lo, i)) Write " %_", i; NewLine;
+  #if 0   /*DEBUG*/
+        WriteLn "----------------------------------------";
+        WriteLn "i=%_  n_inputs=%d", i, n_inputs;
+        WriteLn "ftb=%.16x", ftb;
+        WriteLn "hi =%.16x", hi;
+        WriteLn "lo =%.16x", lo;
+        Write "Support hi: "; for (uint i = 0; i < 6; i++) if (ftb6_inSup(hi | (hi >> shift), i)) Write " %_", i; NewLine;
+        Write "Support lo: "; for (uint i = 0; i < 6; i++) if (ftb6_inSup(lo | (lo >> shift), i)) Write " %_", i; NewLine;
   #endif  /*END DEBUG*/
 
+#if defined(USE_TERNARY_FUNCTIONS)
         // Extract MUX with input selector:
         bool disjoint = true;
         for (uint j = 0; j < n_inputs; j++){
@@ -255,8 +264,31 @@ uchar DsdState::pullOutputs()
                 break; } }
 
         if (disjoint){
-            /**/WriteLn "Top-level MUX with selector inputs[%_]=%_", i, (uint)inputs[i];
+            uchar icopy[6];
+            memcpy(icopy, inputs, 6);
+            uchar ncopy = n_inputs;
 
+            ftb = hi | (hi >> shift);
+            //**/Write "Hi... ";
+            //**/for (uint j = 0; j < n_inputs; j++) Write " %d", inputs[j]; NewLine;
+            //**/Write "\t+\t+";
+            uchar ph = run();
+
+            memcpy(inputs, icopy, 6);
+            n_inputs = ncopy;
+
+            ftb = lo | (lo >> shift);
+            //**/Write "\t-\t-";
+            //**/Write "Lo...";
+            //**/for (uint j = 0; j < n_inputs; j++) Write " %d", inputs[j]; NewLine;
+            //**/Write "\t+\t+";
+            uchar pl = run();
+            //**/Write "\t-\t-";
+            //**/WriteLn "ph=%d  pl=%d", ph, pl;
+            prog += (uchar)dsd_Mux, lit(x), ph, pl;
+
+            //**/WriteLn "Top-level MUX with selector inputs[%_]=%_", i, (uint)inputs[i];
+            return lit(++last_internal);
         }
 #endif
     }
@@ -305,10 +337,10 @@ void DsdState::pullInputs()
             for (uint j = i; j > 0;){ j--;
                 uint64 mask2 = ftb6_proj[0][j];
                 uint   shift2 = 1u << j;
-                uint64 v3 = hi & mask2;                 // hi_of_hi 
-                uint64 v2 = (hi << shift2) & mask2;     // lo_of_hi 
-                uint64 v1 = lo & mask2;                 // hi_of_lo 
-                uint64 v0 = (lo << shift2) & mask2;     // lo_of_lo 
+                uint64 v3 = hi & mask2;                 // hi_of_hi
+                uint64 v2 = (hi << shift2) & mask2;     // lo_of_hi
+                uint64 v1 = lo & mask2;                 // hi_of_lo
+                uint64 v0 = (lo << shift2) & mask2;     // lo_of_lo
 
                 if (v0 == v3 && v1 == v2){          // XyyX
                     // Pull out XOR:
@@ -352,10 +384,10 @@ void DsdState::pullInputs()
             for (uint j = i; j > 1;){ j--;
                 uint64 mask2 = ftb6_proj[0][j];
                 uint   shift2 = 1u << j;
-                uint64 v3 = hi & mask2;                 // hi_of_hi 
-                uint64 v2 = (hi << shift2) & mask2;     // lo_of_hi 
-                uint64 v1 = lo & mask2;                 // hi_of_lo 
-                uint64 v0 = (lo << shift2) & mask2;     // lo_of_lo 
+                uint64 v3 = hi & mask2;                 // hi_of_hi
+                uint64 v2 = (hi << shift2) & mask2;     // lo_of_hi
+                uint64 v1 = lo & mask2;                 // hi_of_lo
+                uint64 v0 = (lo << shift2) & mask2;     // lo_of_lo
 
                 for (uint k = j; k > 0;){ k--;
                     uint64 mask3 = ftb6_proj[0][k];
@@ -394,6 +426,14 @@ void DsdState::pullInputs()
                                 if (q[n] == a)
                                     box |= 1 << n;
                             }
+
+#if 1   /*DEBUG*/
+                            Npn4Norm norm = npn4_norm[(ushort)box | ((ushort)box << 8)];
+                            WriteLn "class: %d", norm.eq_class;
+                            //perm4_to_pseq4[norm.perm]
+                            //norm.negs
+#endif  /*END DEBUG*/
+
                             prog += (uchar)dsd_Box3, lit(inputs[k]), lit(inputs[j]), lit(inputs[i]), box;
 
                             ftb = a | (b >> shift3);
@@ -424,12 +464,12 @@ void DsdState::pullInputs()
 /*
         ONE
 000_
-001_X 
-010_X 
+001_X
+010_X
 011_
-100_X 
-101_ 
-110_ 
+100_X
+101_
+110_
 111_
 
         MAJ
@@ -655,7 +695,7 @@ void testDsd()
     //ftb = ~ftb;
 #endif
 
-#if 1
+#if 0
     uint64 x0 ___unused = ftb6_proj[0][0];
     uint64 x1 ___unused = ftb6_proj[0][1];
     uint64 x2 ___unused = ftb6_proj[0][2];
@@ -668,11 +708,9 @@ void testDsd()
 //    uint64 ftb = 0x8b71a45f8b71a45full;
 //    uint64 ftb = (x0 ^ x1 ^ x2) | ((x3 & x4) | (~x3 & x5));
     uint64 g = (x0 & x1) | (x0 & x2) | (x0 & x3) | (x1 & x2) | (x1 & x3) | (x2 & x3);
-    uint64 h = (x0 & x1 & x2 & x3) | (~x0 & ~x1 & ~x2 & ~x3);
-    uint64 ftb = (x4 & g) | (~x4 & h);
-#endif
+    uint64 h = x4;
+    uint64 ftb = (x5 & g) | (~x5 & h);
 
-#if 1
     WriteLn "ftb: %x", ftb;
 
     Vec<uchar> prog;
@@ -710,10 +748,10 @@ void testDsd()
     }
 #endif
 
-#if 0
+#if 1
     /*
     Non-decomposable functions:
-    
+
     159,765 FTBs in total
     116,707 single output, double input extraction
      74,793 single output, double input extraction, excluding Box3
@@ -750,6 +788,32 @@ void testDsd()
         }
       #endif
     }
+#endif
+
+
+#if 0   // Performance test
+    InFile in("/home/een/ZZ/LutMap/ftbs_n1.txt");
+    Vec<char> buf;
+    Vec<uint64> ftbs;
+    while (!in.eof()){
+        readLine(in, buf);
+        assert(buf.size() >= 16);
+
+        uint64 ftb = 0;
+        for (uint i = 0; i < 16; i++)
+            ftb = (ftb << 4) | fromHex(buf[i]);
+        ftbs.push(ftb);
+    }
+
+    double T0 = cpuTime();
+    Vec<uchar> prog;
+    for (uint n = 0; n < 10; n++){
+        for (uint i = 0; i < ftbs.size(); i++){
+            prog.clear();
+            dsd6(ftbs[i], prog);
+        }
+    }
+    WriteLn "CPU-time: %t", cpuTime() - T0;
 #endif
 }
 

@@ -378,9 +378,11 @@ int main(int argc, char** argv)
     WriteLn "Putting into Lut4 form.";
     putIntoLut4(N);
     WriteLn "Strashing";
+    /**/N.assertMode();
     Add_Gob(N, Strash);
     WriteLn "Info: %_", info(N);
     Remove_Gob(N, Strash);
+    /**/N.assertMode();
     N.setMode(gig_FreeForm);
 #endif
 

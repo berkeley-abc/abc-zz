@@ -644,6 +644,7 @@ void GigObj_Strash::strashNetlist()
     initializing = false;
     N->strash_mask = strash_mask0;
     N->is_compact = false;          // -- gates may have been removed
+    N->is_reach = false;            // -- gates may have become redundant
 
     // Turn on listeners again and send 'msg_Compact':
     for (uint i = 0; i < GigMsgIdx_size; i++)
