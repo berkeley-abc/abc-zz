@@ -15,8 +15,6 @@
 #include "ZZ_BFunc.hh"
 #include "ZZ_Npn4.hh"
 
-#define USE_TERNARY_FUNCTIONS
-
 namespace ZZ {
 using namespace std;
 
@@ -58,6 +56,13 @@ Smaller functions:
 */
 
 
+/*
+    use_box3
+    cofactor (no, cheap, expensive)
+    
+*/
+
+
 enum DsdOp {
     dsd_End,    // -- 1 input, the top of the formula
     dsd_And,    // -- 2 inputs
@@ -67,7 +72,7 @@ enum DsdOp {
     dsd_Gamb,   // -- 3 inputs: all or none of the inputs are true
     // Non-symmetric:
     dsd_Mux,    // -- 3 inputs: selector, true-branch, false-branch
-    dsd_Dot,    // -- 3 inputs: a^b | abc ("diff-or-true")
+    dsd_Dot,    // -- 3 inputs: a^b | ac ("diff-or-true")
     // Boxes:
     dsd_Box3,   // -- 3 inputs followed by a 1-byte FTB
     dsd_Box4,   // -- 4 inputs followed by a 2-byte FTB
@@ -82,19 +87,30 @@ macro Lit dsdLit(uchar byte) {
     return Lit(byte & 0x7F, byte >> 7); }
 
 
+struct Params_Dsd {
+    bool use_box3;
+    bool cofactor;
+
+    Params_Dsd() :
+        use_box3(false),
+        cofactor(true)
+    {}
+};
+
+
 struct DsdState {
     enum { FIRST_INTERNAL = 6 };
     enum { CONST_TRUE = 127 };      // -- used only for FTBs 0x0000000000000000 and 0xFFFFFFFFFFFFFFFF
 
-    uint64 ftb;
-
+    Params_Dsd  P;
+    uint64      ftb;
     Vec<uchar>& prog;
         // -- Resulting program: <OP> <arg> <arg> <OP> <arg> <arg> <arg> ...
         // If executed it builds the DSD bottom-up. The last instruction is  always 'dsd_Top'.
         // Internal nodes are numbered starting from 'DsdState::FIRST_INTERNAL'  and may be
         // negated. Use 'dsdLit()' to convert from 'uchar' to 'Lit'.
 
-    DsdState(uint64 ftb_, Vec<uchar>& prog_) :
+    DsdState(uint64 ftb_, Vec<uchar>& prog_, Params_Dsd P_) :
         prog(prog_)
     {
         for (uint i = 0; i < 6; i++)
@@ -102,6 +118,7 @@ struct DsdState {
         n_inputs = 6;
         last_internal = FIRST_INTERNAL - 1;
         ftb = ftb_;
+        P = P_;
     }
 
     uchar run();
@@ -132,9 +149,9 @@ private:
 
 
 // Wrapper function:
-void dsd6(uint64 ftb, Vec<uchar>& prog)
+void dsd6(uint64 ftb, Vec<uchar>& prog, Params_Dsd P = Params_Dsd())
 {
-    DsdState dsd(ftb, prog);
+    DsdState dsd(ftb, prog, P);
     uchar p = dsd.run();
     prog += dsd_End, p;
 }
@@ -247,17 +264,6 @@ uchar DsdState::pullOutputs()
             return lit(++last_internal, s);
         }
 
-  #if 0   /*DEBUG*/
-        WriteLn "----------------------------------------";
-        WriteLn "i=%_  n_inputs=%d", i, n_inputs;
-        WriteLn "ftb=%.16x", ftb;
-        WriteLn "hi =%.16x", hi;
-        WriteLn "lo =%.16x", lo;
-        Write "Support hi: "; for (uint i = 0; i < 6; i++) if (ftb6_inSup(hi | (hi >> shift), i)) Write " %_", i; NewLine;
-        Write "Support lo: "; for (uint i = 0; i < 6; i++) if (ftb6_inSup(lo | (lo >> shift), i)) Write " %_", i; NewLine;
-  #endif  /*END DEBUG*/
-
-#if defined(USE_TERNARY_FUNCTIONS)
         // Extract MUX with input selector:
         bool disjoint = true;
         for (uint j = 0; j < n_inputs; j++){
@@ -271,46 +277,42 @@ uchar DsdState::pullOutputs()
             uchar ncopy = n_inputs;
 
             ftb = hi | (hi >> shift);
-            //**/Write "Hi... ";
-            //**/for (uint j = 0; j < n_inputs; j++) Write " %d", inputs[j]; NewLine;
-            //**/Write "\t+\t+";
             uchar ph = run();
 
             memcpy(inputs, icopy, 6);
             n_inputs = ncopy;
 
             ftb = lo | (lo >> shift);
-            //**/Write "\t-\t-";
-            //**/Write "Lo...";
-            //**/for (uint j = 0; j < n_inputs; j++) Write " %d", inputs[j]; NewLine;
-            //**/Write "\t+\t+";
             uchar pl = run();
-            //**/Write "\t-\t-";
-            //**/WriteLn "ph=%d  pl=%d", ph, pl;
-            prog += (uchar)dsd_Mux, lit(x), ph, pl;
 
-            //**/WriteLn "Top-level MUX with selector inputs[%_]=%_", i, (uint)inputs[i];
+            if (P.use_box3)
+                prog += (uchar)dsd_Box3, lit(x), ph, pl, (uchar)0xD8;
+            else
+                prog += (uchar)dsd_Mux, lit(x), ph, pl;
+
             return lit(++last_internal);
         }
-#endif
     }
 
     pullInputs();   // -- will add to program and update 'ftb' and 'inputs'
 
-    //**/WriteLn "ftb=%x", ftb;
-    //**/Dump((int)n_inputs);
-
-    //<<== WRONG FTB HERE!!
     switch (n_inputs){
     case 1:
         assert_debug(ftb == 0xAAAAAAAAAAAAAAAAull || ftb == 0x5555555555555555ull);
         return lit(inputs[0], ftb == 0x5555555555555555ull);
-    case 3: prog += (uchar)dsd_Box3, lit(inputs[0]), lit(inputs[1]), lit(inputs[2]), (uchar)ftb; break;
-    case 4: prog += (uchar)dsd_Box4, lit(inputs[0]), lit(inputs[1]), lit(inputs[2]), lit(inputs[3]), (uchar)ftb, (uchar)(ftb >> 8); break;
-    case 5: prog += (uchar)dsd_Box5, lit(inputs[0]), lit(inputs[1]), lit(inputs[2]), lit(inputs[3]), lit(inputs[4]), (uchar)ftb, (uchar)(ftb >> 8), (uchar)(ftb >> 16), (uchar)(ftb >> 24); break;
-    case 6: prog += (uchar)dsd_Box6, lit(inputs[0]), lit(inputs[1]), lit(inputs[2]), lit(inputs[3]), lit(inputs[4]), lit(inputs[5]), (uchar)ftb, (uchar)(ftb >> 8), (uchar)(ftb >> 16), (uchar)(ftb >> 24), (uchar)(ftb >> 32), (uchar)(ftb >> 40), (uchar)(ftb >> 48), (uchar)(ftb >> 56); break;
-    //**/case 2: prog += (uchar)dsd_Box2, lit(inputs[0]), lit(inputs[1]), (uchar)ftb; break;
+    case 4:
+        prog += (uchar)dsd_Box4, lit(inputs[0]), lit(inputs[1]), lit(inputs[2]), lit(inputs[3]), (uchar)ftb, (uchar)(ftb >> 8);
+        break;
+    case 5:
+        prog += (uchar)dsd_Box5, lit(inputs[0]), lit(inputs[1]), lit(inputs[2]), lit(inputs[3]), lit(inputs[4]),
+                (uchar)ftb, (uchar)(ftb >> 8), (uchar)(ftb >> 16), (uchar)(ftb >> 24);
+        break;
+    case 6:
+        prog += (uchar)dsd_Box6, lit(inputs[0]), lit(inputs[1]), lit(inputs[2]), lit(inputs[3]), lit(inputs[4]), lit(inputs[5]),
+                (uchar)ftb, (uchar)(ftb >> 8), (uchar)(ftb >> 16), (uchar)(ftb >> 24), (uchar)(ftb >> 32), (uchar)(ftb >> 40), (uchar)(ftb >> 48), (uchar)(ftb >> 56);
+        break;
     default: assert(false); }
+
     return lit(++last_internal);
 }
 
@@ -383,10 +385,6 @@ bool DsdState::pullInputs2()
 
 bool DsdState::pullInputs3()
 {
-  #if !defined(USE_TERNARY_FUNCTIONS)
-    return false;
-  #endif
-
     // Ternary functions:
     for (uint i = n_inputs; i > 2;){ i--;
         uint64 mask = ftb6_proj[0][i];
@@ -441,59 +439,57 @@ bool DsdState::pullInputs3()
                         }
 
                         bool inv_ftb = false;
-                      #if 1
-                        Npn4Norm norm = npn4_norm[(ushort)box | ((ushort)box << 8)];
-                        pseq4_t seq = perm4_to_pseq4[norm.perm];
-//                        pseq4_t seq = perm4_to_pseq4[inv_perm4[norm.perm]];
+#if 0
+                        /**/Npn4Norm nm = npn4_norm[(ushort)box | ((ushort)box << 8)];
+                        /**/if (P.use_box3 || (nm.eq_class != 109 && nm.eq_class != 83))
+#else
+                        if (P.use_box3)
+#endif
+                            prog += (uchar)dsd_Box3, lit(inputs[k]), lit(inputs[j]), lit(inputs[i]), box;
+                        else{
+                            Npn4Norm norm = npn4_norm[(ushort)box | ((ushort)box << 8)];
+                            pseq4_t seq = perm4_to_pseq4[norm.perm];
 
-                        //**/WriteLn "-- i=%_ j=%_ k=%_  ftb=%.16x", i, j, k, ftb;
-                        //**/WriteLn "-- box=%.2x   repr=%.4x", box, npn4_repr[norm.eq_class];
-                        //**/WriteLn "-- norm: perm=[%d,%d,%d,%d]  negs=[%d : %d,%d,%d,%d]", pseq4Get(seq, 0), pseq4Get(seq, 1), pseq4Get(seq, 2), pseq4Get(seq, 3), ((norm.negs>>4)&1), ((norm.negs>>3)&1), ((norm.negs>>2)&1), ((norm.negs>>1)&1), (norm.negs&1);
+                            uchar xs[3], ys[3];
+                            xs[0] = lit(inputs[k], norm.negs & 1);
+                            xs[1] = lit(inputs[j], norm.negs & 2);
+                            xs[2] = lit(inputs[i], norm.negs & 4);
+                            inv_ftb = (norm.negs & 16);
 
-                        uchar    xs[3], ys[3];
-                        xs[0] = lit(inputs[k], norm.negs & 1);
-                        xs[1] = lit(inputs[j], norm.negs & 2);
-                        xs[2] = lit(inputs[i], norm.negs & 4);
-                        inv_ftb = (norm.negs & 16);
+                            ys[0] = xs[pseq4Get(seq, 0)];
+                            ys[1] = xs[pseq4Get(seq, 1)];
+                            ys[2] = xs[pseq4Get(seq, 2)];
 
-                        ys[0] = xs[pseq4Get(seq, 0)];
-                        ys[1] = xs[pseq4Get(seq, 1)];
-                        ys[2] = xs[pseq4Get(seq, 2)];
+                            switch (norm.eq_class){
+                            case 103:   // GAMB -- repr.: ~(Cba + cBA) = "x2 and output inverted"
+                                inv_ftb = !inv_ftb;
+                                ys[2] = neg(ys[2]);
+                                prog += (uchar)dsd_Gamb;
+                                break;
+                            case 105:   // DOT  -- repr.: ac + aB + Ab = "correct" 
+                                prog += (uchar)dsd_Dot;
+                                break;
+                            case 109:   // MUX  -- repr.: ac + Ab = "x1 x2 swapped"
+                                swp(ys[1], ys[2]);
+                                prog += (uchar)dsd_Mux;
+                                break;
+                            case 81:    // ONE  -- repr.: ABC + bc + ac + ab = ~ONE(a,b,c) = "output inverted"
+                                prog += (uchar)dsd_One;
+                                inv_ftb = !inv_ftb;
+                                break;
+                            case 83:    // MAJ  -- repr.: ab + ac + bc = "correct"
+                                prog += (uchar)dsd_Maj;
+                                break;
+                            default: assert(false); }
 
-                        switch (norm.eq_class){
-                        case 103:   // GAMB -- repr.: ~(Cba + cBA) = "x2 and output inverted"
-                            inv_ftb = !inv_ftb;
-                            ys[2] = neg(ys[2]);
-                            prog += (uchar)dsd_Gamb;
-                            break;
-                        case 105:   // DOT  -- repr.: ac + aB + Ab = "correct" 
-                            prog += (uchar)dsd_Dot;
-                            break;
-                        case 109:   // MUX  -- repr.: ac + Ab = "x1 x2 swapped"
-                            swp(ys[1], ys[2]);
-                            prog += (uchar)dsd_Mux;
-                            break;
-                        case 81:    // ONE  -- repr.: ABC + bc + ac + ab = ~ONE(a,b,c) = "output inverted"
-                            prog += (uchar)dsd_One;
-                            inv_ftb = !inv_ftb;
-                            break;
-                        case 83:    // MAJ  -- repr.: ab + ac + bc = "correct"
-                            prog += (uchar)dsd_Maj;
-                            break;
-                        default: assert(false); }
-
-                        prog += ys[0], ys[1], ys[2];
-
-                      #else
-                        prog += (uchar)dsd_Box3, lit(inputs[k]), lit(inputs[j]), lit(inputs[i]), box;
-                      #endif
+                            prog += ys[0], ys[1], ys[2];
+                        }
 
                         ftb = a | (b >> shift3);
                         ftb |= ftb >> shift2;
                         ftb |= ftb >> shift;
                         swapLast(i);
                         swapLast(j);
-                        //**/WriteLn "-- final ftb=%.16x   inv=%_", ftb, inv_ftb;
                         inputs[k] = lit(++last_internal, inv_ftb);
 
                         i--;
@@ -681,8 +677,6 @@ bool hasBox(const Vec<uchar>& prog)
         case dsd_Dot:
             i += 4; break;
         case dsd_Box3:
-assert(false);
-            i += 5; break;     // -- doesn't count
         case dsd_Box4:
         case dsd_Box5:
         case dsd_Box6:
@@ -759,9 +753,12 @@ void testDsd()
 //    uint64 ftb = 0x8b71a45f91e45c19ull;
 //    uint64 ftb = 0x8b71a45f8b71a45full;
 //    uint64 ftb = (x0 ^ x1 ^ x2) | ((x3 & x4) | (~x3 & x5));
-    uint64 g = (x0 & x1) | (x0 & x2) | (x0 & x3) | (x1 & x2) | (x1 & x3) | (x2 & x3);
-    uint64 h = x4;
-    uint64 ftb = (x5 & g) | (~x5 & h);
+
+//    uint64 g = (x0 & x1) | (x0 & x2) | (x0 & x3) | (x1 & x2) | (x1 & x3) | (x2 & x3);
+//    uint64 h = x4;
+//    uint64 ftb = (x5 & g) | (~x5 & h);
+
+    uint64 ftb = 0xfee8fee8ffff0000;
 
     WriteLn "ftb: %x", ftb;
 
@@ -811,14 +808,19 @@ void testDsd()
     */
 
     InFile in("/home/een/ZZ/LutMap/ftbs_n1.txt");
+//    InFile in("lib6var5M.txt");     // 5,687,661  (4,461,343 non-decomp.)
     Vec<char> buf;
+    uint nd_count = 0;
     while (!in.eof()){
         readLine(in, buf);
         assert(buf.size() >= 16);
 
+        uint off = 0;
+        if (buf[0] == '0' && buf[1] == 'x') off = 2;
+
         uint64 ftb = 0;
         for (uint i = 0; i < 16; i++)
-            ftb = (ftb << 4) | fromHex(buf[i]);
+            ftb = (ftb << 4) | fromHex(buf[i+off]);
 
         Vec<uchar> prog;
         dsd6(ftb, prog);
@@ -832,7 +834,9 @@ void testDsd()
             exit(0);
         }
 
-      #if 1
+        if (hasBox(prog))
+            nd_count++;
+      #if 0
         if (hasBox(prog)){
             WriteLn "Non-decomposable FTB: %.16x", ftb;
             //dumpDsd(prog);
@@ -840,20 +844,25 @@ void testDsd()
         }
       #endif
     }
+    WriteLn "Non-decomposable: %_", nd_count;
 #endif
 
 
 #if 0   // Performance test
-    InFile in("/home/een/ZZ/LutMap/ftbs_n1.txt");
+//    InFile in("/home/een/ZZ/LutMap/ftbs_n1.txt");
+    InFile in("lib6var5M.txt");     // 5,687,661  (4,461,343 non-decomp.)
     Vec<char> buf;
     Vec<uint64> ftbs;
     while (!in.eof()){
         readLine(in, buf);
         assert(buf.size() >= 16);
 
+        uint off = 0;
+        if (buf[0] == '0' && buf[1] == 'x') off = 2;
+
         uint64 ftb = 0;
         for (uint i = 0; i < 16; i++)
-            ftb = (ftb << 4) | fromHex(buf[i]);
+            ftb = (ftb << 4) | fromHex(buf[i + off]);
         ftbs.push(ftb);
     }
 
@@ -865,120 +874,12 @@ void testDsd()
             dsd6(ftbs[i], prog);
         }
     }
-    WriteLn "CPU-time: %t", cpuTime() - T0;
+    double T1 = cpuTime();
+    WriteLn "CPU-time: %t", (T1 - T0) / (10 * ftbs.size());
+    WriteLn "DSD/sec : %,d", uint64((10 * ftbs.size()) / (T1 - T0) + 0.5);
 #endif
 }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
-
-
-/*
-Npn4 classes corresponding to 3-input functions:
-
-class: 103
-class: 105
-class: 109
-class: 120
-class: 13
-class: 15
-class: 2
-class: 220
-class: 81
-class: 83
-
-
-The non-decomposable ones:
-
-class: 103   -- GAMB
-class: 105   -- DOT:  x2 ? ~(x0 & x1) : x0
-class: 109   -- MUX:  x0 ? x1 : x2
-class: 81    -- ONE
-class: 83    -- MAJ
-
-cba
-000_
-001_X
-010_X
-011_
-100_
-101_X
-110_X
-111_ X
-
-*/
-
-/*
-        ONE
-000_
-001_X
-010_X
-011_
-100_X
-101_
-110_
-111_
-
-        MAJ
-000_
-001_
-010_
-011_X
-100_
-101_X
-110_X
-111_X
-
-        GAMB
-000_X
-001_
-010_
-011_
-100_
-101_
-110_
-111_X
-
-        MUX (npn-equivalent)
-000_
-001_
-010_X
-011_X
-100_
-101_X
-110_
-111_X
-
-
-        X2AND (npn-equivalent)
-000_
-001_X
-010_X
-011_
-100_
-101_X
-110_X
-111_X
-
-    ONE(a, b, c)   -- exactly one input is true
-    MAJ(a, b, c)   -- at least two inputs are true
-    GAMB(a, b, c)  -- all or none of the inputs are true
-    MUX(a, b, c)   -- a ? b : c
-    X2AND(a,b,c)   -- a^b | abc
-
-
-a^b | ac
-ac + (a ^ b)
-
-GAMB = e7 = 
-000_X
-001_X
-010_X
-011_    Cba
-100_    cBA
-101_X
-110_X
-111_X
-
-*/
