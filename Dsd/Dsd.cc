@@ -139,6 +139,8 @@ private:
     void  pullInputs();
     bool  pullInputs2();
     bool  pullInputs3();
+    uchar addMux(uchar lit, uint64 ftb_hi, uint64 ftb_lo);
+    uchar cofactor();
 
     void  swapLast(uchar i) {
         n_inputs--;
@@ -184,17 +186,22 @@ uchar DsdState::run()
 
 /*
 ===============================================================================
+Co-factor analysis for pulling out binary gates and MUXes on the output side:
+===============================================================================
+
 O = all zeros
 I = all ones
 x = some function
-z = ~x
+X = ~x
+z = FTB with support disjoint from x
 
 OO II  -- const
 OI IO  -- buf/inv
 Ox xO  -- and
 Ix xI  -- or
 xx     -- shrink support
-xz     -- xor
+xX     -- xor
+xz     -- mux
 ===============================================================================
 */
 
@@ -202,104 +209,91 @@ xz     -- xor
 // Pull out single outputs from FTB ('a & G', 'a | G', 'a ^ G') then recurse.
 uchar DsdState::pullOutputs()
 {
-    if (n_inputs == 1){
-        assert_debug(ftb == 0xAAAAAAAAAAAAAAAAull || ftb == 0x5555555555555555ull);
-        return lit(inputs[0], ftb == 0x5555555555555555ull);
-    }
-
-    // F(atom, comp) -> comp
-    for (uint i = n_inputs; i > 0;){ i--;
-        uint   x = inputs[i];     //  pin -> in; i -> pin
-        uint64 mask = ftb6_proj[0][i];
-        uint   shift = 1u << i;
-        uint64 hi = ftb & mask;
-        uint64 lo = (ftb << shift) & mask;
-
-        assert(hi != lo);   // -- otherwise 'x' is not in the support (which should already have been taken care of)
-
+    for(;;){
         if (n_inputs == 1){
-            assert_debug((hi == mask && lo == 0) || (lo == mask && hi == 0));
-            //Dump(hi, lo);
-            return lit(x, (lo != 0));
-
-        }else if (lo == 0){
-            ftb |= ftb >> shift;
-            swapLast(i);
-            uchar p = pullOutputs();
-            prog += (uchar)dsd_And, lit(x), p;
-            return lit(++last_internal);
-
-        }else if (hi == 0){
-            ftb |= ftb << shift;
-            swapLast(i);
-            uchar p = pullOutputs();
-            prog += (uchar)dsd_And, nlit(x), p;
-            return lit(++last_internal);
-
-        }else if (lo == mask){
-            ftb = ~ftb;
-            ftb |= ftb >> shift;
-            ftb = ~ftb;
-            swapLast(i);
-            uchar p = pullOutputs();
-            prog += (uchar)dsd_And, lit(x), neg(p);
-            return lit(++last_internal, true);
-
-        }else if (hi == mask){
-            ftb = ~ftb;
-            ftb |= ftb << shift;
-            ftb = ~ftb;
-            swapLast(i);
-            uchar p = pullOutputs();
-            prog += (uchar)dsd_And, nlit(x), neg(p);
-            return lit(++last_internal, true);
-
-        }else if (hi == (lo ^ mask)){
-            ftb ^= mask;
-            swapLast(i);
-            uchar p = pullOutputs();
-            bool s = isSigned(p);
-            p = unsign(p);
-            prog += (uchar)dsd_Xor, lit(x), p;
-            return lit(++last_internal, s);
+            assert_debug(ftb == 0xAAAAAAAAAAAAAAAAull || ftb == 0x5555555555555555ull);
+            return lit(inputs[0], ftb == 0x5555555555555555ull);
         }
 
-        // Extract MUX with input selector:
-        bool disjoint = true;
-        for (uint j = 0; j < n_inputs; j++){
-            if (i != j && ftb6_inSup(hi, j) && ftb6_inSup(lo, j)){
-                disjoint = false;
-                break; } }
+        // F(atom, comp) -> comp
+        for (uint i = n_inputs; i > 0;){ i--;
+            uint   x = inputs[i];     //  pin -> in; i -> pin
+            uint64 mask = ftb6_proj[0][i];
+            uint   shift = 1u << i;
+            uint64 hi = ftb & mask;
+            uint64 lo = (ftb << shift) & mask;
 
-        if (disjoint){
-            uchar icopy[6];
-            memcpy(icopy, inputs, 6);
-            uchar ncopy = n_inputs;
+            assert(hi != lo);   // -- otherwise 'x' is not in the support (which should already have been taken care of)
 
-            ftb = hi | (hi >> shift);
-            uchar ph = run();
+            if (n_inputs == 1){
+                assert_debug((hi == mask && lo == 0) || (lo == mask && hi == 0));
+                return lit(x, (lo != 0));
 
-            memcpy(inputs, icopy, 6);
-            n_inputs = ncopy;
+            }else if (lo == 0){
+                ftb |= ftb >> shift;
+                swapLast(i);
+                uchar p = pullOutputs();
+                prog += (uchar)dsd_And, lit(x), p;
+                return lit(++last_internal);
 
-            ftb = lo | (lo >> shift);
-            uchar pl = run();
+            }else if (hi == 0){
+                ftb |= ftb << shift;
+                swapLast(i);
+                uchar p = pullOutputs();
+                prog += (uchar)dsd_And, nlit(x), p;
+                return lit(++last_internal);
 
-            if (P.use_box3)
-                prog += (uchar)dsd_Box3, lit(x), ph, pl, (uchar)0xD8;
-            else
-                prog += (uchar)dsd_Mux, lit(x), ph, pl;
+            }else if (lo == mask){
+                ftb = ~ftb;
+                ftb |= ftb >> shift;
+                ftb = ~ftb;
+                swapLast(i);
+                uchar p = pullOutputs();
+                prog += (uchar)dsd_And, lit(x), neg(p);
+                return lit(++last_internal, true);
 
-            return lit(++last_internal);
+            }else if (hi == mask){
+                ftb = ~ftb;
+                ftb |= ftb << shift;
+                ftb = ~ftb;
+                swapLast(i);
+                uchar p = pullOutputs();
+                prog += (uchar)dsd_And, nlit(x), neg(p);
+                return lit(++last_internal, true);
+
+            }else if (hi == (lo ^ mask)){
+                ftb ^= mask;
+                swapLast(i);
+                uchar p = pullOutputs();
+                bool s = isSigned(p);
+                p = unsign(p);
+                prog += (uchar)dsd_Xor, lit(x), p;
+                return lit(++last_internal, s);
+            }
+
+            // Extract MUX with input selector:
+            bool disjoint = true;
+            for (uint j = 0; j < n_inputs; j++){
+                if (i != j && ftb6_inSup(hi, j) && ftb6_inSup(lo, j)){
+                    disjoint = false;
+                    break; } }
+
+            if (disjoint)
+                return addMux(x, hi | (hi >> shift), lo | (lo >> shift));
         }
+
+        uint n = n_inputs;
+        pullInputs();   // -- will add to program and update 'ftb' and 'inputs'
+        if (n == n_inputs) break;
     }
 
-    pullInputs();   // -- will add to program and update 'ftb' and 'inputs'
+    if (n_inputs > 1 && P.cofactor)
+        return cofactor();
 
     switch (n_inputs){
-    case 1:
-        assert_debug(ftb == 0xAAAAAAAAAAAAAAAAull || ftb == 0x5555555555555555ull);
-        return lit(inputs[0], ftb == 0x5555555555555555ull);
+//    case 1:
+//        assert_debug(ftb == 0xAAAAAAAAAAAAAAAAull || ftb == 0x5555555555555555ull);
+//        return lit(inputs[0], ftb == 0x5555555555555555ull);
     case 4:
         prog += (uchar)dsd_Box4, lit(inputs[0]), lit(inputs[1]), lit(inputs[2]), lit(inputs[3]), (uchar)ftb, (uchar)(ftb >> 8);
         break;
@@ -314,6 +308,69 @@ uchar DsdState::pullOutputs()
     default: assert(false); }
 
     return lit(++last_internal);
+}
+
+
+uchar DsdState::addMux(uchar x, uint64 ftb_hi, uint64 ftb_lo)
+{
+    uchar icopy[6];
+    memcpy(icopy, inputs, 6);
+    uchar ncopy = n_inputs;
+
+    ftb = ftb_hi;
+    uchar ph = run();
+
+    memcpy(inputs, icopy, 6);
+    n_inputs = ncopy;
+
+    ftb = ftb_lo;
+    uchar pl = run();
+
+    if (P.use_box3)
+        prog += (uchar)dsd_Box3, x, ph, pl, (uchar)0xD8;
+    else
+        prog += (uchar)dsd_Mux, x, ph, pl;
+
+    return lit(++last_internal);
+}
+
+
+uchar DsdState::cofactor()
+{
+    assert(n_inputs >= 4);
+
+    // Find best cofactor variable:
+    uint min_supsum = UINT_MAX;
+    uint best_pin   = UINT_MAX;
+
+    for (uint i = 0; i < n_inputs; i++){
+        uint64 mask = ftb6_proj[0][i];
+        uint   shift = 1u << i;
+        uint64 hi = ftb & mask;
+        uint64 lo = (ftb << shift) & mask;
+        hi |= hi >> shift;
+        lo |= lo >> shift;
+
+        uint sup_hi = 0;
+        uint sup_lo = 0;
+        for (uint j = 0; j < n_inputs; j++){
+            if (i == j) continue;
+            if (ftb6_inSup(hi, j)) sup_hi++;
+            if (ftb6_inSup(lo, j)) sup_lo++;
+        }
+
+        if (newMin(min_supsum, sup_hi + sup_lo))
+            best_pin = i;
+    }
+    assert(best_pin != UINT_MAX);
+
+    // Perform cofactoring:
+    uint64 mask = ftb6_proj[0][best_pin];
+    uint   shift = 1u << best_pin;
+    uint64 hi = ftb & mask;
+    uint64 lo = (ftb << shift) & mask;
+
+    return addMux(inputs[best_pin], hi | (hi >> shift), lo | (lo >> shift));
 }
 
 
@@ -797,7 +854,7 @@ void testDsd()
     }
 #endif
 
-#if 1
+#if 0
     /*
     Non-decomposable functions:
 
@@ -824,6 +881,7 @@ void testDsd()
 
         Vec<uchar> prog;
         dsd6(ftb, prog);
+        //**/Write "PROG:"; for (uind i = 0; i < prog.size(); i++) Write " %.2x", prog[i]; NewLine;
         uint64 ftb2 = eval(prog);
 
         if (ftb != ftb2){
@@ -848,9 +906,9 @@ void testDsd()
 #endif
 
 
-#if 0   // Performance test
-//    InFile in("/home/een/ZZ/LutMap/ftbs_n1.txt");
-    InFile in("lib6var5M.txt");     // 5,687,661  (4,461,343 non-decomp.)
+#if 1   // Performance test
+//    InFile in("/home/een/ZZ/LutMap/ftbs_n1.txt"); uint N = 10;
+    InFile in("lib6var5M.txt"); uint N = 1;    // 5,687,661  (4,461,343 non-decomp.)
     Vec<char> buf;
     Vec<uint64> ftbs;
     while (!in.eof()){
@@ -868,15 +926,16 @@ void testDsd()
 
     double T0 = cpuTime();
     Vec<uchar> prog;
-    for (uint n = 0; n < 10; n++){
+    for (uint n = 0; n < N; n++){
         for (uint i = 0; i < ftbs.size(); i++){
+            //**/printf("\r%d", i); fflush(stdout);
             prog.clear();
             dsd6(ftbs[i], prog);
         }
     }
     double T1 = cpuTime();
-    WriteLn "CPU-time: %t", (T1 - T0) / (10 * ftbs.size());
-    WriteLn "DSD/sec : %,d", uint64((10 * ftbs.size()) / (T1 - T0) + 0.5);
+    WriteLn "CPU-time: %t", (T1 - T0) / (N * ftbs.size());
+    WriteLn "DSD/sec : %,d", uint64((N * ftbs.size()) / (T1 - T0) + 0.5);
 #endif
 }
 
