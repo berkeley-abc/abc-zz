@@ -3,7 +3,7 @@
 //| Name        : Dsd.cc
 //| Author(s)   : Niklas Een
 //| Module      : Dsd
-//| Description :
+//| Description : Disjoint Support Decomposition of 6-input functions from truth table.
 //|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
@@ -12,6 +12,7 @@
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
+#include "Dsd.hh"
 #include "ZZ_BFunc.hh"
 #include "ZZ_Npn4.hh"
 
@@ -20,42 +21,7 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Debug:
-
-
-void   dumpDsd(const Vec<uchar>& prog);
-uint64 eval(const Vec<uchar>& prog);
-uint   nLeafs(const Vec<uchar>& prog);
-bool   hasBox(const Vec<uchar>& prog);
-
-
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Disjoint Support Decomposition:
-
-
-enum DsdOp {
-    dsd_End,    // -- 1 input, the top of the formula
-    dsd_And,    // -- 2 inputs
-    dsd_Xor,    // -- 2 inputs, second argument always unsigned
-    dsd_Maj,    // -- 3 inputs: at least two inputs are true
-    dsd_One,    // -- 3 inputs: exactly one input is true
-    dsd_Gamb,   // -- 3 inputs: all or none of the inputs are true
-    // Non-symmetric:
-    dsd_Mux,    // -- 3 inputs: selector, true-branch, false-branch
-    dsd_Dot,    // -- 3 inputs: a^b | ac ("diff-or-true")
-    // Boxes:
-    dsd_Box3,   // -- 3 inputs followed by a 1-byte FTB
-    dsd_Box4,   // -- 4 inputs followed by a 2-byte FTB
-    dsd_Box5,   // -- 5 inputs followed by a 4-byte FTB
-    dsd_Box6,   // -- 6 inputs followed by a 8-byte FTB
-    // k-ary:
-    dsd_kAnd,   // -- k inputs; first byte is 'k'
-    dsd_kXor,   // -- k inputs; first byte is 'k'
-
-    dsd_Box2,   // -- DEBUGGING: 2 inputs followed by a 1-byte FTB
-
-    DsdOp_size
-};
 
 
 
@@ -93,7 +59,7 @@ Smaller functions:
 */
 
 
-static const uint DsdOp_isize[DsdOp_size] = {   // -- instruction size
+const uint DsdOp_isize[DsdOp_size] = {   // -- instruction size
     2,
     3,
     3,
@@ -112,28 +78,9 @@ static const uint DsdOp_isize[DsdOp_size] = {   // -- instruction size
 };
 
 
-macro Lit dsdLit(uchar byte) {
-    return Lit(byte & 0x7F, byte >> 7); }
-
-
-struct Params_Dsd {
-    bool use_box3;      // -- if TRUE, ternary functions are represented using 'dsd_Box3' followed by FTB
-    bool only_muxes;    // -- no other ternary function is used
-    bool cofactor;      // -- remove all 'dsd_Box#' by cofactoring
-    bool use_kary;      // -- post-process decomposition and extract k-ary ANDs and XORs (no 'dsd_And' or 'dsd_Xor' will be present afterwards, not even for binary gates)
-
-    Params_Dsd() :
-        use_box3(false),
-        only_muxes(false),
-        cofactor(true),
-        use_kary(true)
-    {}
-};
-
-
 struct DsdState {
-    enum { FIRST_INTERNAL = 6 };
-    enum { CONST_TRUE = 127 };      // -- used only for FTBs 0x0000000000000000 and 0xFFFFFFFFFFFFFFFF
+    enum { FIRST_INTERNAL = DSD6_FIRST_INTERNAL };
+    enum { CONST_TRUE = DSD6_CONST_TRUE };      // -- used only for FTBs 0x0000000000000000 and 0xFFFFFFFFFFFFFFFF
 
     Params_Dsd  P;
     uint64      ftb;
@@ -162,14 +109,8 @@ private:
     uchar  n_inputs;
     uchar  last_internal;
 
-    uchar lit (uchar idx)            const { return idx; }
-    uchar lit (uchar lit, bool sign) const { return lit ^ ((uchar)sign << 7); }
-    uchar nlit(uchar idx)            const { return idx ^ 0x80; }
-    uchar neg (uchar lit)            const { return lit ^ 0x80; }
-    bool  isSigned(uchar lit)        const { return bool(lit & 0x80); }
-    uchar unsign  (uchar lit)        const { return lit & 0x7F; }
-
-    uchar neg (uchar lit, bool sign) const { return lit ^ ((uchar)sign << 7); }
+    uchar neg(uchar lit)            const { return lit ^ 0x80; }
+    uchar neg(uchar lit, bool sign) const { return lit ^ ((uchar)sign << 7); }
 
     uchar pullOutputs();
     void  pullInputs();
@@ -189,7 +130,7 @@ private:
 
 
 // Wrapper function:
-void dsd6(uint64 ftb, Vec<uchar>& prog, Params_Dsd P = Params_Dsd())
+void dsd6(uint64 ftb, Vec<uchar>& prog, Params_Dsd P)
 {
     prog.clear();
 
@@ -220,7 +161,7 @@ uchar DsdState::run()
 
     // Degenerate case:
     if (n_inputs == 0)
-        return lit(CONST_TRUE, ftb != 0);
+        return neg(CONST_TRUE, ftb != 0);
 
     // Compute DSD:
     return pullOutputs();
@@ -257,7 +198,7 @@ uchar DsdState::pullOutputs()
     for(;;){
         if (n_inputs == 1){
             assert_debug(ftb == 0xAAAAAAAAAAAAAAAAull || ftb == 0x5555555555555555ull);
-            return lit(inputs[0], ftb == 0x5555555555555555ull);
+            return neg(inputs[0], ftb == 0x5555555555555555ull);
         }
 
         // F(atom, comp) -> comp
@@ -272,21 +213,21 @@ uchar DsdState::pullOutputs()
 
             if (n_inputs == 1){
                 assert_debug((hi == mask && lo == 0) || (lo == mask && hi == 0));
-                return lit(x, (lo != 0));
+                return neg(x, (lo != 0));
 
             }else if (lo == 0){
                 ftb |= ftb >> shift;
                 swapLast(i);
                 uchar p = pullOutputs();
-                prog += (uchar)dsd_And, lit(x), p;
-                return lit(++last_internal);
+                prog += (uchar)dsd_And, x, p;
+                return ++last_internal;
 
             }else if (hi == 0){
                 ftb |= ftb << shift;
                 swapLast(i);
                 uchar p = pullOutputs();
-                prog += (uchar)dsd_And, nlit(x), p;
-                return lit(++last_internal);
+                prog += (uchar)dsd_And, neg(x), p;
+                return ++last_internal;
 
             }else if (lo == mask){
                 ftb = ~ftb;
@@ -294,8 +235,8 @@ uchar DsdState::pullOutputs()
                 ftb = ~ftb;
                 swapLast(i);
                 uchar p = pullOutputs();
-                prog += (uchar)dsd_And, lit(x), neg(p);
-                return lit(++last_internal, true);
+                prog += (uchar)dsd_And, x, neg(p);
+                return neg(++last_internal);
 
             }else if (hi == mask){
                 ftb = ~ftb;
@@ -303,17 +244,17 @@ uchar DsdState::pullOutputs()
                 ftb = ~ftb;
                 swapLast(i);
                 uchar p = pullOutputs();
-                prog += (uchar)dsd_And, nlit(x), neg(p);
-                return lit(++last_internal, true);
+                prog += (uchar)dsd_And, neg(x), neg(p);
+                return neg(++last_internal);
 
             }else if (hi == (lo ^ mask)){
                 ftb ^= mask;
                 swapLast(i);
                 uchar p = pullOutputs();
-                bool s = isSigned(p);
-                p = unsign(p);
-                prog += (uchar)dsd_Xor, lit(x), p;
-                return lit(++last_internal, s);
+                bool s = p & 0x80;
+                p &= 0x7F;
+                prog += (uchar)dsd_Xor, x, p;
+                return neg(++last_internal, s);
             }
 
             // Extract MUX with input selector:
@@ -337,19 +278,19 @@ uchar DsdState::pullOutputs()
 
     switch (n_inputs){
     case 4:
-        prog += (uchar)dsd_Box4, lit(inputs[0]), lit(inputs[1]), lit(inputs[2]), lit(inputs[3]), (uchar)ftb, (uchar)(ftb >> 8);
+        prog += (uchar)dsd_Box4, inputs[0], inputs[1], inputs[2], inputs[3], (uchar)ftb, (uchar)(ftb >> 8);
         break;
     case 5:
-        prog += (uchar)dsd_Box5, lit(inputs[0]), lit(inputs[1]), lit(inputs[2]), lit(inputs[3]), lit(inputs[4]),
+        prog += (uchar)dsd_Box5, inputs[0], inputs[1], inputs[2], inputs[3], inputs[4],
                 (uchar)ftb, (uchar)(ftb >> 8), (uchar)(ftb >> 16), (uchar)(ftb >> 24);
         break;
     case 6:
-        prog += (uchar)dsd_Box6, lit(inputs[0]), lit(inputs[1]), lit(inputs[2]), lit(inputs[3]), lit(inputs[4]), lit(inputs[5]),
+        prog += (uchar)dsd_Box6, inputs[0], inputs[1], inputs[2], inputs[3], inputs[4], inputs[5],
                 (uchar)ftb, (uchar)(ftb >> 8), (uchar)(ftb >> 16), (uchar)(ftb >> 24), (uchar)(ftb >> 32), (uchar)(ftb >> 40), (uchar)(ftb >> 48), (uchar)(ftb >> 56);
         break;
     default: assert(false); }
 
-    return lit(++last_internal);
+    return ++last_internal;
 }
 
 
@@ -373,7 +314,7 @@ uchar DsdState::addMux(uchar x, uint64 ftb_hi, uint64 ftb_lo)
     else
         prog += (uchar)dsd_Mux, x, ph, pl;
 
-    return lit(++last_internal);
+    return ++last_internal;
 }
 
 
@@ -435,7 +376,7 @@ bool DsdState::pullInputs2()
         ftb = hi | (lo >> shift2);              \
         ftb |= ftb >> shift;                    \
         swapLast(i);                            \
-        inputs[j] = lit(++last_internal);       \
+        inputs[j] = ++last_internal;            \
         return true;                            \
 
     for (uint i = n_inputs; i > 1;){ i--;
@@ -454,23 +395,23 @@ bool DsdState::pullInputs2()
 
             if (v0 == v3 && v1 == v2){          // XyyX
                 // Pull out XOR:
-                prog += (uchar)dsd_Xor, lit(inputs[i]), lit(inputs[j]);
+                prog += (uchar)dsd_Xor, inputs[i], inputs[j];
                 Pull(v2, v3);       // -- correct
 
             }else if (v0 == v1){
                 if (v0 == v2){                  // Xyyy
-                    prog += (uchar)dsd_And, lit(inputs[i]), lit(inputs[j]);
+                    prog += (uchar)dsd_And, inputs[i], inputs[j];
                     Pull(v3, v2);
                 }else if (v0 == v3){            // yXyy
-                    prog += (uchar)dsd_And, lit(inputs[i]), nlit(inputs[j]);
+                    prog += (uchar)dsd_And, inputs[i], neg(inputs[j]);
                     Pull(v2, v3);
                 }
             }else if (v2 == v3){
                 if (v0 == v2){                  // yyXy
-                    prog += (uchar)dsd_And, nlit(inputs[i]), lit(inputs[j]);
+                    prog += (uchar)dsd_And, neg(inputs[i]), inputs[j];
                     Pull(v1, v0);
                 }else if (v1 == v2){            // yyyX
-                    prog += (uchar)dsd_And, nlit(inputs[i]), nlit(inputs[j]);
+                    prog += (uchar)dsd_And, neg(inputs[i]), neg(inputs[j]);
                     Pull(v0, v1);
                 }
             }
@@ -541,14 +482,14 @@ bool DsdState::pullInputs3()
                         if (!P.only_muxes ||norm.eq_class == 109){
                             bool inv_ftb = false;
                             if (P.use_box3)
-                                prog += (uchar)dsd_Box3, lit(inputs[k]), lit(inputs[j]), lit(inputs[i]), box;
+                                prog += (uchar)dsd_Box3, inputs[k], inputs[j], inputs[i], box;
                             else{
                                 pseq4_t seq = perm4_to_pseq4[norm.perm];
 
                                 uchar xs[3], ys[3];
-                                xs[0] = lit(inputs[k], norm.negs & 1);
-                                xs[1] = lit(inputs[j], norm.negs & 2);
-                                xs[2] = lit(inputs[i], norm.negs & 4);
+                                xs[0] = neg(inputs[k], norm.negs & 1);
+                                xs[1] = neg(inputs[j], norm.negs & 2);
+                                xs[2] = neg(inputs[i], norm.negs & 4);
                                 inv_ftb = (norm.negs & 16);
 
                                 ys[0] = xs[pseq4Get(seq, 0)];
@@ -585,7 +526,7 @@ bool DsdState::pullInputs3()
                             ftb |= ftb >> shift;
                             swapLast(i);
                             swapLast(j);
-                            inputs[k] = lit(++last_internal, inv_ftb);
+                            inputs[k] = neg(++last_internal, inv_ftb);
 
                             i--;
                             return true;
@@ -604,10 +545,8 @@ bool DsdState::pullInputs3()
 // -- Post process:
 
 
-// Returns 255 if 'rset' is used
 void DsdState::rebuild(uchar lit, uchar idx_off, uchar parent_op, uchar ret[6], uchar& ret_sz)
 {
-    //**/WriteLn "rebuild(%Cn%d)", (lit & 0x80) ? '~' : 0, (lit & 0x7F);
     uchar n = lit & 0x7F;
     if (n < FIRST_INTERNAL){
         ret[ret_sz++] = lit;
@@ -660,14 +599,6 @@ void DsdState::postProcess()
     if (prog.size() == 2)
         return;     // -- constant function, nothing to do
 
-    //**/void dumpDsd(const Vec<uchar>& prog);
-    //**/WriteLn "----------------------------------------";
-    //**/dumpDsd(prog);
-    //**/Write "PROG:"; for (uint i = 0; i < prog.size(); i++) Write " %.2x", (uint)prog[i]; NewLine;
-
-    //**/uint orig_n_leafs = nLeafs(prog);
-    //**/Vec<uchar> prog_copy(copy_, prog);
-
     // Create index
     uint idx_off = prog.size();
     uchar share[128];
@@ -702,27 +633,13 @@ void DsdState::postProcess()
     for (uint i = new_off; i < prog.size(); i++)
         prog[i - new_off] = prog[i];
     prog.shrinkTo(prog.size() - new_off);
-
-    //**/uint n_leafs = nLeafs(prog);
-    //**/if (n_leafs != orig_n_leafs){
-    //**/    WriteLn "----------------------------------------";
-    //**/    Dump(orig_n_leafs, n_leafs);
-    //**/    WriteLn "ORIG PROG:";
-    //**/    dumpDsd(prog_copy);
-    //**/    WriteLn "NEW PROG:";
-    //**/    dumpDsd(prog);
-    //**/}
-
-    //**/Write "PROG:"; for (uint i = 0; i < prog.size(); i++) Write " %.2x", (uint)prog[i]; NewLine;
-    //**/dumpDsd(prog);
 }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Testing:
+// Functions on DSD programs:
 
 
-// Debug:
 void dumpDsd(const Vec<uchar>& prog)
 {
     #define LIT(c) (c & 0x80) ? '~' : '\0', ((c & 0x7F) < N) ? 'x' : 'i', ((c & 0x7F) < N) ? (c & 0x7F) : (c & 0x7F) - N
@@ -956,16 +873,9 @@ bool hasBox(const Vec<uchar>& prog)
 }
 
 
-//struct RebuildSet {
-//    uchar elems[6];
-//    uchar op;
-//    uchar sz;
-//};
 
-
-
-//(a & b) & c  -> a & (b & c)
-//AND . . AND . . AND . .
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Debugging:
 
 
 void testDsd()
@@ -1080,7 +990,7 @@ void testDsd()
     }
 #endif
 
-#if 0
+#if 1
     /*
     Non-decomposable functions:
 
@@ -1090,8 +1000,8 @@ void testDsd()
      57,092 single output, triple input extraction
     */
 
-    InFile in("/home/een/ZZ/LutMap/ftbs_n1.txt");
-//    InFile in("lib6var5M.txt");     // 5,687,661  (4,461,343 non-decomp.)
+//    InFile in("/home/een/ZZ/LutMap/ftbs_n1.txt");
+    InFile in("lib6var5M.txt");     // 5,687,661  (4,461,343 non-decomp.)
     Vec<char> buf;
     uint n_ftbs = 0;
     uint nd_count = 0;
@@ -1137,7 +1047,7 @@ void testDsd()
 #endif
 
 
-#if 1   // Performance test
+#if 0   // Performance test
 //    InFile in("/home/een/ZZ/LutMap/ftbs_n1.txt"); uint N = 10;
     InFile in("lib6var5M.txt"); uint N = 1;    // 5,687,661  (4,461,343 non-decomp.)
     Vec<char> buf;
