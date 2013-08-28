@@ -78,6 +78,8 @@ void writeBlif(Out& out, Gig& N)
             break;
         case gate_PO:
         case gate_Seq:
+            /**/if (!(nam[w[0]].chr != 0)) WriteLn "w: %f", w;
+            /**/assert(nam[w[0]].chr != 0);
             FWriteLn(out) ".names %_ %_", nam[w[0]], nam[w];
             FWriteLn(out) "%_ 1", w[0].sign ? 0 : 1;
             break;

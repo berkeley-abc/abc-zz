@@ -4,10 +4,11 @@
 #include "ZZ_Unix.hh"
 #include "ZZ_Npn4.hh"
 #include "ZZ_BFunc.hh"
-#include "LutMap.hh"
-#include "GigReader.hh"
 #include "ZZ/Generics/Map.hh"
 #include "ZZ/Generics/Sort.hh"
+#include "LutMap.hh"
+#include "GigReader.hh"
+#include "Unmap.hh"
 
 
 using namespace ZZ;
@@ -20,9 +21,6 @@ using namespace ZZ;
 static
 void introduceMuxesAsLuts(Gig& N)
 {
-    N.is_frozen = false;
-    N.setMode(gig_FreeForm);
-
     Wire sel, d1, d0;
     For_DownOrder(N, w){
         if (isMux(w, sel, d1, d0))
@@ -35,9 +33,6 @@ void introduceMuxesAsLuts(Gig& N)
 static
 void makeCombinational(Gig& N)
 {
-    N.is_frozen = false;
-    N.setMode(gig_FreeForm);
-
     Vec<GLit> ins;
     For_Gates(N, w){
         if (isCI(w)){
@@ -304,8 +299,8 @@ int main(int argc, char** argv)
     cli.add("input"  , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
     cli.add("output" , "string", ""          , "Output GNL file (optional).", 1);
     cli.add("keep"   , "string", ""          , "List of forcable gates (only gor GNL input).");
-    cli.add("blif"   , "string", ""          , "Save original input in BLIF format (for debugging only).");
-    cli.add("pnl"    , "string", ""          , "Save original input in PNL format (for debugging only).");
+    cli.add("blif"   , "string", ""          , "Save original input in BLIF format (for debugging only). Add '@' as last character to skip mapping.");
+    cli.add("pnl"    , "string", ""          , "Save original input in PNL format (for debugging only). Add '@' as last character to skip mapping.");
     cli.add("ftbs"   , "string", ""          , "Write all FTBs to a file (for analysis).");
     cli.add("N"      , "uint"  , "10"        , "Cuts to keep per node.");
     cli.add("iters"  , "uint"  , "4"         , "Number of mapping phases.");
@@ -375,15 +370,14 @@ int main(int argc, char** argv)
 #if 1
     N.is_frozen = false;
     WriteLn "Info: %_", info(N);
-    WriteLn "Putting into Lut4 form.";
-    putIntoLut4(N);
+    //WriteLn "Putting into Lut4 form.";
+    //putIntoLut4(N);
     WriteLn "Strashing";
-    /**/N.assertMode();
-    Add_Gob(N, Strash);
+    N.strash();
     WriteLn "Info: %_", info(N);
-    Remove_Gob(N, Strash);
-    /**/N.assertMode();
-    N.setMode(gig_FreeForm);
+    N.unstrash();
+
+    N.is_frozen = false;
 #endif
 
     if (cli.get("melt").bool_val)
@@ -446,9 +440,30 @@ int main(int argc, char** argv)
     double T2 = cpuTime();
     WriteLn "Mapping: %t", T2-T1;
 
+    WriteLn "Unmapping...";
+    unmap(N);
+    N.unstrash();
+    removeUnreach(N);
+    N.compact();
+    WriteLn "Netlist: %_", info(N);
+    putIntoLut4(N);
+    lutMap(N, P, &keep);
+
+#if 1
+    WriteLn "Unmapping 2...";
+    unmap(N);
+    N.unstrash();
+    removeUnreach(N);
+    N.compact();
+    WriteLn "Netlist: %_", info(N);
+    putIntoLut4(N);
+    lutMap(N, P, &keep);
+#endif
+
+
     if (output != ""){
         if (hasExtension(output, "blif")){
-            N.setMode(gig_Lut6);
+            //N.setMode(gig_Lut6);
             writeBlifFile(output, N);
             WriteLn "Wrote: \a*%_\a*", output;
         }else if (hasExtension(output, "gnl")){
@@ -494,10 +509,14 @@ int main(int argc, char** argv)
             sizeC[supSize(ftb(w))]++;
     }
 
+    NewLine;
     WriteLn "Statistics:";
     for (uint i = 0; i <= 6; i++)
         if (sizeC[i] > 0)
             WriteLn "    LUT %_: %>11%,d  (%.1f %%)", i, sizeC[i], double(sizeC[i]) / N.typeCount(gate_Lut6) * 100;
+    NewLine;
+    WriteLn "    Total: %>11%,d", N.typeCount(gate_Lut6);
+    WriteLn "    Edges: %>11%,d", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6];
 
     return 0;
 }

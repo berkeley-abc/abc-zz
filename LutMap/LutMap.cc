@@ -22,6 +22,8 @@
 
 #define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
 
+#define WIRE_MAP
+
 
 namespace ZZ {
 using namespace std;
@@ -346,7 +348,11 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
             costs[i].area += area_est[w];
             costs[i].avg_fanout += fanout_est[w];
         }
+      #if defined(WIRE_MAP)
+        costs[i].area += cuts[i].size();
+      #else
         costs[i].area += 1;     // -- LUT cost = 1
+      #endif
         costs[i].avg_fanout /= cuts[i].size();
     }
 
@@ -567,8 +573,11 @@ void LutMap::updateFanoutEst(bool instantiate)
         if (isLogic(w)){
             reprioritizeCuts(w, cutmap[w]);
             const Cut& cut = cutmap[w][0];
+          #if defined(WIRE_MAP)
+            mapped_area += cut.size();
+          #else
             mapped_area += 1;       // -- LUT cost = 1
-
+          #endif
             for (uint i = 0; i < cut.size(); i++){
                 Wire v = cut[i] + N;
                 area_est(v) = 0;
@@ -620,7 +629,11 @@ void LutMap::updateFanoutEst(bool instantiate)
             if (fanouts[w] > 0){
                 /**/prioritizeCuts(w, cutmap[w]);
                 const Cut& cut = cutmap[w][0];
+              #if defined(WIRE_MAP)
+                mapped_area += cut.size();
+              #else
                 mapped_area += 1;       // -- LUT cost = 1
+              #endif
 
                 for (uint i = 0; i < cut.size(); i++){
                     Wire v = cut[i] + N;
@@ -704,7 +717,7 @@ void LutMap::updateFanoutEst(bool instantiate)
         // Build LUT representation:
         N.is_frozen = false;
         N.is_reach = false;
-        N.setMode(gig_FreeForm);
+        //N.setMode(gig_FreeForm);
         uint j = 0;
         For_Gates(N, w){
             if (isLogic(w) && active[w]){
@@ -724,6 +737,7 @@ void LutMap::updateFanoutEst(bool instantiate)
         N.compact(m);
         if (remap)
             m.applyTo(remap->base());
+        N.is_frozen = false;
     }
 }
 

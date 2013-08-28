@@ -79,33 +79,18 @@ inline bool GateHash<ght_Lut>::equal(GLit p, GLit q) const
 // Strash:
 
 
-void updateStrashMode(Gig& N)
-{
-    // Setup 'strash_mask' for the netlist:
-    if (N.mode() == gig_Aig){
-        N.strash_mask = N.mode_mask & ~(1ull << gate_And);
-    }else if (N.mode() == gig_Xig){
-        N.strash_mask = N.mode_mask & ~(1ull << gate_And) & ~(1ull << gate_Xor) & ~(1ull << gate_Mux) & ~(1ull << gate_Maj);
-    }else if (N.mode() == gig_Lut4){
-        N.strash_mask = N.mode_mask & ~(1ull << gate_Lut4);
-    }else{
-        ShoutLn "INTERNAL ERROR! Trying to strash a netlist in mode '%_'.", N.mode_;
-        assert(false);      // -- cannot strash current mode
-    }
-}
-
-
 GigObj_Strash::GigObj_Strash(Gig& N_) :
     GigObj(N_),
     and_nodes(GateHash<ght_Bin>(*this)),
     xor_nodes(GateHash<ght_Bin>(*this)),
     mux_nodes(GateHash<ght_Tri>(*this)),
     maj_nodes(GateHash<ght_Tri>(*this)),
+    one_nodes(GateHash<ght_Tri>(*this)),
+    gmb_nodes(GateHash<ght_Tri>(*this)),
+    dot_nodes(GateHash<ght_Tri>(*this)),
     lut_nodes(GateHash<ght_Lut>(*this)),
     initializing(false)
 {
-    updateStrashMode(*N);
-
     // Add listener:
     N->listen(*this, msg_Remove);
         // -- 'msg_Update' and 'msg_Add' is already handled natively by the Gig (not allowed to
@@ -116,7 +101,6 @@ GigObj_Strash::GigObj_Strash(Gig& N_) :
 
 GigObj_Strash::~GigObj_Strash()
 {
-    N->strash_mask = N->mode_mask;
     N->unlisten(*this, msg_Remove);
 }
 
@@ -128,6 +112,9 @@ void GigObj_Strash::rehashNetlist()
     xor_nodes.clear();
     mux_nodes.clear();
     maj_nodes.clear();
+    one_nodes.clear();
+    gmb_nodes.clear();
+    dot_nodes.clear();
     lut_nodes.clear();
 
     For_UpOrder(*N, w){
@@ -136,6 +123,9 @@ void GigObj_Strash::rehashNetlist()
         case gate_Xor:  { bool ok = !xor_nodes.add(w); assert(ok); break; }
         case gate_Mux:  { bool ok = !mux_nodes.add(w); assert(ok); break; }
         case gate_Maj:  { bool ok = !maj_nodes.add(w); assert(ok); break; }
+        case gate_One:  { bool ok = !one_nodes.add(w); assert(ok); break; }
+        case gate_Gamb: { bool ok = !gmb_nodes.add(w); assert(ok); break; }
+        case gate_Dot:  { bool ok = !dot_nodes.add(w); assert(ok); break; }
         case gate_Lut4: { bool ok = !lut_nodes.add(w); assert(ok); break; }
         default: ;/*nothing*/ }
     }
@@ -149,13 +139,16 @@ void GigObj_Strash::rehashNetlist()
 void GigObj_Strash::removing(Wire w, bool)
 {
     if (initializing) return;
-    if ((1ull << w.type()) & N->strash_mask) return;    // -- we only care about gates controlled by strashing
+    if (!ofType(w, gtm_Strashed)) return;    // -- we only care about gates controlled by strashing
 
     switch (w.type()){
     case gate_And:  { bool ok = and_nodes.exclude(w); assert(ok); break; }
     case gate_Xor:  { bool ok = xor_nodes.exclude(w); assert(ok); break; }
     case gate_Mux:  { bool ok = mux_nodes.exclude(w); assert(ok); break; }
     case gate_Maj:  { bool ok = maj_nodes.exclude(w); assert(ok); break; }
+    case gate_One:  { bool ok = one_nodes.exclude(w); assert(ok); break; }
+    case gate_Gamb: { bool ok = gmb_nodes.exclude(w); assert(ok); break; }
+    case gate_Dot:  { bool ok = dot_nodes.exclude(w); assert(ok); break; }
     case gate_Lut4: { bool ok = lut_nodes.exclude(w); assert(ok); break; }
     default: assert(false); }
 }
@@ -268,6 +261,15 @@ inline GLit GigObj_Strash::add_Mux(GLit s, GLit d1, GLit d0) {
 inline GLit GigObj_Strash::add_Maj(GLit p, GLit q, GLit r) {
     return add_Tri(maj_nodes, gate_Maj, *N, p, q, r); }
 
+inline GLit GigObj_Strash::add_One(GLit p, GLit q, GLit r) {
+    return add_Tri(one_nodes, gate_One, *N, p, q, r); }
+
+inline GLit GigObj_Strash::add_Gamb(GLit p, GLit q, GLit r) {
+    return add_Tri(gmb_nodes, gate_Gamb, *N, p, q, r); }
+
+inline GLit GigObj_Strash::add_Dot(GLit p, GLit q, GLit r) {
+    return add_Tri(dot_nodes, gate_Dot, *N, p, q, r); }
+
 inline GLit GigObj_Strash::add_Lut4(GLit p, GLit q, GLit r, GLit s, ushort ftb) {
     return add_Lut(lut_nodes, gate_Lut4, *N, p, q, r, s, ftb); }
 
@@ -284,7 +286,7 @@ macro Wire falseFrom(Wire x) { return Wire(x.gig(), ~GLit_True); }
 // AIG:
 
 
-macro Wire unified_And(Wire x, Wire y, GigMode mode)
+Wire aig_And(Wire x, Wire y)
 {
     assert_debug(x.gig() == y.gig());
     assert_debug(x.id >= gid_FirstUser || x.id == gid_True);
@@ -298,23 +300,14 @@ macro Wire unified_And(Wire x, Wire y, GigMode mode)
 
     // Structural hashing:
     Gig& N = *x.gig();
-    assert_debug(N.mode() == mode);
 
     GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
     return H.add_And(x, y) + N;
 }
 
 
-Wire aig_And(Wire x, Wire y) {
-    return unified_And(x, y, gig_Aig); }
-
-
 //=================================================================================================
 // -- XIG:
-
-
-Wire xig_And(Wire x, Wire y) {
-    return unified_And(x, y, gig_Xig); }
 
 
 Wire xig_Xor(Wire x, Wire y)
@@ -335,8 +328,6 @@ Wire xig_Xor(Wire x, Wire y)
 
     // Structural hashing:
     Gig& N = *x.gig();
-    assert_debug(N.mode() == gig_Xig);
-
     GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
     return (H.add_Xor(x, y) ^ sign) + N;
 }
@@ -402,8 +393,6 @@ Wire xig_Mux(Wire s, Wire d1, Wire d0)
 
     // Structural hashing:
     Gig& N = *s.gig();
-    assert_debug(N.mode() == gig_Xig);
-
     GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
     return (H.add_Mux(s, d1, d0) ^ sign) + N;
 }
@@ -432,10 +421,79 @@ Wire xig_Maj(Wire x, Wire y, Wire z)
 
     // Structural hashing:
     Gig& N = *x.gig();
-    assert_debug(N.mode() == gig_Xig);
-
     GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
     return H.add_Maj(x, y, z) + N;
+}
+
+
+// x + y + z = 1
+Wire xig_One(Wire x, Wire y, Wire z)
+{
+    assert_debug(x.gig() == y.gig());
+    assert_debug(x.gig() == z.gig());
+    assert_debug(x.id >= gid_FirstUser || x.id == gid_True);
+    assert_debug(y.id >= gid_FirstUser || y.id == gid_True);
+    assert_debug(z.id >= gid_FirstUser || z.id == gid_True);
+
+    // Simple rules:
+    if (y < x) swp(x, y);
+    if (z < y) swp(y, z);
+    if (y < x) swp(x, y);
+
+    if (x ==  GLit_True) return xig_And(~y, ~z);
+    if (x == ~GLit_True) return xig_Xor(y, z);
+
+    if (x ==  y) return xig_And(~y, z);
+    if (x == ~y) return ~z;
+    if (y ==  z) return xig_And(~y, x);
+    if (y == ~z) return ~x;
+
+    // Structural hashing:
+    Gig& N = *x.gig();
+    GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
+    return H.add_One(x, y, z) + N;
+}
+
+
+// x + y + z = 0 or 3
+Wire xig_Gamb(Wire x, Wire y, Wire z)
+{
+    assert_debug(x.gig() == y.gig());
+    assert_debug(x.gig() == z.gig());
+    assert_debug(x.id >= gid_FirstUser || x.id == gid_True);
+    assert_debug(y.id >= gid_FirstUser || y.id == gid_True);
+    assert_debug(z.id >= gid_FirstUser || z.id == gid_True);
+
+    // Simple rules:
+    if (y < x) swp(x, y);
+    if (z < y) swp(y, z);
+    if (y < x) swp(x, y);
+
+    if (x ==  GLit_True) return xig_And(y, z);
+    if (x == ~GLit_True) return xig_And(~y, ~z);
+
+    Gig& N = *x.gig();
+    if (x ==  y) return xig_Equiv(y, z);
+    if (x == ~y) return ~N.True();
+    if (y ==  z) return xig_Equiv(y, x);
+    if (y == ~z) return ~N.True();
+
+    // Structural hashing:
+    GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
+    return H.add_Gamb(x, y, z) + N;
+}
+
+
+// (x ^ y) | (x & z) 
+Wire xig_Dot(Wire x, Wire y, Wire z)
+{
+    if (x == +GLit_True || y == +GLit_True || z == +GLit_True || +x == +y || +x == +z || +y == +z)
+        return xig_Mux(x, xig_Or(~y, z), y);    // -- not the most efficient way, but this is not an important function
+
+    // Structural hashing:
+    Gig& N = *x.gig();
+    GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
+    return H.add_Dot(x, y, z) + N;
 }
 
 
@@ -552,14 +610,10 @@ void GigObj_Strash::strashNetlist()
     // Need to strash?
     bool got_strash_gates = false;
     for (uint i = 0; i < GateType_size; i++){
-        bool in_mmask = N->mode_mask   & (1ull << i);
-        bool in_smask = N->strash_mask & (1ull << i);
-        if (in_mmask && !in_smask){
-            GateType type = (GateType)i;
-            if (N->typeCount(type) > 0){
-                got_strash_gates = true;
-                break; }
-        }
+        GateType type = (GateType)i;
+        if (ofType(type, gtm_Strashed) && N->typeCount(type) > 0){
+            got_strash_gates = true;
+            break; }
     }
     if (!got_strash_gates) return;
 
@@ -574,8 +628,6 @@ void GigObj_Strash::strashNetlist()
     bool recyc = N->isRecycling();
     N->setRecycling(true);
     initializing = true;
-    uint64 strash_mask0 = N->strash_mask;
-    N->strash_mask = N->mode_mask;
 
     WMapX<GLit> xlat;
     xlat.initBuiltins();
@@ -583,13 +635,6 @@ void GigObj_Strash::strashNetlist()
     Wire  w0, w1, w2, w3, w_new;
     ushort ftb;
     For_UpOrder(*N, w){
-      #if 0   /*DEBUG*/
-        For_Inputs(w, v){
-            /**/if (!(!v.isRemoved() || xlat[v])) Dump(v);
-            assert(!v.isRemoved() || xlat[v]);
-        }
-      #endif  /*END DEBUG*/
-
         // Translate inputs:
         For_Inputs(w, v)
             if (v != xlat[v])
@@ -598,35 +643,30 @@ void GigObj_Strash::strashNetlist()
         // If strashed gate type, rebuild the gate using strash functions:
         switch (w.type()){
         case gate_And:
-            assert_debug(N->mode() == gig_Aig || N->mode() == gig_Xig);
             w0 = w[0]; w1 = w[1];
             remove(w);
-            w_new = unified_And(w0, w1, N->mode());
+            w_new = aig_And(w0, w1);
             break;
 
         case gate_Xor:
-            assert_debug(N->mode() == gig_Xig);
             w0 = w[0]; w1 = w[1];
             remove(w);
             w_new = xig_Xor(w0, w1);
             break;
 
         case gate_Mux:
-            assert_debug(N->mode() == gig_Xig);
             w0 = w[0]; w1 = w[1]; w2 = w[2];
             remove(w);
             w_new = xig_Mux(w0, w1, w2);
             break;
 
         case gate_Maj:
-            assert_debug(N->mode() == gig_Xig);
             w0 = w[0]; w1 = w[1]; w2 = w[2];
             remove(w);
             w_new = xig_Maj(w0, w1, w2);
             break;
 
         case gate_Lut4:
-            assert_debug(N->mode() == gig_Lut4);
             w0 = w[0]; w1 = w[1]; w2 = w[2]; w3 = w[3];
             ftb = w.arg();
             remove(w);
@@ -642,7 +682,6 @@ void GigObj_Strash::strashNetlist()
 
     N->setRecycling(recyc);
     initializing = false;
-    N->strash_mask = strash_mask0;
     N->is_compact = false;          // -- gates may have been removed
     N->is_reach = false;            // -- gates may have become redundant
 

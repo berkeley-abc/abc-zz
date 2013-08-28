@@ -25,7 +25,6 @@ using namespace std;
 void readAiger_(In& in, Gig& N, bool verif_problem)
 {
     assert(N.isEmpty());
-    N.setMode(gig_Aig);
 
     // Parse header:
     Vec<char> buf;

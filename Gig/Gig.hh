@@ -116,10 +116,6 @@ struct Gig_data {
     bool                is_compact;     // -- no gaps in gate vector
     bool                is_reach;       // -- all gates reachable from COs
 
-    GigMode             mode_;          // }- restriction on which gate types are allowed (mode
-    uint64              mode_mask;      // }  mask will always exlude 'gate_NULL' and 'gate_Const')
-    uint64              strash_mask;    // -- Subset of 'mode_mask' that is allowed in strashed mode (excluding strashed gate types)
-
   #if defined(ZZ_GIG_PAGED)
     Vec<Gate*>          pages;
   #else
@@ -254,7 +250,6 @@ inline void Wire::set(uint pin, GLit v)
 {
     assert_debug(isLegal());
     assert_debug(pin < size());
-    assert_debug((1ull << type()) & ((Gig_data*)N)->strash_mask); // -- if this assert fails, you are trying to change inputs of a strashed gate.
     assert_debug(v == GLit_NULL || !Wire(N, v).isRemoved());
     assert_debug(!((Gig_data*)N)->is_frozen);
 
@@ -451,20 +446,14 @@ struct Gig : Gig_data, NonCopyable {
   //________________________________________
   //  Mode control:
 
+    void strash(uint64 strashed_gates = gtm_Strashed);
+    void unstrash();
+
     // There are four booleans in the base class 'Gig_data' that can be read/modified directly:
     //  - bool is_frozen      -- if set, netlist cannot be modified (assertion is raised)
     //  - bool is_canonical   -- if set, is topologically sorted (not enforced, so make sure your code is correct)
     //  - bool is_compact     -- if set, there are no deleted gates (gaps in the vector of gates; also not enforced)
     //  - bool is_reach       -- if set, all gates are reachable from combinational outputs (also not enforced)
-
-    GigMode mode() const { return mode_; }
-    void    setMode(GigMode mode);
-    void    assertMode() const;                 // -- validate the current mode, abort program if fails
-  #if defined(ZZ_DEBUG)
-    void    debugAssertMode() const { assertMode(); }
-  #else
-    void    debugAssertMode() const {}
-  #endif
 
   //________________________________________
   //  Special gates: (always present)
@@ -586,9 +575,6 @@ inline Gig::Gig()
     is_canonical = false;
     is_compact   = false;
     is_reach     = false;
-    mode_        = gig_FreeForm;
-    mode_mask    = 0;
-    strash_mask  = 0;
     size_        = 0;
     use_freelist = true;
     objs         = NULL;

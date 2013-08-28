@@ -4,11 +4,11 @@
 //| Author(s)   : Niklas Een
 //| Module      : Gig
 //| Description : Collection of small, commonly useful functions operating on a Gig.
-//| 
+//|
 //| (C) Copyright 2010-2012, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -123,7 +123,6 @@ void upOrderRef(Vec<uchar>& seen, Vec<GLit>& order, Wire w0)
 
 void upOrder(const Gig& N, /*out*/Vec<GLit>& order)
 {
-    N.debugAssertMode();
     Vec<uchar> seen(N.size(), false);
     for (gate_id i = gid_FirstLegal; i < gid_FirstUser; i++)
         seen[i] = true;
@@ -152,7 +151,6 @@ void upOrder(const Gig& N, const Vec<GLit>& sinks, /*out*/Vec<GLit>& order)
 
 void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* order_ptr)
 {
-    N.debugAssertMode();
     Vec<GLit> order_internal;
     Vec<GLit>& order = order_ptr ? *order_ptr : order_internal;
     order.reserve(N.size());
@@ -190,11 +188,6 @@ void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* orde
 
 void introduceMuxes(Gig& N)
 {
-    if (N.mode() == gig_Aig)
-        N.setMode(gig_Xig);
-    else
-        assert(N.mode() == gig_Xig || N.mode() == gig_FreeForm);
-
     Wire sel, d1, d0;
     For_DownOrder(N, w){
         if (isMux(w, sel, d1, d0)){
@@ -214,7 +207,6 @@ void introduceMuxes(Gig& N)
 // LUTs are replaced by buffers pointing to 'True()' or '~True()'.
 void normalizeLut4s(Gig& N, bool ban_constant_luts)
 {
-    N.debugAssertMode();
     For_Gates(N, w){
         if (w != gate_Lut4) continue;
 
@@ -249,18 +241,7 @@ void normalizeLut4s(Gig& N, bool ban_constant_luts)
 // NOTE! If LUTs have inputs not in the support if it's FTB, those inputs may end up unreachable.
 void putIntoNpn4(Gig& N)
 {
-    N.debugAssertMode();
-    N.setMode(gig_FreeForm);
-
-    uint64 mask = (1ull << (uint64)gate_And)
-                | (1ull << (uint64)gate_Xor)
-                | (1ull << (uint64)gate_Mux)
-                | (1ull << (uint64)gate_Maj)
-                | (1ull << (uint64)gate_Buf)
-                | (1ull << (uint64)gate_Not)
-                | (1ull << (uint64)gate_Or)
-                | (1ull << (uint64)gate_Equiv)
-                | (1ull << (uint64)gate_Lut4);
+    uint64 mask = gtm_XigLogic | GTM_(Buf) | GTM_(Not) | GTM_(Or) | GTM_(Equiv) | GTM_(Lut4);
 
     WSeen inverted;
     Wire v[4];
@@ -285,6 +266,17 @@ void putIntoNpn4(Gig& N)
             break;
         case gate_Maj:
             change(w, gate_Npn4, npn4_cl_MAJ).init(v[0], v[1], v[2]);
+            break;
+        case gate_One:
+            change(w, gate_Npn4, npn4_cl_N_ONE).init(v[0], v[1], v[2]);
+            inverted.add(w);
+            break;
+        case gate_Gamb:
+            change(w, gate_Npn4, npn4_cl_N_GAMB).init(v[0], v[1], ~v[2]);
+            inverted.add(w);
+            break;
+        case gate_Dot:
+            change(w, gate_Npn4, npn4_cl_DOT).init(v[0], v[1], v[2]);
             break;
         case gate_Buf:
             change(w, gate_Npn4, npn4_cl_BUF).init(v[0]);
@@ -328,8 +320,6 @@ void putIntoNpn4(Gig& N)
                 w.set(Input_Pin(v), ~N.True() ^ v.sign);
         }
     }
-
-    N.setMode(gig_Npn4);
 }
 
 
@@ -337,7 +327,6 @@ void putIntoLut4(Gig& N)
 {
     // Temporary version using 'putIntoNpn4()':
     putIntoNpn4(N);
-    N.setMode(gig_FreeForm);
 
     For_Gates(N, w){
         if (w == gate_Npn4){
@@ -354,8 +343,6 @@ void putIntoLut4(Gig& N)
             w.arg_set(ftb);
         }
     }
-
-    N.setMode(gig_Lut4);
 }
 
 

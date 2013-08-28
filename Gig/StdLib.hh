@@ -31,13 +31,17 @@ String info(const Gig& N);
 // Simple predicates:
 
 
+macro bool ofType(Wire     w, uint64 type_mask) { return (1ull << w.type()) & type_mask; }
+macro bool ofType(GateType t, uint64 type_mask) { return (1ull << t) & type_mask; }
+
 macro bool isCO(Wire w) { return combOutput(w.type()); }
 macro bool isCI(Wire w) { return combInput (w.type()); }
 
 macro bool isSO(Wire w) { return seqOutput(w.type()); }
 macro bool isSI(Wire w) { return seqInput (w.type()); }
 
-macro bool isSeqElem(Wire w) { return seqElem(w.type()); }
+macro bool isSeqElem(Wire w)   { return seqElem(w.type()); }
+macro bool isLogicGate(Wire w) { return logicGate(w.type()); }
 
 bool isMux(Wire w, Wire& sel, Wire& d1, Wire& d0);
     // -- Returns TRUE if 'w' is the top AND-gate of a balanced, 3 AND-gate tree making up a MUX.
@@ -45,7 +49,7 @@ bool isMux(Wire w, Wire& sel, Wire& d1, Wire& d0);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Topological orders:
+// Topological order:
 
 
 void upOrder(const Gig& N, /*out*/Vec<GLit>& order);
@@ -89,7 +93,7 @@ void normalizeLut4s(Gig& N, bool ban_constant_luts = true);
 
 void putIntoNpn4(Gig& N);
     // -- Put the netlist into Npn4 form. Will convert the following gate types into 'gate_Npn4':
-    // And, Xor, Mux, Maj, Buf, Not, Or, Equiv, Lut4
+    //   And, Xor, Mux, Maj, Buf, Not, Or, Equiv, Lut4.
 
 void putIntoLut4(Gig& N);
     // -- Same as 'putIntoNpn4()' but for 'gate_Lut4' instead of 'gate_Npn4'.

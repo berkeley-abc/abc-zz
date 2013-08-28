@@ -78,6 +78,9 @@ template<> fts_macro void write_(Out& out, const GateAttrType& v){
     Macro(Xor) \
     Macro(Mux) \
     Macro(Maj) \
+    Macro(One) \
+    Macro(Gamb) \
+    Macro(Dot) \
     Macro(Buf) \
     Macro(Not) \
     Macro(Or) \
@@ -130,8 +133,11 @@ DEF( And      , 2    , NULL )
 
 // Extended AIG:
 DEF( Xor      , 2    , NULL )
-DEF( Mux      , 3    , NULL )
+DEF( Mux      , 3    , NULL )   // x ? y : z        (x = pin0, y = pin1, z = pin2)
 DEF( Maj      , 3    , NULL )   // x + y + z >= 2
+DEF( One      , 3    , NULL )   // x + y + z = 1
+DEF( Gamb     , 3    , NULL )   // x + y + z = 0 or 3
+DEF( Dot      , 3    , NULL )   // (x ^ y) | (x & z)
 
 // Alternative AIG nodes:
 DEF( Buf      , 1    , NULL )
@@ -203,25 +209,47 @@ macro bool isNumbered(GateType type) {
 // Sub-types:
 
 
-macro bool seqElem(GateType t) { return t == gate_FF || t == gate_Box || t == gate_MFlop; }
+#define GTM_(typename) (1ull << gate_##typename)
+#define GTM(type)    (1ull << (type))
+
+// Gate type masks:
+#define gtm_All (0xFFFFFFFFFFFFFFFFull)
+#define gtm_Special (GTM_(Const) | GTM_(Reset))
+
+#define gtm_SeqElem (GTM_(FF) | GTM_(Box) | GTM_(MFlop))
     // -- these are the gates that should have 'Seq' gates on their input side
 
-macro bool logicElem(GateType t) { return t >= gate_And && t <= gate_WLut; }
-    // -- these are the gates that are restricted by the netlist's "mode".
+#define gtm_Logic \
+    ( GTM_(And) | GTM_(Xor) | GTM_(Mux) | GTM_(Maj) | GTM_(One) | GTM_(Gamb) | GTM_(Dot) | GTM_(Buf) | GTM_(Not) | GTM_(Or) \
+    | GTM_(Equiv) | GTM_(Conj) | GTM_(Disj) | GTM_(Even) | GTM_(Odd) | GTM_(Lut4) | GTM_(Npn4) | GTM_(Lut6) | GTM_(WLut) )
 
-macro bool combInput (GateType t) { return (t >= gate_FF && t <= gate_PPI) || seqElem(t); }
-macro bool combOutput(GateType t) { return t >= gate_PO && t <= gate_Seq; }
+#define gtm_And GTM_(And)
+#define gtm_Lut4 GTM_(Lut4)
+#define gtm_Npn4 GTM_(Npn4)
+#define gtm_Lut6 GTM_(Lut6)
+#define gtm_XigLogic (GTM_(And) | GTM_(Xor) | GTM_(Mux) | GTM_(Maj) | GTM_(One) | GTM_(Gamb) | GTM_(Dot))
+#define gtm_Strashed (GTM_(And) | GTM_(Xor) | GTM_(Mux) | GTM_(Maj) | GTM_(One) | GTM_(Gamb) | GTM_(Dot) | GTM_(Lut4))
 
-macro bool seqInput (GateType t) { return t >= gate_PI && t <= gate_PPI; }
-macro bool seqOutput(GateType t) { return t >= gate_PO && t <= gate_OrigFF; }
-    // -- excludes 'FF' and 'Seq' from combinational inputs/outputs.
+#define gtm_SI (GTM_(FF) | GTM_(PI) | GTM_(Clk) | GTM_(PPI))
+#define gtm_SO (GTM_(PO) | GTM_(SafeProp) | GTM_(SafeCons) | GTM_(FairProp) | GTM_(FairCons) | GTM_(OrigFF))
+    // primary inputs and outputs for SEQUENTIAL netlists
 
-macro bool aigGate (GateType t) { return !logicElem(t) || t == gate_And; }
-macro bool xigGate (GateType t) { return !logicElem(t) || t <= gate_Maj; }
-macro bool npn4Gate(GateType t) { return !logicElem(t) || t == gate_Npn4; }
-macro bool lut4Gate(GateType t) { return !logicElem(t) || t == gate_Lut4; }
-macro bool lut6Gate(GateType t) { return !logicElem(t) || t == gate_Lut6; }
-    // -- for efficiency, we allow 'gate_NULL' here.
+#define gtm_CI (gtm_SI | gtm_SeqElem)
+#define gtm_CO (gtm_SO | GTM_(Seq))
+    // primary inputs and outputs for COMBINATIONAL interpretation (adding flops as CI/COs)
+
+macro bool seqElem   (GateType t) { return GTM(t) & gtm_SeqElem; }
+macro bool logicGate (GateType t) { return GTM(t) & gtm_Logic; }
+macro bool combInput (GateType t) { return GTM(t) & gtm_CI; }
+macro bool combOutput(GateType t) { return GTM(t) & gtm_CO; }
+macro bool seqInput  (GateType t) { return GTM(t) & gtm_SI; }
+macro bool seqOutput (GateType t) { return GTM(t) & gtm_SO; }
+
+macro bool aigGate (GateType t) { return GTM(t) & (~gtm_Logic | gtm_And); }
+macro bool xigGate (GateType t) { return GTM(t) & (~gtm_Logic | gtm_XigLogic); }
+macro bool npn4Gate(GateType t) { return GTM(t) & (~gtm_Logic | gtm_Npn4); }
+macro bool lut4Gate(GateType t) { return GTM(t) & (~gtm_Logic | gtm_Lut4); }
+macro bool lut6Gate(GateType t) { return GTM(t) & (~gtm_Logic | gtm_Lut6); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

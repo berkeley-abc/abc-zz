@@ -51,6 +51,9 @@ class GigObj_Strash : public GigObj, public GigLis {
     Set<GLit,GateHash<ght_Bin> >  xor_nodes;
     Set<GLit,GateHash<ght_Tri> >  mux_nodes;
     Set<GLit,GateHash<ght_Tri> >  maj_nodes;
+    Set<GLit,GateHash<ght_Tri> >  one_nodes;
+    Set<GLit,GateHash<ght_Tri> >  gmb_nodes;
+    Set<GLit,GateHash<ght_Tri> >  dot_nodes;
     Set<GLit,GateHash<ght_Lut> >  lut_nodes;
 
     bool initializing;      // -- Set during execution of 'strashNetlist()' to modify the behavior of 'removing()'
@@ -69,6 +72,9 @@ public:
     GLit add_Xor (GLit u, GLit v);
     GLit add_Mux (GLit s, GLit tt, GLit ff);
     GLit add_Maj (GLit u, GLit v , GLit w );
+    GLit add_One (GLit u, GLit v , GLit w );
+    GLit add_Gamb(GLit u, GLit v , GLit w );
+    GLit add_Dot (GLit u, GLit v , GLit w );
     GLit add_Lut4(GLit d0, GLit d1, GLit d2, GLit d3, ushort ftb);
 
   //________________________________________
@@ -103,11 +109,14 @@ macro Wire aig_Equiv(Wire x, Wire y)           { return aig_Mux(x,  y, ~y); }
 
 // XIG:
 //
-Wire xig_And(Wire x, Wire y);
-Wire xig_Xor(Wire x, Wire y);
-Wire xig_Mux(Wire s, Wire d1, Wire d0);
-Wire xig_Maj(Wire x, Wire y, Wire z);
+Wire xig_Xor (Wire x, Wire y);
+Wire xig_Mux (Wire s, Wire d1, Wire d0);
+Wire xig_Maj (Wire x, Wire y, Wire z);
+Wire xig_Gamb(Wire x, Wire y, Wire z);
+Wire xig_One (Wire x, Wire y, Wire z);
+Wire xig_Dot (Wire x, Wire y, Wire z);      // (x ^ y) | (x & z) 
 
+macro Wire xig_And  (Wire x, Wire y) { return aig_And(x, y); }
 macro Wire xig_Or   (Wire x, Wire y) { return ~xig_And(~x, ~y); }
 macro Wire xig_Equiv(Wire x, Wire y) { return ~xig_Xor( x , y); }
 

@@ -120,8 +120,6 @@ void Gig::clear(bool reinit)
     is_canonical = false;
     is_compact   = false;
     is_reach     = false;
-    mode_ = gig_FreeForm;
-    mode_mask = ~0ull;
 
     // Initialize netlist:
     if (reinit){
@@ -143,25 +141,11 @@ void Gig::clear(bool reinit)
         add(gate_Reset);
         add(gate_NULL);         // -- reserved slot (want first user gate to be 8, nice and round)
     }
-
-    mode_mask = ~3ull;          // -- disallow construction of NULL gates and constant gates
-    strash_mask = mode_mask;    // -- in normal mode, these masks must be identical
 }
 
 
 gate_id Gig::addInternal(GateType type, uint sz, uint attr, bool strash_normalized)
 {
-    if (hasObj(gigobj_Strash) && !strash_normalized){
-        if (!((1ull << type) & strash_mask)){
-            ShoutLn "INTERNAL ERROR! Trying to bypass strashing for gate of type: %_", type;
-            assert(false); }
-        // -- make sure gates controlled by strashing is not created directly by 'add()'
-    }else{
-        if (!((1ull << type) & mode_mask)){
-            ShoutLn "INTERNAL ERROR! Trying to create illegal gate in mode '%_': %_", mode_, type;
-            assert(false); }
-    }
-
     // Determine gate id:
     gate_id id;
     if (use_freelist && freelist.size() > 0){
@@ -344,176 +328,15 @@ void Gig::clearNumbering(GateType type)
 }
 
 
-//=================================================================================================
-// -- Mode control:
-
-
-// Verify invariants of current mode. Throw assertion if fails.
-void Gig::assertMode() const
+void Gig::strash(uint64 strashed_gates)
 {
-    For_Gates(*this, w){
-        bool in_mode = (1ull << w.type()) & mode_mask;
-        if (!in_mode){
-            ShoutLn "INTERNAL ERROR! Disallowed gate type in mode '%_': %_", mode_, w.type();
-            assert(false);
-        }
-    }
-
-    if (mode_ == gig_Aig || mode_ == gig_Xig || mode_ == gig_Npn4){
-        For_Gates(*this, w){
-            for (uint i = 0; i < w.size(); i++){    // -- Buggy GCC 4.4.3 doesn't like 'For_Inputs()' here (generates spurious warning)
-                Wire v = w[i];
-                if (+v == GLit_False){
-                    ShoutLn "INTERNAL ERROR! Constant 'False' may not be used in mode '%_': %_[%_] = %_", mode_, w, i, v;
-                    assert(false); }
-            }
-        }
-    }
-
-    if (mode_ == gig_Lut4){
-        // In LUT mode, inputs must not be negated (for LUTs):
-        For_Gates(*this, w){
-            if (w.type() != gate_Lut4) continue;
-            For_Inputs(w, v){
-                if (v.sign){
-                    ShoutLn "INTERNAL ERROR! 'Lut4's are not allowed to have inverted inputs: %_[%_] = %_", w, Input_Pin(v), v;
-                    assert(false); }
-            }
-        }
-    }
-
-    if (mode_ == gig_Lut6){
-        // In LUT mode, inputs must not be negated (for LUTs):
-        For_Gates(*this, w){
-            if (w.type() != gate_Lut6) continue;
-            For_Inputs(w, v){
-                if (v.sign){
-                    ShoutLn "INTERNAL ERROR! 'Lut6's are not allowed to have inverted inputs: %_[%_] = %_", w, Input_Pin(v), v;
-                    assert(false); }
-            }
-        }
-    }
-
-    if (is_canonical){
-        WSeen seen;
-        for (uint id = 0; id < gid_FirstUser; id++)
-            seen.add(GLit(id));
-        For_Gates(*this, w){
-            For_Inputs(w, v){
-                if (v == gate_Seq) continue;
-                if (!seen.has(v)){
-                    ShoutLn "INTERNAL ERROR! Non-canonical netlist detected while 'is_canonical' is set.";
-                    ShoutLn "  Gate '%_' has lower ID than input %_: '%_'.", w, Input_Pin(v), v;
-                    assert(false); }
-            }
-            seen.add(w);
-        }
-    }
-
-    if (is_compact){
-        if (this->nRemoved() > 0){
-            ShoutLn "INTERNAL ERROR! Gate vector has gaps while 'is_compact' is set (removed gates: %_).", this->nRemoved();
-            assert(false); }
-    }
-
-    if (is_reach){
-        WZet reach;
-        for (uint id = 0; id < gid_FirstUser; id++)
-            reach.add(id + *this);
-        For_Gates(*this, w)
-            if (isCO(w))
-                reach.add(w);
-        for (uint i = gid_FirstUser; i < reach.size(); i++)
-            For_Inputs(reach[i] + *this, v)
-                if (v != gate_Seq)
-                    reach.add(v);
-
-        if (reach.size() < this->size() - this->nRemoved()){
-            ShoutLn "INTERNAL ERROR! Unreachable gates exist while 'is_reach' is set.";
-            uint count = 0;
-            For_Gates(*this, w){
-                if (!reach.has(w)){
-                    Shout "  %_", w;
-                    count++;
-                    if (count == 10){
-                        Shout "...";
-                        break;
-                    }
-                }
-            }
-            ShoutLn "";
-            assert(false);
-        }
-    }
+    Add_Gob(*this, Strash);
 }
 
 
-void Gig::setMode(GigMode m)
+void Gig::unstrash()
 {
-    assert(!hasObj(gigobj_Strash));
-
-    static uint64 mode_masks[GigMode_size] = { 0ull,  0ull,  0ull,  0ull,  0ull };
-
-    if (m != mode_){
-        Bury_Gob(*this, Strash);
-
-        mode_ = m;
-        if (mode_masks[m] == 0){
-            switch (m){
-            case gig_FreeForm:
-                mode_mask = ~0ull;
-                break;
-
-            case gig_Aig:
-                mode_mask = 0ull;
-                for (uint i = 0; i < GateType_size; i++)
-                    if (aigGate(GateType(i)))
-                        mode_mask |= 1ull << i;
-                break;
-
-            case gig_Xig:
-                mode_mask = 0ull;
-                for (uint i = 0; i < GateType_size; i++)
-                    if (xigGate(GateType(i)))
-                        mode_mask |= 1ull << i;
-                break;
-
-            case gig_Npn4:
-                mode_mask = 0ull;
-                for (uint i = 0; i < GateType_size; i++)
-                    if (npn4Gate(GateType(i)))
-                        mode_mask |= 1ull << i;
-                break;
-
-            case gig_Lut4:
-                mode_mask = 0ull;
-                for (uint i = 0; i < GateType_size; i++)
-                    if (lut4Gate(GateType(i)))
-                        mode_mask |= 1ull << i;
-                break;
-
-            case gig_Lut6:
-                mode_mask = 0ull;
-                for (uint i = 0; i < GateType_size; i++)
-                    if (lut6Gate(GateType(i)))
-                        mode_mask |= 1ull << i;
-                break;
-
-            default: assert(false);}
-
-            mode_mask &= ~3ull;
-            mode_masks[m] = mode_mask;      // -- cache result
-
-        }else
-            mode_mask = mode_masks[m];
-
-        strash_mask = mode_mask;
-        // <<== är detta rätt om vi redan är i strashat mode?
-    }
-
-  #if defined(ZZ_DEBUG)
-    assertMode();
-  #endif
+    Remove_Gob(*this, Strash);
 }
 
 
@@ -531,9 +354,6 @@ void Gig::moveTo(Gig& M)
     mov(is_canonical, M.is_canonical);
     mov(is_compact  , M.is_compact);
     mov(is_reach    , M.is_reach);
-    mov(mode_       , M.mode_);
-    mov(mode_mask   , M.mode_mask);
-    mov(strash_mask , M.strash_mask);
   #if defined(ZZ_GIG_PAGED)
     mov(pages       , M.pages);
   #else
@@ -574,9 +394,6 @@ void Gig::copyTo(Gig& M) const
     cpy(is_canonical, M.is_canonical);
     cpy(is_compact  , M.is_compact);
     cpy(is_reach    , M.is_reach);
-    cpy(mode_       , M.mode_);
-    cpy(mode_mask   , M.mode_mask);
-    cpy(strash_mask , M.strash_mask);
 
   #if defined(ZZ_GIG_PAGED)
     M.pages.growTo(pages.size());
@@ -763,9 +580,9 @@ void Gig::save(Out& out)
     putu(out, is_canonical);
     putu(out, is_compact);
     putu(out, is_reach);
-    putu(out, (uint)mode_);
-    putu(out, mode_mask);
-    putu(out, strash_mask);
+    putu(out, 0);       // -- used to be "mode"; not used anymore
+    putu(out, gtm_All); // -- used to be 'mode_mask'; not used anymore
+    putu(out, gtm_All); // -- used to be 'strash_mask'; not used anymore
     putb(out, use_freelist);
 
     // Establish mapping between "gate-type name" and "enum value":
@@ -855,9 +672,9 @@ void Gig::load(In& in)
         is_compact   = getu(in);
         is_reach     = getu(in);
     }
-    mode_ = (GigMode)getu(in);
-    mode_mask = getu(in);
-    strash_mask = getu(in);
+    getu(in);   // -- used to be "mode"; not used anymore
+    getu(in);   // -- used to be "mode_mask"; not used anymore
+    getu(in);   // -- used to be "strash_mask"; not used anymore
     use_freelist = getb(in);
 
     // Establish mapping between "gate-type name" and "enum value":
@@ -890,7 +707,7 @@ void Gig::load(In& in)
     uint n_gates = getu(in);
     while (size() != n_gates){
         uchar d = getb(in);
-        GateType type = GateType(d & 63);
+        GateType type = GateType(type_map[d & 63]);
         uint n = d >> 6;
         if (n == 0)
             n = getu(in);

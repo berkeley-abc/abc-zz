@@ -74,16 +74,19 @@ extern ftb4_t apply_negs4    [32][65536];
 extern uint npn4_just[222][16];     // -- list of minimal justifications for each function
 
 // Some useful NPN classes:
-static const uchar npn4_cl_TRUE = 0;
-static const uchar npn4_cl_BUF  = 21;
-static const uchar npn4_cl_OR2  = 5;        // -- NOTE! Now lower pin (0 and 1)
-static const uchar npn4_cl_OR3  = 2;
-static const uchar npn4_cl_OR4  = 1;
-static const uchar npn4_cl_EQU2 = 180;
-static const uchar npn4_cl_XOR3 = 220;
-static const uchar npn4_cl_EQU4 = 221;
-static const uchar npn4_cl_MUX  = 109;      // order: (pin0 ? pin2 : pin1)
-static const uchar npn4_cl_MAJ  = 83;       // pin0 + pin1 + pin2 >= 2
+static const uchar npn4_cl_TRUE   = 0;
+static const uchar npn4_cl_BUF    = 21;
+static const uchar npn4_cl_OR2    = 5;      // -- NOTE! Now lower pin (0 and 1)
+static const uchar npn4_cl_OR3    = 2;
+static const uchar npn4_cl_OR4    = 1;
+static const uchar npn4_cl_EQU2   = 180;
+static const uchar npn4_cl_XOR3   = 220;
+static const uchar npn4_cl_EQU4   = 221;
+static const uchar npn4_cl_MUX    = 109;    // order: (pin0 ? pin2 : pin1)
+static const uchar npn4_cl_MAJ    = 83;     // pin0 + pin1 + pin2 >= 2
+static const uchar npn4_cl_N_ONE  = 81;     // ~(pin0 + pin1 + pin2 = 1)
+static const uchar npn4_cl_N_GAMB = 103;    // ~((x & y & ~z) | (~x & ~y & z))
+static const uchar npn4_cl_DOT    = 105;    // (x ^ y) | (x & z)
 
 // Compile time 'pseq4_to_perm4':
 #define PERM4_0123 0
