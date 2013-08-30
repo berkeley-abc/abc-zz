@@ -39,12 +39,17 @@ bool isMux(Wire w, Wire& sel, Wire& d1, Wire& d0)
     Wire yx = x[1];
     Wire xy = y[0];
     Wire yy = y[1];
-    if      (xx == ~xy){ sel = xx, d1 = ~yx, d0 = ~yy; return true; }
-    else if (yx == ~xy){ sel = yx, d1 = ~xx, d0 = ~yy; return true; }
-    else if (xx == ~yy){ sel = xx, d1 = ~yx, d0 = ~xy; return true; }
-    else if (yx == ~yy){ sel = yx, d1 = ~xx, d0 = ~xy; return true; }
+    if      (xx == ~xy){ sel = xx, d1 = ~yx, d0 = ~yy; }
+    else if (yx == ~xy){ sel = yx, d1 = ~xx, d0 = ~yy; }
+    else if (xx == ~yy){ sel = xx, d1 = ~yx, d0 = ~xy; }
+    else if (yx == ~yy){ sel = yx, d1 = ~xx, d0 = ~xy; }
+    else               { return false; }
 
-    return false;
+    if (sel.sign){
+        swp(d0, d1);
+        sel = +sel; }
+
+    return true;
 }
 
 

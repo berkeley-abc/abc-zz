@@ -11,18 +11,18 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
-    ftb4_t x = ftb4_proj[0][0];
-    ftb4_t y = ftb4_proj[0][1];
-    ftb4_t z = ftb4_proj[0][2];
-//    ftb4_t f = (x & ~y & ~z) | (~x & y & ~z) | (~x & ~y & z);
-//    ftb4_t f = (x & y & z) | (~x & ~y & ~z);
+    Gig N;
+    Wire sel = N.add(gate_PI);
+    Wire d1  = N.add(gate_PI);
+    Wire d0  = N.add(gate_PI);
 
-    ftb4_t f = (x ^ y) | (x & z);
+    Wire r1 = N.add(gate_And).init(sel, ~d1);
+    Wire r0 = N.add(gate_And).init(~sel, ~d0);
+    Wire f  = N.add(gate_And).init(~r0, ~r1);
 
-    Npn4Norm n = npn4_norm[f];
-    WriteLn "eq_class=%d", n.eq_class;
-    WriteLn "perm=%d", n.perm;
-    WriteLn "negs=%d", n.negs;
+    Dump(sel, d1, d0);
+    if (isMux(f, sel, d1, d0))
+        Dump(sel, d1, d0);
 
     return 0;
 };

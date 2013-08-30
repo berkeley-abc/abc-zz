@@ -68,14 +68,14 @@ public:
   //________________________________________
   //  Hashed gate creation:
 
-    GLit add_And (GLit u, GLit v);
-    GLit add_Xor (GLit u, GLit v);
-    GLit add_Mux (GLit s, GLit tt, GLit ff);
-    GLit add_Maj (GLit u, GLit v , GLit w );
-    GLit add_One (GLit u, GLit v , GLit w );
-    GLit add_Gamb(GLit u, GLit v , GLit w );
-    GLit add_Dot (GLit u, GLit v , GLit w );
-    GLit add_Lut4(GLit d0, GLit d1, GLit d2, GLit d3, ushort ftb);
+    GLit add_And (GLit u, GLit v, bool just_try);
+    GLit add_Xor (GLit u, GLit v, bool just_try);
+    GLit add_Mux (GLit s, GLit tt, GLit ff, bool just_try);
+    GLit add_Maj (GLit u, GLit v , GLit w, bool just_try);
+    GLit add_One (GLit u, GLit v , GLit w, bool just_try);
+    GLit add_Gamb(GLit u, GLit v , GLit w, bool just_try);
+    GLit add_Dot (GLit u, GLit v , GLit w, bool just_try);
+    GLit add_Lut4(GLit d0, GLit d1, GLit d2, GLit d3, ushort ftb, bool just_try);
 
   //________________________________________
   //  GigObj interface:
@@ -99,7 +99,7 @@ public:
 
 // AIG:
 //
-Wire aig_And(Wire x, Wire y);
+Wire aig_And(Wire x, Wire y, bool just_try = false);
 
 macro Wire aig_Or   (Wire x, Wire y)           { return ~aig_And(~x, ~y); }
 macro Wire aig_Mux  (Wire s, Wire d1, Wire d0) { return ~aig_And(~aig_And(s, d1), ~aig_And(~s, d0)); }
@@ -109,21 +109,22 @@ macro Wire aig_Equiv(Wire x, Wire y)           { return aig_Mux(x,  y, ~y); }
 
 // XIG:
 //
-Wire xig_Xor (Wire x, Wire y);
-Wire xig_Mux (Wire s, Wire d1, Wire d0);
-Wire xig_Maj (Wire x, Wire y, Wire z);
-Wire xig_Gamb(Wire x, Wire y, Wire z);
-Wire xig_One (Wire x, Wire y, Wire z);
-Wire xig_Dot (Wire x, Wire y, Wire z);      // (x ^ y) | (x & z) 
+Wire xig_Xor (Wire x, Wire y, bool just_try = false);
+Wire xig_Mux (Wire s, Wire d1, Wire d0, bool just_try = false);
+Wire xig_Maj (Wire x, Wire y, Wire z, bool just_try = false);
+Wire xig_Gamb(Wire x, Wire y, Wire z, bool just_try = false);
+Wire xig_One (Wire x, Wire y, Wire z, bool just_try = false);
+Wire xig_Dot (Wire x, Wire y, Wire z, bool just_try = false);      // (x ^ y) | (x & z) 
 
-macro Wire xig_And  (Wire x, Wire y) { return aig_And(x, y); }
+macro Wire xig_And  (Wire x, Wire y, bool just_try = false) { return aig_And(x, y, just_try); }
+
 macro Wire xig_Or   (Wire x, Wire y) { return ~xig_And(~x, ~y); }
 macro Wire xig_Equiv(Wire x, Wire y) { return ~xig_Xor( x , y); }
 
 
 // LUT4:
 //
-Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4]);
+Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4], bool just_try = false);
 
 macro Wire lut4_Lut(Gig& N, ushort ftb, GLit w0 = GLit_NULL, GLit w1 = GLit_NULL, GLit w2 = GLit_NULL, GLit w3 = GLit_NULL) {
     GLit w[4];

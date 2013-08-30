@@ -78,8 +78,6 @@ void writeBlif(Out& out, Gig& N)
             break;
         case gate_PO:
         case gate_Seq:
-            /**/if (!(nam[w[0]].chr != 0)) WriteLn "w: %f", w;
-            /**/assert(nam[w[0]].chr != 0);
             FWriteLn(out) ".names %_ %_", nam[w[0]], nam[w];
             FWriteLn(out) "%_ 1", w[0].sign ? 0 : 1;
             break;
@@ -105,7 +103,7 @@ void writeBlif(Out& out, Gig& N)
             for (uint v = 0; v < (1u << n_inputs); v++){
                 if (ftb(w) & (1ull << v)){
                     for (uint i = 0; i < n_inputs; i++)
-                        out += (v & (1u << i)) ? '1' : '0';
+                        out += (bool(v & (1u << i)) ^ w[i].sign) ? '1' : '0';
                     FWriteLn(out) " 1";
                     wrote_something = true;
                 }
@@ -135,7 +133,7 @@ void writeBlif(Out& out, Gig& N)
             for (uint v = 0; v < (1u << n_inputs); v++){
                 if (w.arg() & (1ull << v)){
                     for (uint i = 0; i < n_inputs; i++)
-                        out += (v & (1u << i)) ? '1' : '0';
+                        out += (bool(v & (1u << i)) ^ w[i].sign) ? '1' : '0';
                     FWriteLn(out) " 1";
                     wrote_something = true;
                 }

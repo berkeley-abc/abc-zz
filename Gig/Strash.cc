@@ -168,7 +168,7 @@ fts_macro GLit lookup_helper(SET& nodes, Gig& N, GLit d0, GLit d1, uind idx)
             return w;
         cell = nodes.nextCell(cell);
     }
-    return Wire_NULL;
+    return GLit_NULL;
 }
 
 
@@ -182,7 +182,7 @@ fts_macro GLit lookup_helper(SET& nodes, Gig& N, GLit d0, GLit d1, GLit d2, uind
             return w;
         cell = nodes.nextCell(cell);
     }
-    return Wire_NULL;
+    return GLit_NULL;
 }
 
 
@@ -196,16 +196,16 @@ fts_macro GLit lookup_helper(SET& nodes, Gig& N, GLit d0, GLit d1, GLit d2, GLit
             return w;
         cell = nodes.nextCell(cell);
     }
-    return Wire_NULL;
+    return GLit_NULL;
 }
 
 
 template<class SET>
-fts_macro GLit add_Bin(SET& nodes, GateType type, Gig& N, GLit u, GLit v)
+fts_macro GLit add_Bin(SET& nodes, GateType type, Gig& N, GLit u, GLit v, bool just_try)
 {
     uind   idx = nodes.index_(prehash_Bin(u, v));
     GLit   w   = lookup_helper(nodes, N, u, v, idx);
-    if (!w){
+    if (!w && !just_try){
         w = GLit(N.addInternal(type, 2, /*arg*/0, true));
         N[w].set_unchecked(0, u);
         N[w].set_unchecked(1, v);
@@ -216,11 +216,11 @@ fts_macro GLit add_Bin(SET& nodes, GateType type, Gig& N, GLit u, GLit v)
 
 
 template<class SET>
-fts_macro GLit add_Tri(SET& nodes, GateType type, Gig& N, GLit p, GLit q, GLit r)
+fts_macro GLit add_Tri(SET& nodes, GateType type, Gig& N, GLit p, GLit q, GLit r, bool just_try)
 {
     uind   idx = nodes.index_(prehash_Tri(p, q, r));
     GLit   w   = lookup_helper(nodes, N, p, q, r, idx);
-    if (!w){
+    if (!w && !just_try){
         w = GLit(N.addInternal(type, 3, /*arg*/0, true));
         N[w].set_unchecked(0, p);
         N[w].set_unchecked(1, q);
@@ -232,11 +232,11 @@ fts_macro GLit add_Tri(SET& nodes, GateType type, Gig& N, GLit p, GLit q, GLit r
 
 
 template<class SET>
-fts_macro GLit add_Lut(SET& nodes, GateType type, Gig& N, GLit p, GLit q, GLit r, GLit s, uint arg)
+fts_macro GLit add_Lut(SET& nodes, GateType type, Gig& N, GLit p, GLit q, GLit r, GLit s, uint arg, bool just_try)
 {
     uind   idx = nodes.index_(prehash_Lut(p, q, r, s, arg));
     GLit   w   = lookup_helper(nodes, N, p, q, r, s, arg, idx);
-    if (!w){
+    if (!w && !just_try){
         w = GLit(N.addInternal(type, 4, arg, true));
         N[w].set_unchecked(0, p);
         N[w].set_unchecked(1, q);
@@ -249,29 +249,29 @@ fts_macro GLit add_Lut(SET& nodes, GateType type, Gig& N, GLit p, GLit q, GLit r
 }
 
 
-inline GLit GigObj_Strash::add_And(GLit u, GLit v) {
-    return add_Bin(and_nodes, gate_And, *N, u, v); }
+inline GLit GigObj_Strash::add_And(GLit u, GLit v, bool just_try) {
+    return add_Bin(and_nodes, gate_And, *N, u, v, just_try); }
 
-inline GLit GigObj_Strash::add_Xor(GLit u, GLit v) {
-    return add_Bin(xor_nodes, gate_Xor, *N, u, v); }
+inline GLit GigObj_Strash::add_Xor(GLit u, GLit v, bool just_try) {
+    return add_Bin(xor_nodes, gate_Xor, *N, u, v, just_try); }
 
-inline GLit GigObj_Strash::add_Mux(GLit s, GLit d1, GLit d0) {
-    return add_Tri(mux_nodes, gate_Mux, *N, s, d1, d0); }
+inline GLit GigObj_Strash::add_Mux(GLit s, GLit d1, GLit d0, bool just_try) {
+    return add_Tri(mux_nodes, gate_Mux, *N, s, d1, d0, just_try); }
 
-inline GLit GigObj_Strash::add_Maj(GLit p, GLit q, GLit r) {
-    return add_Tri(maj_nodes, gate_Maj, *N, p, q, r); }
+inline GLit GigObj_Strash::add_Maj(GLit p, GLit q, GLit r, bool just_try) {
+    return add_Tri(maj_nodes, gate_Maj, *N, p, q, r, just_try); }
 
-inline GLit GigObj_Strash::add_One(GLit p, GLit q, GLit r) {
-    return add_Tri(one_nodes, gate_One, *N, p, q, r); }
+inline GLit GigObj_Strash::add_One(GLit p, GLit q, GLit r, bool just_try) {
+    return add_Tri(one_nodes, gate_One, *N, p, q, r, just_try); }
 
-inline GLit GigObj_Strash::add_Gamb(GLit p, GLit q, GLit r) {
-    return add_Tri(gmb_nodes, gate_Gamb, *N, p, q, r); }
+inline GLit GigObj_Strash::add_Gamb(GLit p, GLit q, GLit r, bool just_try) {
+    return add_Tri(gmb_nodes, gate_Gamb, *N, p, q, r, just_try); }
 
-inline GLit GigObj_Strash::add_Dot(GLit p, GLit q, GLit r) {
-    return add_Tri(dot_nodes, gate_Dot, *N, p, q, r); }
+inline GLit GigObj_Strash::add_Dot(GLit p, GLit q, GLit r, bool just_try) {
+    return add_Tri(dot_nodes, gate_Dot, *N, p, q, r, just_try); }
 
-inline GLit GigObj_Strash::add_Lut4(GLit p, GLit q, GLit r, GLit s, ushort ftb) {
-    return add_Lut(lut_nodes, gate_Lut4, *N, p, q, r, s, ftb); }
+inline GLit GigObj_Strash::add_Lut4(GLit p, GLit q, GLit r, GLit s, ushort ftb, bool just_try) {
+    return add_Lut(lut_nodes, gate_Lut4, *N, p, q, r, s, ftb, just_try); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -286,7 +286,7 @@ macro Wire falseFrom(Wire x) { return Wire(x.gig(), ~GLit_True); }
 // AIG:
 
 
-Wire aig_And(Wire x, Wire y)
+Wire aig_And(Wire x, Wire y, bool just_try)
 {
     assert_debug(x.gig() == y.gig());
     assert_debug(x.id >= gid_FirstUser || x.id == gid_True);
@@ -302,7 +302,7 @@ Wire aig_And(Wire x, Wire y)
     Gig& N = *x.gig();
 
     GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
-    return H.add_And(x, y) + N;
+    return H.add_And(x, y, just_try) + N;
 }
 
 
@@ -310,7 +310,7 @@ Wire aig_And(Wire x, Wire y)
 // -- XIG:
 
 
-Wire xig_Xor(Wire x, Wire y)
+Wire xig_Xor(Wire x, Wire y, bool just_try)
 {
     assert_debug(x.gig() == y.gig());
     assert_debug(x.id >= gid_FirstUser || x.id == gid_True);
@@ -329,11 +329,12 @@ Wire xig_Xor(Wire x, Wire y)
     // Structural hashing:
     Gig& N = *x.gig();
     GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
-    return (H.add_Xor(x, y) ^ sign) + N;
+    GLit p = H.add_Xor(x, y, just_try);
+    return p ? (p ^ sign) + N : Wire_NULL;
 }
 
 
-Wire xig_Mux(Wire s, Wire d1, Wire d0)
+Wire xig_Mux(Wire s, Wire d1, Wire d0, bool just_try)
 {
     assert_debug(s.gig() == d1.gig());
     assert_debug(s.gig() == d0.gig());
@@ -394,11 +395,12 @@ Wire xig_Mux(Wire s, Wire d1, Wire d0)
     // Structural hashing:
     Gig& N = *s.gig();
     GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
-    return (H.add_Mux(s, d1, d0) ^ sign) + N;
+    GLit p = H.add_Mux(s, d1, d0, just_try);
+    return p ? (p ^ sign) + N : Wire_NULL;
 }
 
 
-Wire xig_Maj(Wire x, Wire y, Wire z)
+Wire xig_Maj(Wire x, Wire y, Wire z, bool just_try)
 {
     assert_debug(x.gig() == y.gig());
     assert_debug(x.gig() == z.gig());
@@ -422,12 +424,12 @@ Wire xig_Maj(Wire x, Wire y, Wire z)
     // Structural hashing:
     Gig& N = *x.gig();
     GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
-    return H.add_Maj(x, y, z) + N;
+    return H.add_Maj(x, y, z, just_try) + N;
 }
 
 
 // x + y + z = 1
-Wire xig_One(Wire x, Wire y, Wire z)
+Wire xig_One(Wire x, Wire y, Wire z, bool just_try)
 {
     assert_debug(x.gig() == y.gig());
     assert_debug(x.gig() == z.gig());
@@ -451,12 +453,12 @@ Wire xig_One(Wire x, Wire y, Wire z)
     // Structural hashing:
     Gig& N = *x.gig();
     GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
-    return H.add_One(x, y, z) + N;
+    return H.add_One(x, y, z, just_try) + N;
 }
 
 
 // x + y + z = 0 or 3
-Wire xig_Gamb(Wire x, Wire y, Wire z)
+Wire xig_Gamb(Wire x, Wire y, Wire z, bool just_try)
 {
     assert_debug(x.gig() == y.gig());
     assert_debug(x.gig() == z.gig());
@@ -480,20 +482,20 @@ Wire xig_Gamb(Wire x, Wire y, Wire z)
 
     // Structural hashing:
     GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
-    return H.add_Gamb(x, y, z) + N;
+    return H.add_Gamb(x, y, z, just_try) + N;
 }
 
 
 // (x ^ y) | (x & z) 
-Wire xig_Dot(Wire x, Wire y, Wire z)
+Wire xig_Dot(Wire x, Wire y, Wire z, bool just_try)
 {
     if (x == +GLit_True || y == +GLit_True || z == +GLit_True || +x == +y || +x == +z || +y == +z)
-        return xig_Mux(x, xig_Or(~y, z), y);    // -- not the most efficient way, but this is not an important function
+        return xig_Mux(x, xig_Or(~y, z), y, false);    // -- not the most efficient way, but this is not an important function
 
     // Structural hashing:
     Gig& N = *x.gig();
     GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
-    return H.add_Dot(x, y, z) + N;
+    return H.add_Dot(x, y, z, just_try) + N;
 }
 
 
@@ -508,7 +510,7 @@ macro bool isConst(GLit p)
 }
 
 
-Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4])
+Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4], bool just_try)
 {
     #define Pop(i)                              \
         sz--,                                   \
@@ -597,7 +599,7 @@ Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4])
 
     // Hash it:
     GigObj_Strash& H = static_cast<GigObj_Strash&>(N.getObj(gigobj_Strash));
-    return H.add_Lut4(w[0], w[1], w[2], w[3], ftb) + N;
+    return H.add_Lut4(w[0], w[1], w[2], w[3], ftb, just_try) + N;
 }
 
 

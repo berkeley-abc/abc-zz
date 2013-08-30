@@ -244,6 +244,8 @@ bool writeGigForTechmap(String filename, Gig& N)
 
             if (w == gate_Lut6)
                 FWrite(out) " [%.16X]", ftb(w);
+            else if (w == gate_Lut4)
+                FWrite(out) " [%.4X]", w.arg();
 
             FNewLine(out);
         }

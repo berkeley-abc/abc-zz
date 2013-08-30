@@ -23,11 +23,14 @@ void introduceMuxesAsLuts(Gig& N)
 {
     Wire sel, d1, d0;
     For_DownOrder(N, w){
-        if (isMux(w, sel, d1, d0))
-            change(w, gate_Lut4, 0xCACA).init(d0, d1, sel);     // <<== unverified + need to remove signs
+        if (isMux(w, sel, d1, d0)){
+            if (d0 == ~d1)  // (sel ? ~d0 : d0) == (sel ^ d0)
+                change(w, gate_Lut4, 0x6666).init(d0, sel);
+            else
+                change(w, gate_Lut4, 0xCACA).init(d0, d1, sel);
+        }
     }
 }
-
 
 
 static
@@ -93,7 +96,7 @@ String infoLut4(const Gig& N)
     }
 
     String out;
-    FWrite(out) "#Lut4:0=%_  Lut4:1=%_  Lut4:2=%_  Lut4:3=%_  Lut4:4=%_",
+    FWrite(out) "#0=%_  #1=%_  #2=%_  #3=%_  #4=%_",
         count[0], count[1], count[2], count[3], count[4];
 
     return out;
@@ -390,14 +393,16 @@ int main(int argc, char** argv)
         introduceMuxesAsLuts(N);
 
     N.compact(true, false);
+    //**/N.save("tmp.gnl"); writeGigForTechmap("tmp.gig", N); /**/WriteLn "wrote tmp.gnl/gig";
 
     double T1 = cpuTime();
     WriteLn "Parsing: %t", T1-T0;
-    WriteLn "Input: %_", info(N);
+    Write "Input: %_", info(N);
     if (N.typeCount(gate_Lut4) > 0)
-        WriteLn "       %_", infoLut4(N);
+        Write "  (LUT-hist. %_)", infoLut4(N);
     if (keep_sz > 0)
-        WriteLn "       #keeps=%_", keep_sz;
+        Write "  #keeps=%_", keep_sz;
+    NewLine;
 
     if (blif != ""){
         bool quit = false;
@@ -440,6 +445,7 @@ int main(int argc, char** argv)
     double T2 = cpuTime();
     WriteLn "Mapping: %t", T2-T1;
 
+#if 1
     WriteLn "Unmapping...";
     unmap(N);
     N.unstrash();
@@ -449,7 +455,6 @@ int main(int argc, char** argv)
     putIntoLut4(N);
     lutMap(N, P, &keep);
 
-#if 1
     WriteLn "Unmapping 2...";
     unmap(N);
     N.unstrash();

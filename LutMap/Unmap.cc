@@ -22,10 +22,26 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+typedef Wire (*GigBinOp)(Wire, Wire, bool);
+
+
+#define GET(n) N[nodes[prog[n] & 0x7F] ^ bool(prog[n] & 0x80)]
+
+
+static
+GLit buildK(Gig& N, uint sz, const uchar* prog, Vec<GLit>& nodes, GigBinOp f, GLit acc)
+{
+    for (uint i = 0; i < sz; i++){
+        acc = f(acc + N, GET(i), false);
+    }
+
+    return acc;
+}
+
+
 static
 GLit build(Gig& N, const Vec<uchar>& prog, Vec<GLit>& nodes)
 {
-    #define GET(n) N[nodes[prog[n] & 0x7F] ^ bool(prog[n] & 0x80)]
 
     if (prog.size() == 2 && (prog[1] & 0x7F) == DSD6_CONST_TRUE){
         assert(prog[0] == dsd_End);
@@ -35,24 +51,25 @@ GLit build(Gig& N, const Vec<uchar>& prog, Vec<GLit>& nodes)
     uint i = 0;
     for(;;){
         switch (prog[i]){
-        case dsd_End:    return GET(i+1);
-        case dsd_And:    nodes.push(xig_And(GET(i+1), GET(i+2))); i += 3; break;
-        case dsd_Xor:    nodes.push(xig_Xor(GET(i+1), GET(i+2))); i += 3; break;
-        case dsd_Mux:    nodes.push(xig_Mux(GET(i+1), GET(i+2), GET(i+3))); i += 4; break;
-        case dsd_Maj:    nodes.push(xig_Maj(GET(i+1), GET(i+2), GET(i+3))); i += 4; break;
-        case dsd_One:    nodes.push(xig_One(GET(i+1), GET(i+2), GET(i+3))); i += 4; break;
-        case dsd_Gamb:   nodes.push(xig_Gamb(GET(i+1), GET(i+2), GET(i+3))); i += 4; break;
-        case dsd_Dot:    nodes.push(xig_Dot(GET(i+1), GET(i+2), GET(i+3))); i += 4; break;
-
-        case dsd_kAnd: // later
-        case dsd_kXor: // later
+        case dsd_End:  return GET(i+1);
+        case dsd_And:  nodes.push(xig_And(GET(i+1), GET(i+2))); i += 3; break;
+        case dsd_Xor:  nodes.push(xig_Xor(GET(i+1), GET(i+2))); i += 3; break;
+        case dsd_Mux:  nodes.push(xig_Mux(GET(i+1), GET(i+2), GET(i+3))); i += 4; break;
+        case dsd_Maj:  nodes.push(xig_Maj(GET(i+1), GET(i+2), GET(i+3))); i += 4; break;
+        case dsd_One:  nodes.push(xig_One(GET(i+1), GET(i+2), GET(i+3))); i += 4; break;
+        case dsd_Gamb: nodes.push(xig_Gamb(GET(i+1), GET(i+2), GET(i+3))); i += 4; break;
+        case dsd_Dot:  nodes.push(xig_Dot(GET(i+1), GET(i+2), GET(i+3))); i += 4; break;
+        case dsd_kAnd: nodes.push(buildK(N, (uint)prog[i+1], (const uchar*)&prog[i+2], nodes, aig_And,  GLit_True)); i += prog[i+1] + 2; break;
+        case dsd_kXor: nodes.push(buildK(N, (uint)prog[i+1], (const uchar*)&prog[i+2], nodes, xig_Xor, ~GLit_True)); i += prog[i+1] + 2; break;
         default:
             /**/WriteLn "Unxepected type: %d", prog[i];
             assert(false); }
     }
 
-    #undef GET
 }
+
+
+#undef GET
 
 
 // Unmap 6-LUT netlist while considering depth and sharing...

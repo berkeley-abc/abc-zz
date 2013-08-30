@@ -336,7 +336,8 @@ void Gig::strash(uint64 strashed_gates)
 
 void Gig::unstrash()
 {
-    Remove_Gob(*this, Strash);
+    if (Has_Gob(*this, Strash))
+        Remove_Gob(*this, Strash);
 }
 
 
