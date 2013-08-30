@@ -112,9 +112,6 @@ struct Gig_data {
     SlimAlloc<uint>     mem;
 
     bool                is_frozen;      // -- no updates allowed to netlist (except netlist objects)
-    bool                is_canonical;   // -- gates are topologically sorted
-    bool                is_compact;     // -- no gaps in gate vector
-    bool                is_reach;       // -- all gates reachable from COs
 
   #if defined(ZZ_GIG_PAGED)
     Vec<Gate*>          pages;
@@ -496,7 +493,7 @@ struct Gig : Gig_data, NonCopyable {
 
     uint  size     () const { return size_; }
     uint  nRemoved () const { return type_count[gate_NULL] - ZZ_GLIT_NULL_GATES; }
-    uint  count    () const { return size() - type_count[gate_NULL] - (gid_FirstUser - gid_FirstLegal); }
+    uint  count    () const { return size() - type_count[gate_NULL] - GIG_N_PERSISTENT_GATES; }
     uint  typeCount(GateType type) const { return type_count[type]; }
         // -- 'size' is the underlying size of the netlist (= number of slots for gates, deleted or not)
         // which can be used with 'operator[]'. 'nRemoved()' and 'count()' only includes user gates.
@@ -535,8 +532,8 @@ struct Gig : Gig_data, NonCopyable {
         // numbering scheme (which by default provides numbers in reverse order of freeing due to
         // the freelist implementation).
 
-    void  compact(bool remove_unreach = true, bool set_frozen = true);
-    void  compact(GigRemap& remap, bool remove_unreach = true, bool set_frozen = true);
+    void  compact(bool remove_unreach = true);
+    void  compact(GigRemap& remap, bool remove_unreach = true);
         // -- Will topologically order the gates and remove any gaps in the gate tables
         // created by gate removal. By default, unreachable gates (from COs) are first removed.
         // Once done, 'compact()' will leave the netlist in a frozen mode (unless 'set_frozen'
@@ -572,9 +569,6 @@ macro Wire operator+(GLit p    , const Gig& N) { return N[p];  }
 inline Gig::Gig()
 {
     is_frozen    = false;
-    is_canonical = false;
-    is_compact   = false;
-    is_reach     = false;
     size_        = 0;
     use_freelist = true;
     objs         = NULL;

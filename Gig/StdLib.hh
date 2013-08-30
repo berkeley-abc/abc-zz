@@ -49,6 +49,17 @@ bool isMux(Wire w, Wire& sel, Wire& d1, Wire& d0);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Netlist state:
+
+
+bool isCanonical(const Gig& N); // -- children has lower IDs than parents (= gates topologically ordered)
+bool isReach    (const Gig& N); // -- all gates are reachabled from combinational output
+
+macro bool isCompact(const Gig& N) {    // -- no deleted gates
+    return N.nRemoved() == 0; }
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Topological order:
 
 
@@ -81,7 +92,7 @@ macro Wire mkEquiv(Wire x, Wire y)           { return mkMux(x,  y, ~y); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// LUTs:
+// LUTs etc:
 
 
 void introduceMuxes(Gig& N);

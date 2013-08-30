@@ -486,7 +486,7 @@ Wire xig_Gamb(Wire x, Wire y, Wire z, bool just_try)
 }
 
 
-// (x ^ y) | (x & z) 
+// (x ^ y) | (x & z)
 Wire xig_Dot(Wire x, Wire y, Wire z, bool just_try)
 {
     if (x == +GLit_True || y == +GLit_True || z == +GLit_True || +x == +y || +x == +z || +y == +z)
@@ -684,8 +684,6 @@ void GigObj_Strash::strashNetlist()
 
     N->setRecycling(recyc);
     initializing = false;
-    N->is_compact = false;          // -- gates may have been removed
-    N->is_reach = false;            // -- gates may have become redundant
 
     // Turn on listeners again and send 'msg_Compact':
     for (uint i = 0; i < GigMsgIdx_size; i++)
@@ -697,7 +695,7 @@ void GigObj_Strash::strashNetlist()
         N->listeners[msgidx_Compact][i]->compacting(remap);
 
     // If holes in gate table, do a real compact as well:
-    N->compact(false, false);
+    N->compact(false);
 }
 
 

@@ -29,13 +29,108 @@ typedef Wire (*GigBinOp)(Wire, Wire, bool);
 
 
 static
+void putLast(GLit* args, uint& sz, uint i, uint j, GLit new_w)
+{
+    assert(sz >= 2);
+    if (sz > 2){
+        uint n = 0;
+        for (uint k = 0; k < sz; k++){
+            if (k != i && k != j)
+                args[n++] = args[k];
+        }
+    }
+    sz--;
+    args[sz-1] = new_w;
+}
+
+
+static
+void putFirst(GLit* args, uint& sz, uint i, uint j, GLit new_w)
+{
+    putLast(args, sz, i, j, new_w);
+    GLit last = args[sz-1];
+    for (uint k = sz; k > 1;){ k--;
+        args[k] = args[k-1]; }
+    args[0] = last;
+}
+
+
+static
 GLit buildK(Gig& N, uint sz, const uchar* prog, Vec<GLit>& nodes, GigBinOp f, GLit acc)
 {
-    for (uint i = 0; i < sz; i++){
-        acc = f(acc + N, GET(i), false);
+#if 1
+    GLit* args = (GLit*)alloca(sz * sizeof(GLit));
+    for (uint i = 0; i < sz; i++)
+        args[i] = GET(i);
+
+    while (sz > 1){
+      #if 0
+        for (uint i = 0; i < sz-1; i++){
+            for (uint j = i+1; j < sz; j++){
+      #else
+        for (uint i = 1; i < sz; i++){
+            for (uint j = 0; j < i; j++){
+      #endif
+                // Try combining inputs 'i' and 'j'; if exist in netlist, keep combination:
+                Wire w = f(args[i] + N, args[j] + N, true);
+                if (w){
+                    putFirst(args, sz, i, j, w);
+                    goto Found;
+                }
+            }
+        }
+        // No combination exists; just combine any two inputs:
+        putFirst(args, sz, 0, 1, f(args[0] + N , args[1] + N, false));
+
+      Found:;
     }
 
+    return args[0];
+#endif
+
+
+#if 0
+    GLit* args = (GLit*)alloca(sz * sizeof(GLit));
+    for (uint i = 0; i < sz; i++)
+        args[i] = GET(i);
+
+    // <<== should make this depth aware
+    while (sz > 1){
+        for (uint i = sz; i > 1;){ i--;
+            for (uint j = i-1; j > 0;){ j--;
+                // Try combining inputs 'i' and 'j'; if exist in netlist, keep combination:
+                Wire w = f(args[i] + N, args[j] + N, true);
+                if (w){
+                    args[j] = w;
+                    sz--;
+                    args[i] = args[sz];
+                    goto Found;
+                }
+            }
+        }
+
+        // No combination exists; just combine any two inputs:
+      #if 0
+        sz--;
+        args[sz-1] = f(args[sz] + N , args[sz-1] + N, false);
+      #else
+        args[0] = f(args[0] + N, args[1] + N, false);
+        sz--;
+        args[1] = args[sz];
+      #endif
+
+      Found:;
+    }
+
+    return args[0];
+#endif
+
+#if 0
+    for (uint i = 0; i < sz; i++)
+        acc = f(acc + N, GET(i), false);
+
     return acc;
+#endif
 }
 
 
@@ -82,7 +177,7 @@ void unmap(Gig& N)
     N.strash();
 
     Params_Dsd P;
-    P.use_kary = false;
+    P.use_kary = true;
 
     WMapX<GLit> xlat;
     xlat.initBuiltins();

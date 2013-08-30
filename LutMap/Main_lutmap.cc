@@ -313,6 +313,7 @@ int main(int argc, char** argv)
     cli.add("comb"   , "bool"  , "no"        , "Remove white/black boxes and sequential elements (may change delay profile).");
     cli.add("mux"    , "bool"  , "yes"       , "Do MUX and XOR extraction first.");
     cli.add("melt"   , "bool"  , "no"        , "Undo the 3-input LUT mapping of HDL-ICE.");
+    cli.add("batch"  , "bool"  , "no"        , "Add last line summary for batch jobs.");
     cli.parseCmdLine(argc, argv);
 
     String input  = cli.get("input").string_val;
@@ -392,7 +393,7 @@ int main(int argc, char** argv)
     if (cli.get("mux").bool_val)
         introduceMuxesAsLuts(N);
 
-    N.compact(true, false);
+    N.compact();
     //**/N.save("tmp.gnl"); writeGigForTechmap("tmp.gig", N); /**/WriteLn "wrote tmp.gnl/gig";
 
     double T1 = cpuTime();
@@ -522,6 +523,13 @@ int main(int argc, char** argv)
     NewLine;
     WriteLn "    Total: %>11%,d", N.typeCount(gate_Lut6);
     WriteLn "    Edges: %>11%,d", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6];
+
+    if (cli.get("batch").bool_val){
+        Write "Total: %>11%,d        ", N.typeCount(gate_Lut6);
+        Write "Edges: %>11%,d        ", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6];
+        Write "CPU-time: %t", cpuTime();
+        NewLine;
+    }
 
     return 0;
 }

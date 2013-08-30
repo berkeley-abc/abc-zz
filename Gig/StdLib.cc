@@ -20,6 +20,28 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Misc:
+
+
+String info(const Gig& N)
+{
+    Out out;
+
+    for (uint t = (uint)gate_Const + 1; t < GateType_size; t++){
+        GateType type = GateType(t);
+        if (N.typeCount(type) > 0)
+            FWrite(out) "#%_=%,d  ", GateType_name[type], N.typeCount(type);
+    }
+    if (N.nRemoved() > 0)
+        FWrite(out) "Deleted=%,d  ", N.nRemoved();
+    FWrite(out) "TOTAL=%,d", N.size();
+
+    return String(out.vec());
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Simple predicates:
 
 
 bool isMux(Wire w, Wire& sel, Wire& d1, Wire& d0)
@@ -54,26 +76,32 @@ bool isMux(Wire w, Wire& sel, Wire& d1, Wire& d0)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Netlist state:
 
 
-String info(const Gig& N)
+bool isCanonical(const Gig& N)
 {
-    Out out;
-
-    for (uint t = (uint)gate_Const + 1; t < GateType_size; t++){
-        GateType type = GateType(t);
-        if (N.typeCount(type) > 0)
-            FWrite(out) "#%_=%,d  ", GateType_name[type], N.typeCount(type);
+    For_Gates(N, w){
+        For_Inputs(w, v)
+            if (v.id >= w.id)
+                return false;
     }
-    if (N.nRemoved() > 0)
-        FWrite(out) "Deleted=%,d  ", N.nRemoved();
-    FWrite(out) "TOTAL=%,d", N.size();
+    return true;
+}
 
-    return String(out.vec());
+
+bool isReach(const Gig& N)
+{
+    Vec<GLit> order;
+    upOrder(N, order);
+    assert(order.size() <= N.count());
+
+    return order.size() == N.count();
 }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Topological order:
 
 
 void upOrder_helper(Vec<Pair<GLit,uint> >& Q, Vec<uchar>& seen, Vec<GLit>& order, Wire w0)
@@ -189,6 +217,7 @@ void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* orde
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// LUTs etc:
 
 
 void introduceMuxes(Gig& N)
@@ -202,9 +231,6 @@ void introduceMuxes(Gig& N)
                 change(w, gate_Mux).init(sel, d1, d0);
         }
     }
-
-    N.is_reach = false;
-    N.is_compact = false;
 }
 
 

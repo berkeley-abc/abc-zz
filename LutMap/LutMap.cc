@@ -22,7 +22,7 @@
 
 #define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
 
-#define WIRE_MAP
+//#define WIRE_MAP
 
 
 namespace ZZ {
@@ -715,8 +715,6 @@ void LutMap::updateFanoutEst(bool instantiate)
         }
 
         // Build LUT representation:
-        N.is_frozen = false;
-        N.is_reach = false;
         //N.setMode(gig_FreeForm);
         uint j = 0;
         For_Gates(N, w){
@@ -737,7 +735,6 @@ void LutMap::updateFanoutEst(bool instantiate)
         N.compact(m);
         if (remap)
             m.applyTo(remap->base());
-        N.is_frozen = false;
     }
 }
 
@@ -815,7 +812,7 @@ LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_, WMapX<GLit>* remap_) :
     if (Has_Gob(N, Strash))
         Remove_Gob(N, Strash);
 
-    if (!N.is_canonical){
+    if (!isCanonical(N)){
         WriteLn "Compacting... %_", info(N);
 
         gate_id orig_sz = N.size();

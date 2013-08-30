@@ -24,5 +24,10 @@ int main(int argc, char** argv)
     if (isMux(f, sel, d1, d0))
         Dump(sel, d1, d0);
 
+    Dump(isReach(N));
+
+    for (uint i = 0; i < N.size(); i++)
+        Dump(N[i]);
+
     return 0;
 };

@@ -117,9 +117,6 @@ void Gig::clear(bool reinit)
     size_ = 0;
     use_freelist = false;
     is_frozen    = false;
-    is_canonical = false;
-    is_compact   = false;
-    is_reach     = false;
 
     // Initialize netlist:
     if (reinit){
@@ -139,7 +136,7 @@ void Gig::clear(bool reinit)
         add(gate_Const, l_False.value);
         add(gate_Const, l_True .value);
         add(gate_Reset);
-        add(gate_NULL);         // -- reserved slot (want first user gate to be 8, nice and round)
+        add(gate_NULL);         // -- reserved slot (want first user gate to be 8; nice and round number)
     }
 }
 
@@ -352,9 +349,6 @@ void Gig::moveTo(Gig& M)
     // Migrate state:
     mem.moveTo(M.mem, false);
     mov(is_frozen   , M.is_frozen);
-    mov(is_canonical, M.is_canonical);
-    mov(is_compact  , M.is_compact);
-    mov(is_reach    , M.is_reach);
   #if defined(ZZ_GIG_PAGED)
     mov(pages       , M.pages);
   #else
@@ -392,9 +386,6 @@ void Gig::copyTo(Gig& M) const
 
     // Copy state:
     cpy(is_frozen   , M.is_frozen);
-    cpy(is_canonical, M.is_canonical);
-    cpy(is_compact  , M.is_compact);
-    cpy(is_reach    , M.is_reach);
 
   #if defined(ZZ_GIG_PAGED)
     M.pages.growTo(pages.size());
@@ -435,12 +426,8 @@ void Gig::copyTo(Gig& M) const
 // -- Compaction:
 
 
-void Gig::compact(GigRemap& remap, bool remove_unreach, bool set_frozen)
+void Gig::compact(GigRemap& remap, bool remove_unreach)
 {
-    if (is_compact && is_canonical){
-        if (!remove_unreach || is_reach)
-            return;
-    }
     assert(!is_frozen);
 
     Gig& N = *this;
@@ -521,18 +508,12 @@ void Gig::compact(GigRemap& remap, bool remove_unreach, bool set_frozen)
         listeners[msgidx_Compact][j]->compacting(remap);
 
     // Finish up:
-    is_canonical = true;
-    is_compact = true;
-    if (remove_unreach)
-        is_reach = true;
-    if (set_frozen)
-        is_frozen = true;
 }
 
 
-void Gig::compact(bool remove_unreach, bool set_canonical) {
+void Gig::compact(bool remove_unreach) {
     GigRemap remap;
-    compact(remap, remove_unreach, set_canonical); }
+    compact(remap, remove_unreach); }
 
 
 //=================================================================================================
@@ -578,9 +559,9 @@ void Gig::save(Out& out)
 
     // Write state:
     putu(out, is_frozen);
-    putu(out, is_canonical);
-    putu(out, is_compact);
-    putu(out, is_reach);
+    putu(out, 0);       // -- was 'is_canonical', now unused
+    putu(out, 0);       // -- was 'is_compact', now unused
+    putu(out, 0);       // -- was 'is_reach', now unused
     putu(out, 0);       // -- used to be "mode"; not used anymore
     putu(out, gtm_All); // -- used to be 'mode_mask'; not used anymore
     putu(out, gtm_All); // -- used to be 'strash_mask'; not used anymore
@@ -662,16 +643,14 @@ void Gig::load(In& in)
     // Read state:
     if (version == 3){
         // Old format:
-        is_frozen = is_canonical = is_compact = is_reach = 0;
+        is_frozen = 0;
         uint mut = getu(in);
         if (mut >= 1) is_frozen = true;
-        if (mut >= 2) is_canonical = is_reach = true;
-        if (mut >= 3) is_compact = true;
     }else{
-        is_frozen    = getu(in);
-        is_canonical = getu(in);
-        is_compact   = getu(in);
-        is_reach     = getu(in);
+        is_frozen = getu(in);
+        getu(in);   // -- now unused
+        getu(in);   // -- now unused
+        getu(in);   // -- now unused
     }
     getu(in);   // -- used to be "mode"; not used anymore
     getu(in);   // -- used to be "mode_mask"; not used anymore

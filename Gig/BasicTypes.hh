@@ -55,20 +55,10 @@ enum {
     gid_MAX        = (0x7FFFFFFF),
     gid_FirstLegal = (2),
     gid_FirstUser  = (8),
+
+    GIG_N_PERSISTENT_GATES = 5    // constants + reset
 };
-/*
-#define gid_NULL       gate_id(0)
-#define gid_ERROR      gate_id(1)
-#define gid_Unbound    gate_id(2)
-#define gid_Conflict   gate_id(3)
-#define gid_False      gate_id(4)
-#define gid_True       gate_id(5)
-#define gid_Reset      gate_id(6)
-#define gid_Reserved   gate_id(7)
-#define gid_MAX        gate_id(0x7FFFFFFF)
-#define gid_FirstLegal gate_id(2)
-#define gid_FirstUser  gate_id(8)
-*/
+
 
 #define GLit_NULL      GLit(gid_NULL)
 #define GLit_ERROR     GLit(gid_ERROR)
