@@ -304,6 +304,7 @@ int main(int argc, char** argv)
     cli.add("keep"   , "string", ""          , "List of forcable gates (only gor GNL input).");
     cli.add("blif"   , "string", ""          , "Save original input in BLIF format (for debugging only). Add '@' as last character to skip mapping.");
     cli.add("pnl"    , "string", ""          , "Save original input in PNL format (for debugging only). Add '@' as last character to skip mapping.");
+    cli.add("cost"   , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
     cli.add("ftbs"   , "string", ""          , "Write all FTBs to a file (for analysis).");
     cli.add("N"      , "uint"  , "10"        , "Cuts to keep per node.");
     cli.add("iters"  , "uint"  , "4"         , "Number of mapping phases.");
@@ -326,6 +327,14 @@ int main(int argc, char** argv)
     P.delay_factor  = cli.get("df").float_val;
     P.map_for_delay = cli.get("dopt").bool_val;
     P.recycle_cuts  = cli.get("recycle").bool_val;
+
+    if (cli.get("cost").enum_val == 0){
+        for (uint i = 0; i <= 6; i++)
+            P.lut_cost[i] = 1;
+    }else{
+        for (uint i = 0; i <= 6; i++)
+            P.lut_cost[i] = i;
+    }
 
     // Read input file:
     double  T0 = cpuTime();
@@ -523,6 +532,8 @@ int main(int argc, char** argv)
     NewLine;
     WriteLn "    Total: %>11%,d", N.typeCount(gate_Lut6);
     WriteLn "    Edges: %>11%,d", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6];
+    NewLine;
+    WriteLn "    CPU-time: %t", cpuTime();
 
     if (cli.get("batch").bool_val){
         Write "Total: %>11%,d        ", N.typeCount(gate_Lut6);

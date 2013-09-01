@@ -22,9 +22,6 @@
 
 #define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
 
-//#define WIRE_MAP
-
-
 namespace ZZ {
 using namespace std;
 
@@ -71,7 +68,7 @@ class LutMap {
     WMap<float>       area_est;
     WMap<float>       fanout_est;
     WMap<float>       arrival;
-    WMap<float>       depart;               // -- 'FLT_MAX' marks a deactivated node
+    WMap<float>       depart;
     WMap<uchar>       active;
 
     uint              round;
@@ -89,6 +86,12 @@ class LutMap {
     void  generateCuts(Wire w);
     void  updateFanoutEst(bool instantiate);
     void  run();
+
+    uint  derefCut(const Gig& N, const Cut& cut, WMap<uint>& fanouts);
+    uint  refCut  (const Gig& N, const Cut& cut, WMap<uint>& fanouts);
+    uint  tryCut  (const Gig& N, const Cut& cut, WMap<uint>& fanouts);
+    void  exactLocalArea(WMap<uint>& fanouts);
+
 
     // Temporaries:
     Vec<Cut>     tmp_cuts;
@@ -348,11 +351,7 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
             costs[i].area += area_est[w];
             costs[i].avg_fanout += fanout_est[w];
         }
-      #if defined(WIRE_MAP)
-        costs[i].area += cuts[i].size();
-      #else
-        costs[i].area += 1;     // -- LUT cost = 1
-      #endif
+        costs[i].area += P.lut_cost[cuts[i].size()];
         costs[i].avg_fanout /= cuts[i].size();
     }
 
@@ -518,6 +517,93 @@ void LutMap::generateCuts(Wire w)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Exact local area:
+
+
+// <<== need cut-off 
+// <<== need to make it delay aware (at least optionally)
+// <<== can we speed up 'try'?
+
+
+uint LutMap::derefCut(const Gig& N, const Cut& cut, WMap<uint>& fanouts)
+{
+    uint n = P.lut_cost[cut.size()];
+    for (uint i = 0; i < cut.size(); i++){
+        Wire v = cut[i] + N; assert_debug(fanouts[v] > 0); assert_debug(active[v]);
+        if (!isLogic(v)) continue;
+
+        fanouts(v)--;
+        if (fanouts[v] == 0){
+            active(v) = false;
+            n += derefCut(N, cutmap[v][0], fanouts);
+        }
+    }
+
+    return n;
+}
+
+
+uint LutMap::refCut(const Gig& N, const Cut& cut, WMap<uint>& fanouts)
+{
+    uint n = P.lut_cost[cut.size()];
+    for (uint i = 0; i < cut.size(); i++){
+        Wire v = cut[i] + N;
+        if (!isLogic(v)) continue;
+
+        if (fanouts[v] == 0){
+            active(v) = true;
+            n += refCut(N, cutmap[v][0], fanouts);
+        }
+        fanouts(v)++;
+    }
+
+    return n;
+}
+
+
+// Temporary
+uint LutMap::tryCut(const Gig & N, const Cut& cut, WMap<uint>& fanouts)
+{
+    uint n = refCut(N, cut, fanouts);
+    uint m = derefCut(N, cut, fanouts);
+    assert(n == m);
+    return n;
+}
+
+
+ZZ_PTimer_Add(LutMap_ELA);
+
+void LutMap::exactLocalArea(WMap<uint>& fanouts)
+{
+    ZZ_PTimer_Scope(LutMap_ELA);
+
+    WZet tmp;
+    For_Gates_Rev(N, w){
+        if (!isLogic(w)) continue;
+        if (!active[w]) continue;
+        if (cutmap[w].size() == 1) continue;
+
+        uint orig = derefCut(N, cutmap[w][0], fanouts);
+        uint best = orig;
+        if (best == 1){
+            refCut(N, cutmap[w][0], fanouts);
+            continue; }
+
+        uint best_i = 0;
+        for (uint i = 1; i < cutmap[w].size(); i++){
+            uint cost = tryCut(N, cutmap[w][i], fanouts);
+            if (newMin(best, cost))
+                best_i = i;
+        }
+        swp(cutmap[w][0], cutmap[w][best_i]);
+        refCut(N, cutmap[w][0], fanouts);
+
+        mapped_area -= orig - best;
+    }
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Fanout estimation:
 
 
@@ -573,11 +659,7 @@ void LutMap::updateFanoutEst(bool instantiate)
         if (isLogic(w)){
             reprioritizeCuts(w, cutmap[w]);
             const Cut& cut = cutmap[w][0];
-          #if defined(WIRE_MAP)
-            mapped_area += cut.size();
-          #else
-            mapped_area += 1;       // -- LUT cost = 1
-          #endif
+            mapped_area += P.lut_cost[cut.size()];
             for (uint i = 0; i < cut.size(); i++){
                 Wire v = cut[i] + N;
                 area_est(v) = 0;
@@ -629,11 +711,7 @@ void LutMap::updateFanoutEst(bool instantiate)
             if (fanouts[w] > 0){
                 /**/prioritizeCuts(w, cutmap[w]);
                 const Cut& cut = cutmap[w][0];
-              #if defined(WIRE_MAP)
-                mapped_area += cut.size();
-              #else
-                mapped_area += 1;       // -- LUT cost = 1
-              #endif
+                mapped_area += P.lut_cost[cut.size()];
 
                 for (uint i = 0; i < cut.size(); i++){
                     Wire v = cut[i] + N;
@@ -687,6 +765,8 @@ void LutMap::updateFanoutEst(bool instantiate)
         if (isCI(w))
             newMax(mapped_delay, depart[w]);
 
+    /**/exactLocalArea(fanouts);
+
     if (!instantiate){
         if (!P.map_for_delay || round > 0){
             // Blend new values with old:
@@ -706,7 +786,12 @@ void LutMap::updateFanoutEst(bool instantiate)
 
     }else{
         // Compute FTBs:
-        Vec<uint64> ftbs(reserve_, mapped_area);
+        uint count = 0;
+        For_Gates(N, w)
+            if (isLogic(w) && active[w])
+                count++;
+        Vec<uint64> ftbs(reserve_, count);
+
         For_Gates(N, w){
             if (isLogic(w) && active[w]){
                 const Cut& cut = cutmap[w][0];

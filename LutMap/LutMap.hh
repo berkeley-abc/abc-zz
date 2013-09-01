@@ -16,6 +16,7 @@ struct Params_LutMap {
     float   delay_factor;       // If '1', delay optimal mapping is produced. If '1.15', 15% artificial slack is given to mapper.
     bool    map_for_delay;      // Otherwise, prioritize area.
     bool    recycle_cuts;       // Faster but sacrifice some quality
+    uint    lut_cost[7];        // Cost of a LUT for each size.
     bool    quiet;
 
     Params_LutMap() :
@@ -25,7 +26,10 @@ struct Params_LutMap {
         map_for_delay(false),
         recycle_cuts(true),
         quiet(false)
-    {}
+    {
+        for (uint i = 0; i < elemsof(lut_cost); i++)
+            lut_cost[i] = 1;    // -- default is unit cost
+    }
 };
 
 
