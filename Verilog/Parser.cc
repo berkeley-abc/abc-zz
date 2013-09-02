@@ -132,7 +132,7 @@ Currently we support expressions of the type:
            | sig-name '[' simple-num ':' simple-num ']'
            | const-bit-vec                  -- eg. from "100'b111000...0101"
            | concat-list-of-expr            -- concat op., eg. from "{ a, b, 1b1 }"
-           | assign-expr                    -- including '&'s, '~'s and '? :'s 
+           | assign-expr                    -- including '&'s, '~'s and '? :'s
 
     assign-expr ::= pseudo                  -- the string: 1'bx
                   | '~' expr
@@ -672,7 +672,7 @@ void VerilogParser::read(String filename, /*out*/Vec<VerilogModule>& result, /*i
 static bool removeComments(Array<char> text)
 {
     char* p   = &text[0];
-    char* end = &text.end();
+    char* end = &text.end_();
 
     while (p != end){
         if (*p == '"'){
@@ -780,7 +780,7 @@ void VerilogParser::preprocessText(String file, Array<char> raw)
     uint      nominal_line = 0;         // -- for `line statements
     String    nominal_file = file;
     cchar*    p   = &raw[0];
-    cchar*    end = &raw.end();
+    cchar*    end = &raw.end_();
     while (p != end){
         // Scan one line:
         cchar* q = p;

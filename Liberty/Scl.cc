@@ -90,7 +90,7 @@ void writeSurface(Out& out, const SC_Surface& s)
 
 void writeScl(Out& out, const SC_Lib& L)
 {
-    putu(out, /*version*/5);
+    putu(out, /*version*/6);
 
     // Write non-composite fields:
     putz(out, L.lib_name);
@@ -171,6 +171,7 @@ void writeScl(Out& out, const SC_Lib& L)
             putu(out, pin.func.nVars());
             for (uint k = 0; k < pin.func.size(); k++)  // -- 'size = 1u << (n_vars - 6)'
                 putU(out, pin.func[k]); // -- 64-bit number, written uncompressed (low-byte first)
+            putz(out, pin.func_text);
 
             // Write 'rtiming': (pin-to-pin timing tables for this particular output)
             assert(pin.rtiming.size() == cell.n_inputs);
@@ -242,8 +243,8 @@ void readScl_internal(In& in, SC_Lib& L)
     Vec<char> text;     // -- all strings will be stored here
 
     uint version = getu(in);
-    if (version != 5)
-        Throw(Excp_ParseError) "SCL reader expected version 5, not: %_", version;
+    if (version < 5)
+        Throw(Excp_ParseError) "SCL reader expected version >= 5, not: %_", version;
 
 
     // Read non-composite fields:
@@ -315,6 +316,8 @@ void readScl_internal(In& in, SC_Lib& L)
             pin.func.init(getu(in));
             for (uint k = 0; k < pin.func.size(); k++)
                 pin.func[k] = getU(in);
+            if (version == 6)
+                pin.func_text = gets(in, text);     // [bp]
 
             // Write 'rtiming': (pin-to-pin timing tables for this particular output)
             for (uint k = 0; k < cell.n_inputs; k++){

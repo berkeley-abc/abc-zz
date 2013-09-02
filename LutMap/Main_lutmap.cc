@@ -380,6 +380,14 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+#if 0   /*DEBUG*/
+    N.clear();
+    Wire acc = N.add(gate_PI);
+    for (uint i = 0; i < 10000; i++)
+        acc = mkAnd(acc, N.add(gate_PI));
+    N.add(gate_PO).init(acc);
+#endif  /*END DEBUG*/
+
 #if 1
     N.is_frozen = false;
     WriteLn "Info: %_", info(N);

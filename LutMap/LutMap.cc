@@ -21,6 +21,7 @@
 #include "Cut.hh"
 
 #define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
+#define ELA_GLOBAL_LIM 500      // -- if more nodes than this is dereferenced, MFFC is too big to consider
 
 namespace ZZ {
 using namespace std;
@@ -525,49 +526,109 @@ void LutMap::generateCuts(Wire w)
 // <<== can we speed up 'try'?
 
 
-uint LutMap::derefCut(const Gig& N, const Cut& cut, WMap<uint>& fanouts)
+struct RefDerefCut {
+    const Gig&               N;
+    const WMap<Array<Cut> >& cutmap;
+    const Params_LutMap&     P;
+    WMap<uint>&              fanouts;
+    WMap<uchar>&             active;
+    Vec<GLit>                undo;
+
+    RefDerefCut(const Gig& N_, const WMap<Array<Cut> >& cutmap_, const Params_LutMap& P_, WMap<uint>& fanouts_, WMap<uchar>& active_) :
+        N(N_), cutmap(cutmap_), P(P_), fanouts(fanouts_), active(active_) {}
+
+    uint        acc;
+    uint        lim;
+
+    uint derefCut(const Cut& cut, uint lim_ = UINT_MAX) {
+        acc = 0;
+        lim = lim_;
+        undo.clear();
+        return deref(cut) ? acc : 0; }
+
+    uint refCut(const Cut& cut, uint lim_ = UINT_MAX) {
+        acc = 0;
+        lim = lim_;
+        undo.clear();
+        return ref(cut) ? acc : UINT_MAX; }
+
+    uint tryCut(const Cut& cut, uint lim_ = UINT_MAX) {
+        uint ret = refCut(cut, lim_);
+        undoRef();
+        return ret; }
+
+    void undoDeref();
+    void undoRef();
+
+private:
+    bool deref(const Cut& cut);
+    bool ref(const Cut& cut);
+};
+
+
+bool RefDerefCut::deref(const Cut& cut)
 {
-    uint n = P.lut_cost[cut.size()];
+    acc += P.lut_cost[cut.size()];
+    if (acc > lim) return false;
+
     for (uint i = 0; i < cut.size(); i++){
         Wire v = cut[i] + N; assert_debug(fanouts[v] > 0); assert_debug(active[v]);
         if (!isLogic(v)) continue;
 
         fanouts(v)--;
+        undo.push(v);
         if (fanouts[v] == 0){
             active(v) = false;
-            n += derefCut(N, cutmap[v][0], fanouts);
+            if (!deref(cutmap[v][0]))
+                return false;
         }
     }
 
-    return n;
+    return true;
 }
 
 
-uint LutMap::refCut(const Gig& N, const Cut& cut, WMap<uint>& fanouts)
+bool RefDerefCut::ref(const Cut& cut)
 {
-    uint n = P.lut_cost[cut.size()];
+    acc += P.lut_cost[cut.size()];
+    if (acc > lim) return false;
+
     for (uint i = 0; i < cut.size(); i++){
         Wire v = cut[i] + N;
         if (!isLogic(v)) continue;
 
-        if (fanouts[v] == 0){
-            active(v) = true;
-            n += refCut(N, cutmap[v][0], fanouts);
+        fanouts(v)++;   // <<== update (store in undo)
+        undo.push(v);
+        if (fanouts[v] == 1){
+            active(v) = true;   // <<== update (store in undo)
+            if (!ref(cutmap[v][0]))
+                return false;
         }
-        fanouts(v)++;
     }
 
-    return n;
+    return true;
 }
 
 
-// Temporary
-uint LutMap::tryCut(const Gig & N, const Cut& cut, WMap<uint>& fanouts)
+void RefDerefCut::undoDeref()
 {
-    uint n = refCut(N, cut, fanouts);
-    uint m = derefCut(N, cut, fanouts);
-    assert(n == m);
-    return n;
+    for (uint i = undo.size(); i > 0;){ i--;
+        GLit w = undo[i];
+        if (fanouts[w] == 0)
+            active(w) = true;
+        fanouts(w)++;
+    }
+}
+
+
+void RefDerefCut::undoRef()
+{
+    for (uint i = undo.size(); i > 0;){ i--;
+        GLit w = undo[i];
+        fanouts(w)--;
+        if (fanouts[w] == 0)
+            active(w) = false;
+    }
 }
 
 
@@ -577,28 +638,26 @@ void LutMap::exactLocalArea(WMap<uint>& fanouts)
 {
     ZZ_PTimer_Scope(LutMap_ELA);
 
-    WZet tmp;
+    RefDerefCut R(N, cutmap, P, fanouts, active);
+
     For_Gates_Rev(N, w){
         if (!isLogic(w)) continue;
         if (!active[w]) continue;
         if (cutmap[w].size() == 1) continue;
 
-        uint orig = derefCut(N, cutmap[w][0], fanouts);
-        uint best = orig;
-        if (best == 1){
-            refCut(N, cutmap[w][0], fanouts);
+        uint best = R.derefCut(cutmap[w][0], ELA_GLOBAL_LIM);
+        if (best <= 1){
+            R.undoDeref();
             continue; }
 
         uint best_i = 0;
         for (uint i = 1; i < cutmap[w].size(); i++){
-            uint cost = tryCut(N, cutmap[w][i], fanouts);
+            uint cost = R.tryCut(cutmap[w][i], best);
             if (newMin(best, cost))
                 best_i = i;
         }
         swp(cutmap[w][0], cutmap[w][best_i]);
-        refCut(N, cutmap[w][0], fanouts);
-
-        mapped_area -= orig - best;
+        R.refCut(cutmap[w][0]);
     }
 }
 
@@ -637,8 +696,6 @@ void LutMap::updateFanoutEst(bool instantiate)
     WMap<uint> fanouts(N, 0);
     fanouts.reserve(N.size());
 
-    mapped_area = 0;
-
 #if 1   /*EXPERIMENTAL*/
     active.clear();
 
@@ -659,7 +716,6 @@ void LutMap::updateFanoutEst(bool instantiate)
         if (isLogic(w)){
             reprioritizeCuts(w, cutmap[w]);
             const Cut& cut = cutmap[w][0];
-            mapped_area += P.lut_cost[cut.size()];
             for (uint i = 0; i < cut.size(); i++){
                 Wire v = cut[i] + N;
                 area_est(v) = 0;
@@ -711,7 +767,6 @@ void LutMap::updateFanoutEst(bool instantiate)
             if (fanouts[w] > 0){
                 /**/prioritizeCuts(w, cutmap[w]);
                 const Cut& cut = cutmap[w][0];
-                mapped_area += P.lut_cost[cut.size()];
 
                 for (uint i = 0; i < cut.size(); i++){
                     Wire v = cut[i] + N;
@@ -766,6 +821,11 @@ void LutMap::updateFanoutEst(bool instantiate)
             newMax(mapped_delay, depart[w]);
 
     /**/exactLocalArea(fanouts);
+    mapped_area = 0;
+    For_Gates(N, w){
+        if (active[w] && isLogic(w))
+            mapped_area += P.lut_cost[cutmap[w][0].size()];
+    }
 
     if (!instantiate){
         if (!P.map_for_delay || round > 0){
