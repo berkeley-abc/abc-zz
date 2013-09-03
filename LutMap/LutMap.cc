@@ -168,82 +168,6 @@ uint64 computeFtb(Wire w, const Cut& cut, WZet& in_memo, WMap<uint64>& memo)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-/*
-
-====================
-Globally:
-====================
-
-  - Initialize fanouts to:
-     1. Unit
-     2. Actual fanouts
-     3. Fanouts after XOR/Mux extraction
-     4. Fanouts of fanouts.
-
-====================
-Per round:
-====================
-
-  [bool]    recompute or reuse cuts?
-  [uint]    cuts to keep (only if recomputing, else same as previous round)
-  [uint]    max cut-width (probably always 6, but perhaps for first phase...)
-  [float]   alpha coefficient for fanout est. blending
-  [uint]    force keeping k best cuts from last round
-  [sort]    cut sorting criteria
-  [uint]    keep m cuts from secondary sorting criterita (put them last)
-  [sort]    secondary cut sorting criteria
-
-Perhaps only allow for two or three sorting functions and then reuse them
-if more phases (or put copying of these functions into mutation code).
-
-
-====================
-Sorting atoms:
-====================
-
-  Per cut:
-    float   delay       (or normalized delay [0..1])
-    float   area        (normalized area [0..1])
-    uint    cut_size
-    float   avg_fanout
-
-  For all cuts of a node:
-    float   req_time
-    uint    level, rev_level (and normalized versions)
-    enum    mode             -- (1) normal, (2) randomize before sort, (3) use 'idx' as final tie-breaking
-
-Lexicographical, weighted sum, sharp threshold, soft threshold (atan)
-
-    (a < b * C) ?[D]
-
-
-            req_time = (depart[w] == FLT_MAX) ? FLT_MAX : target_arrival - (depart[w] + 1);
-            req_time = (depart[w] == FLT_MAX) ? costs[0].delay + 1 : target_arrival - (depart[w] + 1);  // -- give one unit of artificial slack
-
-
-
-====================
-Scoring:
-====================
-
-  - delay
-  - area
-  - runtime
-
-Either limits on two, improve the third, or perhaps weighted percentual improvement over a reference
-point.
-
-
-====================
-Later extensions:
-====================
-
-Re-expanding mapped LUTs in various ways (then 4-input LUT mapping will be more important,
-esp. if combined with lut-strashing and const. propagation/simple rules).
-
-
-*/
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Cut evalutation:
 
 
@@ -275,59 +199,6 @@ struct Area_lt {
 //        return x.cut_size < y.cut_size;
     }
 };
-
-
-macro float sq(float x) { return x*x; }
-
-struct Weighted_lt {
-    float min_delay;
-    float max_delay;
-    float min_area;
-    float max_area;
-    float req_time;
-    uint  round;
-    Weighted_lt(float min_delay_, float max_delay_, float min_area_, float max_area_, float req_time_, uint round_) : min_delay(min_delay_), max_delay(max_delay_), min_area(min_area_), max_area(max_area_), req_time(req_time_), round(round_) {}
-
-    bool operator()(const LutMap_Cost& x, const LutMap_Cost& y) const
-    {
-        float xa = (x.area  - min_area ) / (max_area  - min_area + 1);
-        float xd = (x.delay - min_delay) / (max_delay - min_delay + 1);
-        float ya = (y.area  - min_area ) / (max_area  - min_area + 1);
-        float yd = (y.delay - min_delay) / (max_delay - min_delay + 1);
-
-        if (req_time == FLT_MAX)
-//            return xa/1024 + xd < ya/1024 + yd;
-            return xd < yd;
-
-        else{
-            xd *= atan((x.delay - req_time) * 4) / M_PI + 0.5;
-            yd *= atan((y.delay - req_time) * 4) / M_PI + 0.5;
-
-            return xa + xd*4 < ya + yd*4;
-        }
-        //return sq(xa + xd) < sq(ya + yd);
-        //return sqrt(xa) + sqrt(xd) < sqrt(ya) + sqrt(yd);
-    }
-};
-
-
-static void sortCuts(Vec<LutMap_Cost>& costs, uint round, float req_time) ___unused;
-static void sortCuts(Vec<LutMap_Cost>& costs, uint round, float req_time)
-{
-    float min_delay = +FLT_MAX;
-    float max_delay = -FLT_MAX;
-    float min_area  = +FLT_MAX;
-    float max_area  = -FLT_MAX;
-    for (uint i = 0; i < costs.size(); i++){
-        newMin(min_delay, costs[i].delay);
-        newMax(max_delay, costs[i].delay);
-        newMin(min_area , costs[i].area );
-        newMax(max_area , costs[i].area );
-    }
-
-    Weighted_lt lt(min_delay, max_delay, min_area, max_area, req_time, round);
-    sobSort(sob(costs, lt));
-}
 
 
 void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
@@ -412,6 +283,7 @@ void LutMap::reprioritizeCuts(Wire w, Array<Cut> cuts)
             this_area += area_est[v];
             newMax(this_delay, arrival[v]);
         }
+        /**/this_area += P.lut_cost[cuts[i].size()];
 
         if (i == 0){
             best_delay = this_delay;
@@ -634,30 +506,69 @@ void RefDerefCut::undoRef()
 
 ZZ_PTimer_Add(LutMap_ELA);
 
+#define ELA_TIMING
+
+// <<== need to make this delay aware (as well as unmapping)
 void LutMap::exactLocalArea(WMap<uint>& fanouts)
 {
     ZZ_PTimer_Scope(LutMap_ELA);
 
     RefDerefCut R(N, cutmap, P, fanouts, active);
 
+  #if defined(ELA_TIMING)
+    depart.clear();
+  #endif
+
     For_Gates_Rev(N, w){
-        if (!isLogic(w)) continue;
-        if (!active[w]) continue;
-        if (cutmap[w].size() == 1) continue;
+        if (active[w] && isLogic(w) && cutmap[w].size() > 1){
+#if 1 // ELA
+            uint best = R.derefCut(cutmap[w][0], ELA_GLOBAL_LIM);
+            if (best <= 1){
+                R.undoDeref();
+                continue; }
 
-        uint best = R.derefCut(cutmap[w][0], ELA_GLOBAL_LIM);
-        if (best <= 1){
-            R.undoDeref();
-            continue; }
+            uint best_i = 0;
+            for (uint i = 1; i < cutmap[w].size(); i++){
+                Cut& cut = cutmap[w][i];
+              #if defined(ELA_TIMING)
+                // Check if meets timing:       <<== delay/area trade-off 
+                float arr = 0;
+                for (uint j = 0; j < cut.size(); j++)
+                    newMax(arr, arrival[cut[j] + N] + 1.0f);
 
-        uint best_i = 0;
-        for (uint i = 1; i < cutmap[w].size(); i++){
-            uint cost = R.tryCut(cutmap[w][i], best);
-            if (newMin(best, cost))
-                best_i = i;
+                if (arr > arrival[w] && arr + depart[w] > target_arrival)
+                    continue;
+              #endif
+
+                // Try cut:
+                uint cost = R.tryCut(cut, best);
+                if (newMin(best, cost))
+                    best_i = i;
+            }
+            swp(cutmap[w][0], cutmap[w][best_i]);
+            R.refCut(cutmap[w][0]);
+#endif
         }
-        swp(cutmap[w][0], cutmap[w][best_i]);
-        R.refCut(cutmap[w][0]);
+
+      #if defined(ELA_TIMING)
+        // Departure time computation:      <<== flytta till efter valt cut.
+        if (isLogic(w)){
+            if (active[w]){
+                const Cut& cut = cutmap[w][0];
+                for (uint i = 0; i < cut.size(); i++){
+                    Wire v = cut[i] + N;
+                    newMax(depart(v), depart[w] + 1.0f);
+                }
+            }else
+                depart(w) = FLT_MAX;    // -- marks deactivated node
+
+        }else if (!isCI(w)){
+            float delay = (w != gate_Delay) ? 0.0f : w.arg() / DELAY_FRACTION;
+            For_Inputs(w, v){
+                newMax(depart(v), depart[w] + delay);
+            }
+        }
+      #endif
     }
 }
 
@@ -696,9 +607,9 @@ void LutMap::updateFanoutEst(bool instantiate)
     WMap<uint> fanouts(N, 0);
     fanouts.reserve(N.size());
 
-#if 1   /*EXPERIMENTAL*/
     active.clear();
 
+#if 1   /*EXPERIMENTAL*/
     InstOrder lt(arrival, depart);
     KeyHeap<GLit, false, InstOrder> ready(lt);
     For_Gates(N, w){
@@ -791,7 +702,41 @@ void LutMap::updateFanoutEst(bool instantiate)
     }
 #endif
 
+    /**/exactLocalArea(fanouts);
+
+#if 0   // recompute departure/fanouts (redundant???)
+    fanouts.clear();
+    depart.clear();
+    For_All_Gates_Rev(N, w){
+        if (isLogic(w)){
+            if (active[w]){
+                const Cut& cut = cutmap[w][0];
+                for (uint i = 0; i < cut.size(); i++){
+                    Wire v = cut[i] + N;
+                    fanouts(v)++;
+                    newMax(depart(v), depart[w] + 1.0f);
+                }
+            }else
+                depart(w) = FLT_MAX;    // -- marks deactivated node
+
+        }else if (!isCI(w)){
+            float delay = (w != gate_Delay) ? 0.0f : w.arg() / DELAY_FRACTION;
+            For_Inputs(w, v){
+                fanouts(v)++;
+                newMax(depart(v), depart[w] + delay);
+            }
+        }
+    }
+
+#endif  /*END DEBUG*/
+
+
     //**/For_All_Gates_Rev(N, w) Dump(w, (int)active[w], fanouts[w]);
+
+    mapped_delay = 0.0f;
+    For_Gates(N, w)
+        if (isCI(w))
+            newMax(mapped_delay, depart[w]);
 
 #if 1   // -- temporary solution for computing estimated departure for inactive nodes
     WMap<float> tmpdep;
@@ -815,12 +760,8 @@ void LutMap::updateFanoutEst(bool instantiate)
             depart(w) = tmpdep[w];
 #endif
 
-    mapped_delay = 0.0f;
-    For_Gates(N, w)
-        if (isCI(w))
-            newMax(mapped_delay, depart[w]);
+    //**/exactLocalArea(fanouts);
 
-    /**/exactLocalArea(fanouts);
     mapped_area = 0;
     For_Gates(N, w){
         if (active[w] && isLogic(w))

@@ -464,6 +464,7 @@ int main(int argc, char** argv)
     WriteLn "Mapping: %t", T2-T1;
 
 #if 1
+    NewLine;
     WriteLn "Unmapping...";
     unmap(N);
     N.unstrash();
@@ -473,6 +474,8 @@ int main(int argc, char** argv)
     putIntoLut4(N);
     lutMap(N, P, &keep);
 
+  #if 0
+    NewLine;
     WriteLn "Unmapping 2...";
     unmap(N);
     N.unstrash();
@@ -481,6 +484,19 @@ int main(int argc, char** argv)
     WriteLn "Netlist: %_", info(N);
     putIntoLut4(N);
     lutMap(N, P, &keep);
+  #endif
+
+  #if 0
+    NewLine;
+    WriteLn "Unmapping 3...";
+    unmap(N);
+    N.unstrash();
+    removeUnreach(N);
+    N.compact();
+    WriteLn "Netlist: %_", info(N);
+    putIntoLut4(N);
+    lutMap(N, P, &keep);
+  #endif
 #endif
 
 
@@ -527,10 +543,29 @@ int main(int argc, char** argv)
 
     // Print some statistics:
     Vec<uint> sizeC(7, 0);
+    WMap<uint> depth;
+    uint max_delay = 0;
+    assert(isCanonical(N));
     For_Gates(N, w){
         if (w == gate_Lut6)
             sizeC[supSize(ftb(w))]++;
+
+        if (isCI(w))
+            depth(w) = 0;
+        else{
+            uint d = 0;
+            For_Inputs(w, v)
+                newMax(d, depth[v]);
+            if (isLogicGate(w))
+                depth(w) = d + 1;
+            else if (w == gate_Delay)
+                depth(w) = d + w.arg();     // -- should use DELAY_FRACTION here
+            else
+                depth(w) = d;
+        }
+        newMax(max_delay, depth[w]);
     }
+
 
     NewLine;
     WriteLn "Statistics:";
@@ -538,15 +573,17 @@ int main(int argc, char** argv)
         if (sizeC[i] > 0)
             WriteLn "    LUT %_: %>11%,d  (%.1f %%)", i, sizeC[i], double(sizeC[i]) / N.typeCount(gate_Lut6) * 100;
     NewLine;
-    WriteLn "    Total: %>11%,d", N.typeCount(gate_Lut6);
+    WriteLn "    LUTs : %>11%,d", N.typeCount(gate_Lut6);
     WriteLn "    Edges: %>11%,d", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6];
+    WriteLn "    Delay: %>11%,d", max_delay;
     NewLine;
     WriteLn "    CPU-time: %t", cpuTime();
 
     if (cli.get("batch").bool_val){
-        Write "Total: %>11%,d        ", N.typeCount(gate_Lut6);
-        Write "Edges: %>11%,d        ", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6];
-        Write "CPU-time: %t", cpuTime();
+        Write "%>11%,d    ", N.typeCount(gate_Lut6);
+        Write "%>11%,d    ", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6];
+        Write "%>6%d    ", max_delay;
+        Write "%>10%t", cpuTime();
         NewLine;
     }
 
