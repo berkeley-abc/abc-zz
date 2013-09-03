@@ -168,7 +168,9 @@ GLit build(Gig& N, const Vec<uchar>& prog, Vec<GLit>& nodes)
 
 
 // Unmap 6-LUT netlist while considering depth and sharing...
-void unmap(Gig& N)
+// <<== add depth awareness
+// <<== add search when (a & b) and (a & c) both exists
+void unmap(Gig& N, WMapX<GLit>* remap)
 {
     assert(!N.is_frozen);
     N.compact();
@@ -204,6 +206,9 @@ void unmap(Gig& N)
             xlat(w) = w;
         }
     }
+
+    if (remap)
+        xlat.moveTo(*remap);
 }
 
 

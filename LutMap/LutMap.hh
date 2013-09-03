@@ -33,7 +33,8 @@ struct Params_LutMap {
 };
 
 
-void lutMap(Gig& N, Params_LutMap P, WSeen* keep = NULL, WMapX<GLit>* remap = NULL);
+void lutMap(Gig& N, Params_LutMap P, WMapX<GLit>* remap = NULL);
+void lutMap(Gig& N, const Vec<Params_LutMap>& P, WMapX<GLit>* remap = NULL);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

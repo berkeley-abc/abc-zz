@@ -192,7 +192,8 @@ void LutMap::generateCuts_LogicGate(Wire w, Vec<Cut>& out)
     for (sz = 0; sz < w.size(); sz++){
         if (+w[sz] == Wire_NULL) break;
         l_tuple(triv[sz], cs[sz]) = getCuts(w[sz], cutmap);
-        lim[sz] = keep.has(w[sz]) ? 0 : (int)cs[sz].size();
+//        lim[sz] = keep.has(w[sz]) ? 0 : (int)cs[sz].size();
+        lim[sz] = (int)cs[sz].size();
     }
 
     // Compute cross-product:

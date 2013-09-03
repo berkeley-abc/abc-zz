@@ -19,6 +19,7 @@
 #include "ZZ/Generics/Sort.hh"
 #include "ZZ/Generics/Heap.hh"
 #include "Cut.hh"
+#include "Unmap.hh"
 
 #define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
 #define ELA_GLOBAL_LIM 500      // -- if more nodes than this is dereferenced, MFFC is too big to consider
@@ -59,7 +60,6 @@ class LutMap {
     // Input:
     const Params_LutMap& P;
     Gig&                 N;
-    WSeen&               keep;
     WMapX<GLit>*         remap;
 
     // State:
@@ -107,7 +107,7 @@ class LutMap {
 
 public:
 
-    LutMap(Gig& N, Params_LutMap P, WSeen& keep, WMapX<GLit>* remap);
+    LutMap(Gig& N, Params_LutMap P, WMapX<GLit>* remap);
 };
 
 
@@ -536,7 +536,7 @@ void LutMap::exactLocalArea(WMap<uint>& fanouts)
                 for (uint j = 0; j < cut.size(); j++)
                     newMax(arr, arrival[cut[j] + N] + 1.0f);
 
-                if (arr > arrival[w] && arr + depart[w] > target_arrival)
+                if (arr > arrival[w] && arr + depart[w] > target_arrival + /*FUDGE*/2)
                     continue;
               #endif
 
@@ -890,8 +890,8 @@ void LutMap::run()
 
 // <<== put preprocessing here, not in Main_lutmap.cc
 
-LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_, WMapX<GLit>* remap_) :
-    P(P_), N(N_), keep(keep_), remap(remap_)
+LutMap::LutMap(Gig& N_, Params_LutMap P_, WMapX<GLit>* remap_) :
+    P(P_), N(N_), remap(remap_)
 {
     assert(!N.is_frozen);
 
@@ -932,23 +932,77 @@ LutMap::LutMap(Gig& N_, Params_LutMap P_, WSeen& keep_, WMapX<GLit>* remap_) :
 }
 
 
-// If provided, each gate in 'keep' will be the output of a lookup table, and all the fanout logic
-// of that gate will treat it as if it were a free input (i.e. no assumption is made on its logic
-// function). This allows the LUT to be "forced" (modified to a constant, or indeed any logic)
-// after the mapping phase without old logic on the fanin side leaking through the "keep gate" by
-// means of circuit optimization done during mapping.
-//
 // The 'remap' map will map old gates to new gates (with sign, so 'x' can go to '~y'). Naturally,
 // many signals may be gone; these are mapped to 'glit_NULL'. NOTE! Even inputs may be missing from
 // 'remap' if they are not in the transitive fanin of any output.
 // 
-void lutMap(Gig& N, Params_LutMap P, WSeen* keep, WMapX<GLit>* remap)
+void lutMap(Gig& N, Params_LutMap P, WMapX<GLit>* remap)
 {
-    WSeen keep_dummy;
-    if (!keep)
-        keep = &keep_dummy;
+//        expandLut3s(N);
+//        introduceMuxesAsLuts(N);
+//    putIntoLut4(N); -- if needed
 
-    LutMap inst(N, P, *keep, remap);
+    LutMap inst(N, P, remap);
+}
+
+
+void lutMap(Gig& N, const Vec<Params_LutMap>& Ps, WMapX<GLit>* remap)
+{
+    /**/For_Gates(N, w){ if (isLogicGate(w)) WriteLn "%f", w; }
+    WMapX<GLit> xlat;
+    xlat.initBuiltins();
+    if (remap)
+        remap->initBuiltins();
+
+    for (uint i = 0; i < Ps.size(); i++){
+        NewLine;
+        WriteLn "==== Mapping %_ ====", i + 1;
+        lutMap(N, Ps[i], remap ? &xlat : NULL);
+
+        if (remap){
+            /**/Dump(xlat.base());
+            /**/For_Gates(N, w){ if (isLogicGate(w)) WriteLn "%f", w; }
+            if (i == 0)
+                xlat.moveTo(*remap);
+            else{
+                Vec<GLit>& v = remap->base();
+                for (uint i = gid_FirstUser; i < v.size(); i++)
+                    v[i] = xlat[v[i]];
+            }
+        }
+
+        if (i != Ps.size() - 1){
+            NewLine;
+            WriteLn "==== Unmapping %_ ====", i + 1;
+            unmap(N, &xlat);
+            /**/Dump(xlat.base());
+            /**/For_Gates(N, w){ if (isLogicGate(w)) WriteLn "%f", w; }
+            N.unstrash();
+            Vec<GLit>& v = remap->base();
+            for (uint i = gid_FirstUser; i < v.size(); i++)
+                v[i] = xlat[v[i]];
+#if 0
+            GigRemap cmap;
+            N.compact(cmap);
+            if (remap)
+                cmap.applyTo(remap->base());
+#endif
+
+            WriteLn "Result: %_", info(N);
+            putIntoLut4(N);
+        }
+    }
+    NewLine;
+
+    if (remap){
+        Vec<GLit>& v = remap->base();
+        for (uint i = gid_FirstUser; i < v.size(); i++)
+            if (+v[i] == GLit_NULL)
+                v[i] = GLit_NULL;       // -- remove sign on 'GLit_NULL'
+    }
+    // <<== add profiling timers to see where time is spent
+    // <<== perhaps let mapper work directly on GIG rather than in Lut4 mode?
+
 }
 
 

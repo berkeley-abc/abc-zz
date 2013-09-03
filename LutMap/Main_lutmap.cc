@@ -8,7 +8,6 @@
 #include "ZZ/Generics/Sort.hh"
 #include "LutMap.hh"
 #include "GigReader.hh"
-#include "Unmap.hh"
 
 
 using namespace ZZ;
@@ -446,59 +445,39 @@ int main(int argc, char** argv)
         if (quit) return 0;
     }
 
-  #if 1
-    lutMap(N, P, &keep);
+  #if 0
+    Vec<Params_LutMap> Ps(3, P);
+    lutMap(N, Ps);
   #else
     WMapX<GLit> remap;
-    Write "\a/"; For_Gates(N, w) Dump(w); Write "\a/";
+    Gig N_orig;
+    N.copyTo(N_orig);
 
-    lutMap(N, P, NULL, &remap);
+    Vec<Params_LutMap> Ps(2, P);
+    lutMap(N, Ps, &remap);
 
-    Write "\a/"; For_Gates(N, w) Dump(w); Write "\a/";
-    WriteLn "== REMAP ==";
-    for (uint i = 0; i < remap.base().size(); i++)
-        WriteLn "%_ -> %_", Lit(i), remap[Lit(i)];
+    uint count = 0;
+    Vec<GLit>& v = remap.base();
+    for (uint i = gid_FirstUser; i < v.size(); i++){
+        if (v[i] && isLogicGate(v[i] + N)){
+            count++;
+            N_orig.add(gate_PO).init(N_orig[i]);
+            N.add(gate_PO).init(v[i]);
+            /**/WriteLn "orig: %f    new: %f", N_orig[i], (v[i] + N);
+        }
+    }
+
+    WriteLn "Signals retained: %_", count;
+
+    writeBlifFile("src.blif", N_orig);
+    WriteLn "Wrote: \a*src.blif\a*";
+
+    writeBlifFile("dst.blif", N);
+    WriteLn "Wrote: \a*dst.blif\a*";
   #endif
 
     double T2 = cpuTime();
     WriteLn "Mapping: %t", T2-T1;
-
-#if 1
-    NewLine;
-    WriteLn "Unmapping...";
-    unmap(N);
-    N.unstrash();
-    removeUnreach(N);
-    N.compact();
-    WriteLn "Netlist: %_", info(N);
-    putIntoLut4(N);
-    lutMap(N, P, &keep);
-
-  #if 0
-    NewLine;
-    WriteLn "Unmapping 2...";
-    unmap(N);
-    N.unstrash();
-    removeUnreach(N);
-    N.compact();
-    WriteLn "Netlist: %_", info(N);
-    putIntoLut4(N);
-    lutMap(N, P, &keep);
-  #endif
-
-  #if 0
-    NewLine;
-    WriteLn "Unmapping 3...";
-    unmap(N);
-    N.unstrash();
-    removeUnreach(N);
-    N.compact();
-    WriteLn "Netlist: %_", info(N);
-    putIntoLut4(N);
-    lutMap(N, P, &keep);
-  #endif
-#endif
-
 
     if (output != ""){
         if (hasExtension(output, "blif")){

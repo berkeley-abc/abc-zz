@@ -303,9 +303,9 @@ struct GigRemap {
     Vec<GLit> new_lit;
         // -- 'new_lit[old_id]' gives new gate literal after compaction, or 'GLit_NULL' if gate was removed.
 
-    gate_id operator()(gate_id old) const { return new_lit[old].id; }   // -- loses sign
-    GLit    operator()(GLit    old) const { return new_lit[old.id] ^ old.sign; }
-    Wire    operator()(Wire    old) const { return Wire(old.gig(), new_lit[old.id] ^ old.sign); }
+    gate_id operator()(gate_id old) const { return (old >= new_lit.size()) ? gid_NULL : new_lit[old].id; }   // -- loses sign
+    GLit    operator()(GLit    old) const { return ((old.id >= new_lit.size()) ? GLit_NULL : new_lit[old.id]) ^ old.sign; }
+    Wire    operator()(Wire    old) const { return Wire(old.gig(), (*this)(old.lit())); }
 
     template<class V>
     void applyTo(V& v) {
@@ -366,57 +366,6 @@ inline void tell_update(Vec<GigLis*>& lis, uint pin, Wire w, Wire v)    // -- us
     for (uint i = 0; i < lis.size(); i++)
         lis[i]->updating(w, pin, v_old, v);
 }
-
-
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Debug:
-
-
-template<> fts_macro void write_(Out& out, const Gate& v)
-{
-    FWrite(out) "{type=%_; is_ext=%_; size=%_; inl=%_; attr=%_}",
-        (GateType)v.type, v.is_ext, v.size,
-        Array_new(v.is_ext ? v.ext : v.inl, v.size),
-        v.inl[2];
-}
-
-
-inline void write_Wire(Out& out, const Wire& v)
-{
-    if (!v.isLegal()){
-        if (v.id == gid_NULL)
-            FWrite(out) "%CWire_NULL", v.sign?'~':0;
-        else{ assert(v.id == gid_ERROR);
-            FWrite(out) "%CWire_ERROR", v.sign?'~':0; }
-    }else{
-        FWrite(out) "%Cw%_:%_", v.sign?'~':0, v.id, v.type();
-        if (isNumbered(v.type()))
-            FWrite(out) "<%_>", v.num();
-        else if (v.attrType() == attr_Arg){
-            if (v == gate_Lut4)
-                FWrite(out) "[ftb=0x%.4X]", v.arg();
-            else
-                FWrite(out) "[arg=%_]", v.arg();
-        }
-    }
-}
-
-
-inline void write_Wire(Out& out, const Wire& v, Str flags)
-{
-    if (flags.size() == 1 && flags[0] == 'f'){  // f == fanins included
-        write_Wire(out, v);
-        out += ' ', v.fanins();
-    }else
-        assert(false);  // -- more flags later
-}
-
-
-template<> fts_macro void write_(Out& out, const Wire& v) {
-    write_Wire(out, v); }
-
-template<> fts_macro void write_(Out& out, const Wire& v, Str flags) {
-    write_Wire(out, v, flags); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -685,6 +634,60 @@ macro Wire  changeDyn(Wire w, GateType type, uint sz, uint attr) { Wrap(N.addDyn
 macro uint64& ftb(Wire w) {     // -- the returned reference is invalidated if a gate is added
     assert_debug(w.type() == gate_Lut6);
     return w.gig()->lut6_ftb[w.num()]; }
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Debug:
+
+
+template<> fts_macro void write_(Out& out, const Gate& v)
+{
+    FWrite(out) "{type=%_; is_ext=%_; size=%_; inl=%_; attr=%_}",
+        (GateType)v.type, v.is_ext, v.size,
+        Array_new(v.is_ext ? v.ext : v.inl, v.size),
+        v.inl[2];
+}
+
+
+inline void write_Wire(Out& out, const Wire& v)
+{
+    if (!v.isLegal()){
+        if (v.id == gid_NULL)
+            FWrite(out) "%CWire_NULL", v.sign?'~':0;
+        else{ assert(v.id == gid_ERROR);
+            FWrite(out) "%CWire_ERROR", v.sign?'~':0; }
+    }else{
+        FWrite(out) "%Cw%_:%_", v.sign?'~':0, v.id, v.type();
+        if (isNumbered(v.type())){
+            if (v == gate_Lut6)
+                FWrite(out) "[ftb=0x%:.16X]", ftb(v);
+            else
+                FWrite(out) "<%_>", v.num();
+        }else if (v.attrType() == attr_Arg){
+            if (v == gate_Lut4)
+                FWrite(out) "[ftb=0x%.4X]", v.arg();
+            else
+                FWrite(out) "[arg=%_]", v.arg();
+        }
+    }
+}
+
+
+inline void write_Wire(Out& out, const Wire& v, Str flags)
+{
+    if (flags.size() == 1 && flags[0] == 'f'){  // f == fanins included
+        write_Wire(out, v);
+        out += ' ', v.fanins();
+    }else
+        assert(false);  // -- more flags later
+}
+
+
+template<> fts_macro void write_(Out& out, const Wire& v) {
+    write_Wire(out, v); }
+
+template<> fts_macro void write_(Out& out, const Wire& v, Str flags) {
+    write_Wire(out, v, flags); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

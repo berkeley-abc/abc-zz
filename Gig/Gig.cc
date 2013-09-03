@@ -76,7 +76,6 @@ void Gig::clear(bool reinit)
 {
     // Free fanin memory:
     for (uint id = 0; id < size(); id++){
-
         Gate& g = getGate(*this, id);
         if (g.is_ext)
             mem.free(g.ext, g.size);
@@ -359,10 +358,11 @@ void Gig::moveTo(Gig& M)
     mov(type_count  , M.type_count);
     mov(size_       , M.size_);
     mov(use_freelist, M.use_freelist);
+    mov(freelist    , M.freelist);
 
     mov(lut6_ftb    , M.lut6_ftb);
 
-    mov(objs        , M.objs);
+    mov(objs, M.objs);
     for (uint i = 0; i < GigObjType_size; i++)
         if (M.objs[i])
             M.objs[i]->N = &M;
@@ -383,9 +383,11 @@ void Gig::moveTo(Gig& M)
 void Gig::copyTo(Gig& M) const
 {
     M.clear(false);
+    M.mem.~SlimAlloc<uint>();
+    new (&M.mem) SlimAlloc<uint>;   // -- this member has to be reinitialized
 
     // Copy state:
-    cpy(is_frozen   , M.is_frozen);
+    cpy(is_frozen, M.is_frozen);
 
   #if defined(ZZ_GIG_PAGED)
     M.pages.growTo(pages.size());
@@ -397,11 +399,22 @@ void Gig::copyTo(Gig& M) const
     cpy(gates, M.gates);
   #endif
 
+    cpy(size_, M.size_);
+    for (uint id = 0; id < size_; id++){
+        Gate& g = getGate(M, id);
+        if (g.is_ext){
+            // Duplicate external gate data:
+            uint* src = g.ext;
+            g.ext = M.mem.alloc(g.size);
+            memcpy(g.ext, src, g.size * sizeof(uint));
+        }
+    }
+
     cpy(numbers     , M.numbers);
     cpy(type_list   , M.type_list);
     cpy(type_count  , M.type_count);
-    cpy(size_       , M.size_);
     cpy(use_freelist, M.use_freelist);
+    cpy(freelist    , M.freelist);
 
     // Side-tables:
     cpy(lut6_ftb, M.lut6_ftb);
