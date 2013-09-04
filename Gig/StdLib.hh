@@ -102,7 +102,7 @@ void introduceMuxes(Gig& N);
 void normalizeLut4s(Gig& N, bool ban_constant_luts = true);
     // -- Make sure unused pins are always the uppermost ones. Optionally also ban zero-input LUTs.
 
-void putIntoNpn4(Gig& N);
+void putIntoNpn4(Gig& N, WSeen* out_inverted = NULL);
     // -- Put the netlist into Npn4 form. Will convert the following gate types into 'gate_Npn4':
     //   And, Xor, Mux, Maj, Buf, Not, Or, Equiv, Lut4.
 

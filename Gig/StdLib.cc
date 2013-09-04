@@ -270,7 +270,7 @@ void normalizeLut4s(Gig& N, bool ban_constant_luts)
 // -- Put the netlist into Npn4 form. Will convert the following gate types into 'gate_Npn4':
 // And, Xor, Mux, Maj, Buf, Not, Or, Equiv, Lut4
 // NOTE! If LUTs have inputs not in the support if it's FTB, those inputs may end up unreachable.
-void putIntoNpn4(Gig& N)
+void putIntoNpn4(Gig& N, WSeen* out_inverted)
 {
     uint64 mask = gtm_XigLogic | GTM_(Buf) | GTM_(Not) | GTM_(Or) | GTM_(Equiv) | GTM_(Lut4);
 
@@ -351,13 +351,16 @@ void putIntoNpn4(Gig& N)
                 w.set(Input_Pin(v), ~N.True() ^ v.sign);
         }
     }
+
+    if (out_inverted) inverted.moveTo(*out_inverted);
 }
 
 
 void putIntoLut4(Gig& N)
 {
     // Temporary version using 'putIntoNpn4()':
-    putIntoNpn4(N);
+    WSeen inverted;
+    putIntoNpn4(N, &inverted);
 
     For_Gates(N, w){
         if (w == gate_Npn4){
@@ -365,13 +368,24 @@ void putIntoLut4(Gig& N)
             ftb4_t ftb = npn4_repr[cl];
             uint   sz  = npn4_repr_sz[cl];
             for (uint i = 0; i < sz; i++){
-                if (w[i].sign){
+                bool s = w[i].sign ^ inverted.has(w[i]);
+                if (w[i].sign)
                     w.set(i, +w[i]);
+                if (s)
                     ftb = ftb4_neg(ftb, i);
-                }
             }
+            if (inverted.has(w))
+                ftb ^= 0xFFFF;
+
             changeType(w, gate_Lut4);
             w.arg_set(ftb);
+
+        }else{
+            For_Inputs(w, v){
+                if (inverted.has(v)){
+                    assert(v == gate_Lut4 || v == gate_Npn4);
+                    w.set(Input_Pin(v), ~v); }
+            }
         }
     }
 }

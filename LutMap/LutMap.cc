@@ -4,11 +4,11 @@
 //| Author(s)   : Niklas Een
 //| Module      : LutMap
 //| Description :
-//| 
+//|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -393,7 +393,7 @@ void LutMap::generateCuts(Wire w)
 // Exact local area:
 
 
-// <<== need cut-off 
+// <<== need cut-off
 // <<== need to make it delay aware (at least optionally)
 // <<== can we speed up 'try'?
 
@@ -531,7 +531,7 @@ void LutMap::exactLocalArea(WMap<uint>& fanouts)
             for (uint i = 1; i < cutmap[w].size(); i++){
                 Cut& cut = cutmap[w][i];
               #if defined(ELA_TIMING)
-                // Check if meets timing:       <<== delay/area trade-off 
+                // Check if meets timing:       <<== delay/area trade-off
                 float arr = 0;
                 for (uint j = 0; j < cut.size(); j++)
                     newMax(arr, arrival[cut[j] + N] + 1.0f);
@@ -948,7 +948,8 @@ void lutMap(Gig& N, Params_LutMap P, WMapX<GLit>* remap)
 
 void lutMap(Gig& N, const Vec<Params_LutMap>& Ps, WMapX<GLit>* remap)
 {
-    /**/For_Gates(N, w){ if (isLogicGate(w)) WriteLn "%f", w; }
+    //**/For_Gates(N, w){ if (isLogicGate(w) || w == gate_PO) WriteLn "%f", w; }
+
     WMapX<GLit> xlat;
     xlat.initBuiltins();
     if (remap)
@@ -960,8 +961,6 @@ void lutMap(Gig& N, const Vec<Params_LutMap>& Ps, WMapX<GLit>* remap)
         lutMap(N, Ps[i], remap ? &xlat : NULL);
 
         if (remap){
-            /**/Dump(xlat.base());
-            /**/For_Gates(N, w){ if (isLogicGate(w)) WriteLn "%f", w; }
             if (i == 0)
                 xlat.moveTo(*remap);
             else{
@@ -975,13 +974,11 @@ void lutMap(Gig& N, const Vec<Params_LutMap>& Ps, WMapX<GLit>* remap)
             NewLine;
             WriteLn "==== Unmapping %_ ====", i + 1;
             unmap(N, &xlat);
-            /**/Dump(xlat.base());
-            /**/For_Gates(N, w){ if (isLogicGate(w)) WriteLn "%f", w; }
             N.unstrash();
             Vec<GLit>& v = remap->base();
             for (uint i = gid_FirstUser; i < v.size(); i++)
                 v[i] = xlat[v[i]];
-#if 0
+#if 1
             GigRemap cmap;
             N.compact(cmap);
             if (remap)

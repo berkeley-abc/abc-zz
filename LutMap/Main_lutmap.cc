@@ -453,7 +453,7 @@ int main(int argc, char** argv)
     Gig N_orig;
     N.copyTo(N_orig);
 
-    Vec<Params_LutMap> Ps(2, P);
+    Vec<Params_LutMap> Ps(3, P);
     lutMap(N, Ps, &remap);
 
     uint count = 0;
@@ -463,7 +463,6 @@ int main(int argc, char** argv)
             count++;
             N_orig.add(gate_PO).init(N_orig[i]);
             N.add(gate_PO).init(v[i]);
-            /**/WriteLn "orig: %f    new: %f", N_orig[i], (v[i] + N);
         }
     }
 
