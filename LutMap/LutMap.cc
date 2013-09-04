@@ -975,15 +975,17 @@ void lutMap(Gig& N, const Vec<Params_LutMap>& Ps, WMapX<GLit>* remap)
             WriteLn "==== Unmapping %_ ====", i + 1;
             unmap(N, &xlat);
             N.unstrash();
-            Vec<GLit>& v = remap->base();
-            for (uint i = gid_FirstUser; i < v.size(); i++)
-                v[i] = xlat[v[i]];
-#if 1
+
+            if (remap){
+                Vec<GLit>& v = remap->base();
+                for (uint i = gid_FirstUser; i < v.size(); i++)
+                    v[i] = xlat[v[i]];
+            }
+
             GigRemap cmap;
             N.compact(cmap);
             if (remap)
                 cmap.applyTo(remap->base());
-#endif
 
             WriteLn "Result: %_", info(N);
             putIntoLut4(N);

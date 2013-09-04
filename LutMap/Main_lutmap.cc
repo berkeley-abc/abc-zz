@@ -445,7 +445,7 @@ int main(int argc, char** argv)
         if (quit) return 0;
     }
 
-  #if 0
+  #if 1
     Vec<Params_LutMap> Ps(3, P);
     lutMap(N, Ps);
   #else
