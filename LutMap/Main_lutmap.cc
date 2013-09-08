@@ -447,7 +447,7 @@ int main(int argc, char** argv)
     }
 
   #if 1
-    Vec<Params_LutMap> Ps(3, P);
+    Vec<Params_LutMap> Ps(cli.get("rounds").int_val, P);
     lutMap(N, Ps);
   #else
     WMapX<GLit> remap;

@@ -1762,10 +1762,10 @@ lbool treb( NetlistRef          N0,
                 assert(*bug_free_depth + 1 >= 0);
                 Vec<uint> depths;
                 depths.push(cex->depth());
-                sendMsg_Result_fails(props_, depths, *cex, N0, true);
+                sendMsg_Result_fails(props_, 1/*safety prop*/, depths, *cex, N0, true);
 
             }else if (result == l_True){
-                sendMsg_Result_holds(props_);
+                sendMsg_Result_holds(props_, 1/*safety prop*/);
             }else
                 assert(false);
         }

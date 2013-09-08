@@ -307,7 +307,7 @@ lbool imcStd(NetlistRef N0, const Vec<Wire>& props, const Params_ImcStd& P, Cex*
 
         if (ret == l_Undef){
             assert(props.size() == 1);      // -- for now, can only handle singel properties in PAR mode
-            sendMsg_Result_unknown(props);
+            sendMsg_Result_unknown(props, 1/*safety prop*/);
 
         }else if (ret == l_False){
             assert(cex);
@@ -315,10 +315,10 @@ lbool imcStd(NetlistRef N0, const Vec<Wire>& props, const Params_ImcStd& P, Cex*
             assert(*bf_depth + 1 >= 0);
             Vec<uint> depths;
             depths.push(uint(cex->depth()));
-            sendMsg_Result_fails(props, depths, *cex, N0, true);
+            sendMsg_Result_fails(props, 1/*safety prop*/, depths, *cex, N0, true);
 
         }else{ assert(ret == l_True);
-            sendMsg_Result_holds(props);
+            sendMsg_Result_holds(props, 1/*safety prop*/);
         }
     }
 

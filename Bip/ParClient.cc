@@ -809,35 +809,39 @@ void unpack_UCube(Pkg pkg, /*outputs:*/ uint& frame, Vec<GLit>& state)
 }
 
 
-void sendMsg_Result_unknown(const Vec<uint>& props)
+void sendMsg_Result_unknown(const Vec<uint>& props, uint prop_type)
 {
     Vec<uchar> data;
     data.push(l_Undef.value);
     put_vec_uint(data, props);
     sendMsg(101/*Result*/, data.slice());
+    putu(data, prop_type);
 }
 
 
 // 'concrete' means flops are not abstracted => only the initial state will be included in the counterexample
-void sendMsg_Result_fails(const Vec<uint>& props, const Vec<uint>& depths, const Cex& cex, NetlistRef N, bool concrete_cex, uint loop_frame)
+void sendMsg_Result_fails(const Vec<uint>& props, uint prop_type, const Vec<uint>& depths, const Cex& cex, NetlistRef N, bool concrete_cex, uint loop_frame)
 {
     Vec<uchar> data;
     data.push(l_False.value);
     put_vec_uint(data, props);
     put_vec_uint(data, depths);
     put_Cex(data, cex, N, concrete_cex);
+    putu(data, prop_type);
     if (loop_frame != UINT_MAX)
         putu(data, loop_frame);
     sendMsg(101/*Result*/, data.slice());
 }
 
 
-void sendMsg_Result_holds(const Vec<uint>& props, NetlistRef N_invar)
+void sendMsg_Result_holds(const Vec<uint>& props, uint prop_type, NetlistRef N_invar)
 {
     Vec<uchar> data;
     data.push(l_True.value);
     put_vec_uint(data, props);
     putu(data, 0);  // -- boolean; 0 = no invariant follows
+        // <<== 'N_invar' should be put here if used
+    putu(data, prop_type);
     sendMsg(101/*Result*/, data.slice());
 }
 

@@ -64,9 +64,9 @@ void sendMsg_UnreachCube(NetlistRef N, TCube c);                     // -- for '
 void sendMsg_UnreachCube(const Vec<GLit>& s, uint frame);            // -- for 'Pdr'
 void unpack_UCube(Pkg pkg, /*outputs:*/ uint& frame, Vec<GLit>& state);
 
-void sendMsg_Result_unknown(const Vec<uint>& props);
-void sendMsg_Result_fails(const Vec<uint>& props, const Vec<uint>& depths, const Cex& cex, NetlistRef N, bool concrete_cex, uint loop_frame = UINT_MAX);
-void sendMsg_Result_holds(const Vec<uint>& props, NetlistRef N_invar = Netlist_NULL);
+void sendMsg_Result_unknown(const Vec<uint>& props, uint prop_type);
+void sendMsg_Result_fails  (const Vec<uint>& props, uint prop_type, const Vec<uint>& depths, const Cex& cex, NetlistRef N, bool concrete_cex, uint loop_frame = UINT_MAX);
+void sendMsg_Result_holds  (const Vec<uint>& props, uint prop_type, NetlistRef N_invar = Netlist_NULL);
     // -- unnumbered flops/PIs will be ignored when sending counterexample
 
 void sendMsg_Abstr(const WZetL& abstr, NetlistRef N);

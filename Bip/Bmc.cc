@@ -472,14 +472,14 @@ lbool bmc(NetlistRef N0, const Vec<Wire>& props, const Params_Bmc& P, Cex* cex, 
 
         if (ret == l_Undef){
             assert(props.size() == 1);      // -- for now, can only handle singel properties in PAR mode
-            sendMsg_Result_unknown(props);
+            sendMsg_Result_unknown(props, 1/*safety prop*/);
         }else{
             assert(cex);
             assert(bf_depth);
             assert(*bf_depth + 1 >= 0);
             Vec<uint> depths;
             depths.push(uint(*bf_depth + 1));
-            sendMsg_Result_fails(props, depths, *cex, N0, true);
+            sendMsg_Result_fails(props, 1/*safety prop*/, depths, *cex, N0, true);
         }
     }
 

@@ -260,11 +260,11 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P, Cex* 
             lbool ret = kLive(N, P, fair_mon, 0, true);      // <<== use 'eng' parameter here
             if (ret == l_Undef){
                 WriteLn "LIVENESS: \a*Inconclusive.\a*";
-                if (par) sendMsg_Result_unknown(par_props);
+                if (par) sendMsg_Result_unknown(par_props, 2/*liveness property*/);
 
             }else{ assert(ret == l_True);
                 WriteLn "LIVENESS: \a*No witness exists.\a*";
-                if (par) sendMsg_Result_holds(par_props);
+                if (par) sendMsg_Result_holds(par_props, 2/*liveness property*/);
             }
             return ret;         // -- EXIT POINT!
 
@@ -391,7 +391,7 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P, Cex* 
         if (par){
             Vec<uint> depths;
             depths.push(cex.depth());
-            sendMsg_Result_fails(par_props, depths, cex, N, true, loop_frame);
+            sendMsg_Result_fails(par_props, 2/*liveness property*/, depths, cex, N, true, loop_frame);
         }
 
         if (out_cex)
@@ -401,13 +401,13 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P, Cex* 
         // Inconclusive k-liveness call:
         WriteLn "LIVENESS: \a*Inconclusive.\a*";
         if (par)
-            sendMsg_Result_unknown(par_props);
+            sendMsg_Result_unknown(par_props, 2/*liveness property*/);
 
     }else if (ret == l_True){
         // Invariant found => no fair witness exists:
         WriteLn "LIVENESS: \a*No witness exists.\a*";
         if (par)
-            sendMsg_Result_holds(par_props);
+            sendMsg_Result_holds(par_props, 2/*liveness property*/);
 
     }else{
         if (P.gig_output == "" && P.aig_output == "")

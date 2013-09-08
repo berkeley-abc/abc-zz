@@ -708,7 +708,7 @@ void localAbstr(NetlistRef N0, Vec<Wire>& props, const Params_LocalAbstr& P, /*i
                         assert(props.size() == 1);
                         Vec<uint> props;  props .push(0);
                         Vec<uint> depths; depths.push(depth);
-                        sendMsg_Result_fails(props, depths, *cex, N0, true);
+                        sendMsg_Result_fails(props, 1/*safety prop*/, depths, *cex, N0, true);
                     }
                 }else
                     if (!P.quiet){ WriteLn "Counterexample INCORRECT! (please report this bug!)"; }
