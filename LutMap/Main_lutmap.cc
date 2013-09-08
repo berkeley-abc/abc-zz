@@ -306,7 +306,8 @@ int main(int argc, char** argv)
     cli.add("cost"   , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
     cli.add("ftbs"   , "string", ""          , "Write all FTBs to a file (for analysis).");
     cli.add("N"      , "uint"  , "10"        , "Cuts to keep per node.");
-    cli.add("iters"  , "uint"  , "4"         , "Number of mapping phases.");
+    cli.add("iters"  , "uint"  , "4"         , "Phases in each mapping.");
+    cli.add("rounds" , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
     cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
     cli.add("recycle", "bool"  , "yes"       , "Recycle cuts for faster iterations.");
     cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (defaul is area).");
@@ -453,7 +454,7 @@ int main(int argc, char** argv)
     Gig N_orig;
     N.copyTo(N_orig);
 
-    Vec<Params_LutMap> Ps(3, P);
+    Vec<Params_LutMap> Ps(cli.get("rounds").int_val, P);
     lutMap(N, Ps, &remap);
 
     uint count = 0;
