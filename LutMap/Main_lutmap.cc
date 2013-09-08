@@ -299,8 +299,8 @@ int main(int argc, char** argv)
     ZZ_Init;
 
     cli.add("input"  , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
-    cli.add("output" , "string", ""          , "Output GNL file (optional).", 1);
-    cli.add("keep"   , "string", ""          , "List of forcable gates (only gor GNL input).");
+    cli.add("output" , "string", ""          , "Output GNL, GIG or BLIF file (optional).", 1);
+    cli.add("keep"   , "string", ""          , "List of forcable gates (only for GNL input).");
     cli.add("blif"   , "string", ""          , "Save original input in BLIF format (for debugging only). Add '@' as last character to skip mapping.");
     cli.add("pnl"    , "string", ""          , "Save original input in PNL format (for debugging only). Add '@' as last character to skip mapping.");
     cli.add("cost"   , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
@@ -310,7 +310,7 @@ int main(int argc, char** argv)
     cli.add("rounds" , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
     cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
     cli.add("recycle", "bool"  , "yes"       , "Recycle cuts for faster iterations.");
-    cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (defaul is area).");
+    cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (default is area).");
     cli.add("comb"   , "bool"  , "no"        , "Remove white/black boxes and sequential elements (may change delay profile).");
     cli.add("mux"    , "bool"  , "yes"       , "Do MUX and XOR extraction first.");
     cli.add("melt"   , "bool"  , "no"        , "Undo the 3-input LUT mapping of HDL-ICE.");
