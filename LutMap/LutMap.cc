@@ -868,7 +868,7 @@ void LutMap::run()
         newMin(best_arrival, mapped_delay);
 
         if (!P.quiet)
-            WriteLn "round=%d   mapped_area=%,d   mapped_delay=%_   cuts=%,d   [enum: %t, blend: %t]", round, mapped_area, mapped_delay, cuts_enumerated, T1-T0, T2-T1;
+            WriteLn "phase=%d   mapped_area=%,d   mapped_delay=%_   cuts=%,d   [enum: %t, blend: %t]", round, mapped_area, mapped_delay, cuts_enumerated, T1-T0, T2-T1;
 
         if (round == 0 || !P.recycle_cuts || (round == 1 && P.map_for_delay)){
             if (round != last_round){
@@ -935,7 +935,7 @@ LutMap::LutMap(Gig& N_, Params_LutMap P_, WMapX<GLit>* remap_) :
 // The 'remap' map will map old gates to new gates (with sign, so 'x' can go to '~y'). Naturally,
 // many signals may be gone; these are mapped to 'glit_NULL'. NOTE! Even inputs may be missing from
 // 'remap' if they are not in the transitive fanin of any output.
-// 
+//
 void lutMap(Gig& N, Params_LutMap P, WMapX<GLit>* remap)
 {
 //        expandLut3s(N);
