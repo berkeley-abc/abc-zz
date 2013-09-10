@@ -182,8 +182,8 @@ void Pec_Strash::strashNetlist()
     for (uind i = 0; i < order.size(); i++){
         Wire w = N[order[i]];
         if (type(w) == gate_And){
-            Wire x = repr[w[0]] ^ sign(w[0]);
-            Wire y = repr[w[1]] ^ sign(w[1]);
+            Wire x = repr[w[0]] ^ sign(w[0]); assert(+x);   // }- These may fail if a PO is used as input to another gate, for instance.
+            Wire y = repr[w[1]] ^ sign(w[1]); assert(+y);   // }
             if (y < x) swp(x, y);   // -- make sure 'x < y'.
             if (+x == glit_True)
                 repr(w) = sign(x) ? x : y;

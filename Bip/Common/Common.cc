@@ -69,6 +69,14 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
         Wire w0 = N0[order[i]];
         if (!seen.has(w0)) continue;
         Wire w;
+#if 1   /*DEBUG*/
+        for (uint j = 0; j < w0.size(); j++){
+            if (!+w0[j]){
+                WriteLn "%n is missing input %_", w0, j;
+            }
+        }
+#endif  /*END DEBUG*/
+
         if (type(w0) == gate_PI)
             w = N.add(PI_(attr_PI(w0).number));
         else if (type(w0) == gate_PO)
