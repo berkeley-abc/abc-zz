@@ -20,6 +20,7 @@
 #include "ZZ/Generics/Heap.hh"
 #include "Cut.hh"
 #include "Unmap.hh"
+/**/#include "ZZ_Dsd.hh"
 
 #define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
 #define ELA_GLOBAL_LIM 500      // -- if more nodes than this is dereferenced, MFFC is too big to consider
@@ -342,6 +343,24 @@ void LutMap::generateCuts(Wire w)
             if (!winner[w].null())
                 cuts.push(winner[w]);
             generateCuts_LogicGate(w, cuts);
+#if 0   /*DEBUG*/
+{
+            Params_Dsd Pd;
+            Pd.cofactor = false;
+            Pd.use_kary = false;
+            Vec<uchar> prog;
+
+            uint j = 0;
+            for (uint i = 0; i < cuts.size(); i++){
+                uint64 ftb = computeFtb(w, cuts[i], in_memo, memo);
+                dsd6(ftb, prog, Pd);
+                if (!hasBox(prog))
+                    cuts[j++] = cuts[i];
+            }
+            cuts.shrinkTo(j);
+}
+#endif  /*END DEBUG*/
+
             cuts_enumerated += cuts.size();
             prioritizeCuts(w, cuts.slice());
 
@@ -988,6 +1007,14 @@ void lutMap(Gig& N, const Vec<Params_LutMap>& Ps, WMapX<GLit>* remap)
                 cmap.applyTo(remap->base());
 
             WriteLn "Result: %_", info(N);
+            WriteLn "Pseudo-ANDs: %_", N.typeCount(gate_And)
+                                     + N.typeCount(gate_Xor)  * 3
+                                     + N.typeCount(gate_Mux)  * 3
+                                     + N.typeCount(gate_Maj)  * 5
+                                     + N.typeCount(gate_One)  * 8
+                                     + N.typeCount(gate_Gamb) * 5
+                                     + N.typeCount(gate_Dot)  * 5;
+
             putIntoLut4(N);
         }
     }

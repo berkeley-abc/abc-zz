@@ -1658,6 +1658,10 @@ bool Treb::run(Cex* cex_out, NetlistRef N_invar)
             bad_depth++;
             if (bad_depth > depth()){
                 newFrame();
+
+                if (par && P.par_send_result)
+                    sendMsg_Text(3/*Progress*/, (FMT "bug-free-depth: %_\n", bugFreeDepth()));
+
                 showProgress("block");
                 if (P.semant_coi & 1){
                     semanticCoi(depth() - 1);
