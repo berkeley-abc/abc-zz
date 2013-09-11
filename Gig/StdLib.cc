@@ -208,8 +208,19 @@ void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* orde
         if (!seen[w.id])
             upOrder_helper(Q, seen, removed, w);
 
+#if 1   // -- keep CIs
+    uint j = mark;
+    for (uint i = mark; i < removed.size(); i++){
+        Wire w = removed[i] + N;
+        if (!isCI(w)){
+            remove(w);
+            removed[j++] = w; }
+    }
+    removed.shrinkTo(j);
+#else
     for (uint i = mark; i < removed.size(); i++){
         remove(removed[i] + N); }
+#endif
 
     if (order_ptr && !removed_ptr)
         order.shrinkTo(mark);
