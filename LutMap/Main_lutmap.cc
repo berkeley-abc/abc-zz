@@ -380,26 +380,14 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-#if 0   /*DEBUG*/
-    N.clear();
-    Wire acc = N.add(gate_PI);
-    for (uint i = 0; i < 10000; i++)
-        acc = mkAnd(acc, N.add(gate_PI));
-    N.add(gate_PO).init(acc);
-#endif  /*END DEBUG*/
-
-#if 1
+    // Temporary preprocessing; rewrite this:
     N.is_frozen = false;
     WriteLn "Info: %_", info(N);
-    //WriteLn "Putting into Lut4 form.";
-    //putIntoLut4(N);
     WriteLn "Strashing";
     N.strash();
     WriteLn "Info: %_", info(N);
     N.unstrash();
-
     N.is_frozen = false;
-#endif
 
     if (cli.get("melt").bool_val)
         expandLut3s(N);
@@ -411,7 +399,6 @@ int main(int argc, char** argv)
         introduceMuxesAsLuts(N);
 
     N.compact();
-    //**/N.save("tmp.gnl"); writeGigForTechmap("tmp.gig", N); /**/WriteLn "wrote tmp.gnl/gig";
 
     double T1 = cpuTime();
     WriteLn "Parsing: %t", T1-T0;
@@ -449,7 +436,9 @@ int main(int argc, char** argv)
   #if 1
     Vec<Params_LutMap> Ps(cli.get("rounds").int_val, P);
     lutMap(N, Ps);
+
   #else
+    // With signal tracking (for debugging)
     WMapX<GLit> remap;
     Gig N_orig;
     N.copyTo(N_orig);

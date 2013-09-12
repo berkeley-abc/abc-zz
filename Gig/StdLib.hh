@@ -8,7 +8,7 @@
 //| (C) Copyright 2010-2012, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #ifndef ZZ__Gig__StdLib_hh
@@ -49,17 +49,6 @@ bool isMux(Wire w, Wire& sel, Wire& d1, Wire& d0);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Netlist state:
-
-
-bool isCanonical(const Gig& N); // -- children has lower IDs than parents (= gates topologically ordered)
-bool isReach    (const Gig& N); // -- all gates are reachabled from combinational output
-
-macro bool isCompact(const Gig& N) {    // -- no deleted gates
-    return N.nRemoved() == 0; }
-
-
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Topological order:
 
 
@@ -70,14 +59,35 @@ void upOrder(const Gig& N, const Vec<GLit>& sinks, /*out*/Vec<GLit>& order);
     // gates are NOT included in 'order', even if reachable.
 
 
-void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed = NULL, Vec<GLit>* order = NULL);
-    // -- Remove all nodes not reachable from a combinational output. If 'removed' is given,
-    // deleted nodes are returned through that vector. If 'order' is given, a topological
-    // order for the remaining node is returned through that vector. 
+bool removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed = NULL, Vec<GLit>* order = NULL);
+    // -- Remove all nodes not reachable from a combinational output EXCEPT combinational inputs.
+    // If 'removed' is given, deleted nodes are returned through that vector. If 'order' is given,
+    // a topological order for the remaining nodes is returned through that vector.
+    // Returns TRUE if at least one node was removed.
+
+bool checkUnreach(const Gig& N, /*outs*/Vec<GLit>* unreach = NULL, Vec<GLit>* order = NULL);
+    // Same as 'removeUnreach()' but doesn't actually delete the nodes, just adds them to output
+    // vectore 'unreach' (which is the same as 'removed' would have been).
 
 
 // DEBUG:
 void upOrderTest(const Gig& N);
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Netlist state:
+
+
+bool isCanonical(const Gig& N);
+    // -- children has lower IDs than parents (= gates topologically ordered)
+
+macro bool isReach(const Gig& N){
+    // -- all gates are reachabled from combinational outputs (CIs excluded from this check)
+    return !checkUnreach(N); }
+
+macro bool isCompact(const Gig& N) {
+    // -- netlist has no deleted gates (no "holes" in the vector of gates)
+    return N.nRemoved() == 0; }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

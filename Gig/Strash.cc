@@ -638,9 +638,11 @@ void GigObj_Strash::strashNetlist()
     ushort ftb;
     For_UpOrder(*N, w){
         // Translate inputs:
-        For_Inputs(w, v)
-            if (v != xlat[v])
-                w.set(Input_Pin(v), xlat[v]);
+        if (!isSeqElem(w)){
+            For_Inputs(w, v)
+                if (v != xlat[v])
+                    w.set(Input_Pin(v), xlat[v]);
+        }
 
         // If strashed gate type, rebuild the gate using strash functions:
         switch (w.type()){

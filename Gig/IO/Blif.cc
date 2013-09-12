@@ -4,11 +4,11 @@
 //| Author(s)   : Niklas Een
 //| Module      : IO
 //| Description : Blif writer, intended for transferring LUT mapped designs to ABC
-//| 
+//|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -72,6 +72,7 @@ void writeBlif(Out& out, Gig& N)
     FWriteLn(out) ".names %_\n 0", nam[N.False()];
 
     For_UpOrder(N, w){
+        assert(nam[w].chr);
         switch (w.type()){
         case gate_PI:
         case gate_FF:

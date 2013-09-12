@@ -83,20 +83,10 @@ bool isCanonical(const Gig& N)
 {
     For_Gates(N, w){
         For_Inputs(w, v)
-            if (v.id >= w.id)
+            if (v != gate_Seq && v.id >= w.id)
                 return false;
     }
     return true;
-}
-
-
-bool isReach(const Gig& N)
-{
-    Vec<GLit> order;
-    upOrder(N, order);
-    assert(order.size() <= N.count());
-
-    return order.size() == N.count();
 }
 
 
@@ -182,7 +172,8 @@ void upOrder(const Gig& N, const Vec<GLit>& sinks, /*out*/Vec<GLit>& order)
 }
 
 
-void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* order_ptr)
+template<bool do_remove>
+bool removeUnreach_helper(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* order_ptr)
 {
     Vec<GLit> order_internal;
     Vec<GLit>& order = order_ptr ? *order_ptr : order_internal;
@@ -197,8 +188,9 @@ void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* orde
 
     // Collect all nodes reachable from combinational outputs into 'order':
     For_Gates(N, w)
-        if (isCO(w) && !seen[w.id])
-            upOrder_helper(Q, seen, order, w);
+        if (isCO(w)){
+            assert_debug(!seen[w.id]);
+            upOrder_helper(Q, seen, order, w); }
 
     // Collect all remaining nodes into 'removed' (which may be the tail of 'order'):
     Vec<GLit>& removed = removed_ptr ? *removed_ptr : order;
@@ -208,22 +200,40 @@ void removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* orde
         if (!seen[w.id])
             upOrder_helper(Q, seen, removed, w);
 
-#if 1   // -- keep CIs
+    // Remove all unreachable gates (except combinational inputs):
+    Vec<GLit> cis;
     uint j = mark;
     for (uint i = mark; i < removed.size(); i++){
         Wire w = removed[i] + N;
         if (!isCI(w)){
-            remove(w);
-            removed[j++] = w; }
+            if (do_remove)
+                remove(w);
+            removed[j++] = w;
+        }else if (order_ptr)
+            cis.push(w);
     }
     removed.shrinkTo(j);
-#else
-    for (uint i = mark; i < removed.size(); i++){
-        remove(removed[i] + N); }
-#endif
 
     if (order_ptr && !removed_ptr)
         order.shrinkTo(mark);
+
+    if (order_ptr)
+        // Tuck CIs at the end of topological order:
+        append(order, cis);
+
+    return j != mark;
+}
+
+
+bool removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* order_ptr)
+{
+    return removeUnreach_helper<true>(N, removed_ptr, order_ptr);
+}
+
+
+bool checkUnreach(const Gig& N, /*outs*/Vec<GLit>* unreach_ptr, Vec<GLit>* order_ptr)
+{
+    return removeUnreach_helper<false>(N, unreach_ptr, order_ptr);
 }
 
 
