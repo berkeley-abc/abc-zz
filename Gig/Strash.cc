@@ -526,6 +526,12 @@ Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4], bool just_try)
         }
     }
 
+    // Constant?
+    if (sz == 0){
+        if (ftb == 0xFFFF) return N.True();
+        else{ assert(ftb == 0); return ~N.True(); }
+    }
+
     // Remove duplicate inputs from FTB:
     for (uint i = 0; i < sz-1; i++){
         if (w[i] == GLit_NULL) continue;
