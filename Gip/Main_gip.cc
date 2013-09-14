@@ -164,6 +164,7 @@ int main(int argc, char** argv)
 
     Params_Bmc P;
     DefaultRep rep;
+    P.sat_solver = sat_Msc;
     bmc(N, P, rep);
 
 

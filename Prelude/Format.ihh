@@ -430,7 +430,11 @@ macro Formater<0,0,0> operator, (Out& out, Pre_Formater P) { return Formater<0,0
 
 #define FWrite(  out) out %=        // -- no auto-flushing for "file" writing.
 #define FWriteLn(out) out /=
-#define FNewLine(out) out += NL
+#define FNewLine(out) out += '\n'
+
+#define FFWrite(  out) out &=       // -- "file" writing with flushing
+#define FFWriteLn(out) out |=
+#define FFNewLine(out) out += NL
 
 #if defined(__GNUC__) || defined(sun)
     #define Dump(args...) std_out |= formatDumpArgs(#args).c_str(), args
