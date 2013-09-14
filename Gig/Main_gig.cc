@@ -12,6 +12,9 @@ int main(int argc, char** argv)
     ZZ_Init;
 
     Gig N;
+    Dump(N.isEmpty());
+    return 0;
+
     Wire sel = N.add(gate_PI);
     Wire d1  = N.add(gate_PI);
     Wire d0  = N.add(gate_PI);

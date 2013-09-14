@@ -15,6 +15,7 @@
 #define ZZ__Gig__StdLib_hh
 
 #include "GigExtra.hh"
+#include "Maps.hh"
 
 namespace ZZ {
 using namespace std;
@@ -99,6 +100,11 @@ macro Wire mkOr   (Wire x, Wire y)           { return ~mkAnd(~x, ~y); }
 macro Wire mkMux  (Wire s, Wire d1, Wire d0) { return ~mkAnd(~mkAnd(s, d1), ~mkAnd(~s, d0)); }
 macro Wire mkXor  (Wire x, Wire y)           { return mkMux(x, ~y,  y); }
 macro Wire mkEquiv(Wire x, Wire y)           { return mkMux(x,  y, ~y); }
+
+Wire copyGate(Wire w, Gig& N, WMapX<GLit>& xlat);
+    // -- copy a gate 'w' from netlist 'M' to netlist 'N', using 'xlat' to translate its inputs
+    // (with exception of 'gate_Seq', which are ignored since they break cycles and have to be
+    // tied up last). NOTE! Don't forget to call 'xlat.initBuiltins()' before using this function.
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

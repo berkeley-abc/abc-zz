@@ -184,15 +184,15 @@ gate_id Gig::addInternal(GateType type, uint sz, uint attr, bool strash_normaliz
         inputs[i] = 0;      // -- here we are assuming that 'GLit_NULL' has the underlying representation of '0'
 
     // Bookkeeping:
-    if (gatetype_attr[type] == attr_Enum)
+    if (gatetype_attr[type] == attr_Enum){
+        assert(type_list[type](attr, gid_NULL) == gid_NULL);
         type_list[type](attr, gid_NULL) = id;
+    }
     type_count[type]++;
 
     // Side-tables (gate specific):
-    if (isNumbered(type)){
-        if (type == gate_Lut6)
-            lut6_ftb.growTo(attr + 1, 0ull);
-    }
+    if (type == gate_Lut6)
+        lut6_ftb.growTo(attr + 1, 0ull);
 
     // Listeners
     Vec<GigLis*>& lis = listeners[msgidx_Add];
@@ -334,6 +334,12 @@ void Gig::unstrash()
 {
     if (Has_Gob(*this, Strash))
         Remove_Gob(*this, Strash);
+}
+
+
+bool Gig::isStrashed()
+{
+    return Has_Gob(*this, Strash);
 }
 
 

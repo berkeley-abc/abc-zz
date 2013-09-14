@@ -46,7 +46,7 @@ struct Params_CnfMap {
 // CNF generatation:
 
 
-void cnfMap(Gig& N, Params_CnfMap P);
+void cnfMap(Gig& N, Params_CnfMap P = Params_CnfMap());
     // -- Maps the 'And', 'Xor' and 'Mux' gates of 'N' into 'Lut4's.
     // PRE-CONDITION: 'N' must be in canonical mode.
 

@@ -209,6 +209,8 @@ public:
 
     void  arg_set(uint  v) { assert_debug(!((Gig_data*)N)->is_frozen); assert_debug(attrType() == attr_Arg); gate().inl[2] = v; }
     void  lb_set (lbool v) { assert_debug(!((Gig_data*)N)->is_frozen); assert_debug(attrType() == attr_LB ); assert_debug(id >= gid_FirstUser); gate().inl[2] = v.value; }
+
+    uint  attr() const { return gate().inl[2]; }    // -- low-level; no type checking (don't use)
 };
 
 
@@ -394,12 +396,8 @@ struct Gig : Gig_data, NonCopyable {
 
     void strash(uint64 strashed_gates = gtm_Strashed);
     void unstrash();
-
-    // There are four booleans in the base class 'Gig_data' that can be read/modified directly:
-    //  - bool is_frozen      -- if set, netlist cannot be modified (assertion is raised)
-    //  - bool is_canonical   -- if set, is topologically sorted (not enforced, so make sure your code is correct)
-    //  - bool is_compact     -- if set, there are no deleted gates (gaps in the vector of gates; also not enforced)
-    //  - bool is_reach       -- if set, all gates are reachable from combinational outputs (also not enforced)
+    bool isStrashed();
+//  bool is_frozen      -- if set, netlist cannot be modified (assertion is raised)
 
   //________________________________________
   //  Special gates: (always present)
@@ -433,8 +431,9 @@ struct Gig : Gig_data, NonCopyable {
     Wire  operator[](gate_id id) const { return Wire(this, GLit(id)); }
     Wire  operator[](GLit    p ) const { return Wire(this, p); }
 
-    Wire  enumGate(GateType type, uint num) const { return Wire(this, GLit(type_list[type][num])); }
-    uint  enumSize(GateType type)           const { return type_list[type].size(); }
+    Wire  enumGate  (GateType type, uint num) const { return Wire(this, GLit(type_list[type][num])); }
+    uint  enumSize  (GateType type)           const { return type_list[type].size(); }
+    Wire  operator()(GateType type, uint num) const { return enumGate(type, num); }     // -- shorter syntax
         // -- Loop through enumerable gates of a specific type.
 
   //________________________________________

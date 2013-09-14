@@ -7,6 +7,9 @@ extern "C"{
 
 #include "Prelude.hh"
 #include "ZZ_Lua.hh"
+#include "ZZ_CmdLine.hh"
+#include "ZZ_Gig.IO.hh"
+#include "Bmc.hh"
 
 using namespace ZZ;
 
@@ -127,20 +130,49 @@ int myTab(int count, int key)
 }
 
 
+struct DefaultRep : EngRep {
+    void bugFreeDepth(Prop prop, uint depth)          { WriteLn "%%%% bugFreeDepth(%_, %_)", prop, depth; }
+    void cex         (Prop prop, const Cex& cex)      { WriteLn "%%%% cex(%)", prop; }
+    void proved      (Prop prop, Invar* invar = NULL) { WriteLn "%%%% proved(%)", prop; }
+
+    DefaultRep() { out = &std_out; }
+};
+
+
 int main(int argc, char** argv)
 {
     ZZ_Init;
 
-    testLua();
+    // Commandline:
+    cli.add("input", "string", arg_REQUIRED, "Input AIGER.", 0);
+    cli.parseCmdLine(argc, argv);
+    String input  = cli.get("input").string_val;
+
+    // Read input:
+    Gig N;
+    try{
+        if (hasExtension(input, "aig"))
+            readAigerFile(input, N, true);
+        else{
+            ShoutLn "ERROR! Unknown file extension: %_", input;
+            exit(1);
+        }
+    }catch (const Excp_Msg& err){
+        ShoutLn "PARSE ERROR! %_", err.msg;
+        exit(1);
+    }
+
+    Params_Bmc P;
+    DefaultRep rep;
+    bmc(N, P, rep);
+
+
     return 0;
 
+//    testLua();
+//    return 0;
+
 #if defined(ZZ_HAS_READLINE)
-    WriteLn "\a_                                                                               \a0";
-    WriteLn "\a_[\a*GIP\a*  --  (C) UC Berkeley 2013    Licence: \a*MIT/X11\a*   Build: \a*September 31, 2013]\a0";
-
-    WriteLn "\a_                                                                               \a0";
-    WriteLn "\a_|\a*GIP\a*  --  (C) UC Berkeley 2013    Licence: \a*MIT/X11\a*   Build: \a*September 31, 2013|\a0";
-
     WriteLn "\a_                                                                               \a0";
     WriteLn "\a_\a*GIP\a*  --  (C) UC Berkeley 2013     Licence: \a*MIT/X11\a*    Build: \a*September 31, 2013\a0";
 

@@ -820,16 +820,22 @@ void LutMap::updateFanoutEst(bool instantiate)
         }
 
         // Build LUT representation:
-        //N.setMode(gig_FreeForm);
         uint j = 0;
         For_Gates(N, w){
             if (isLogic(w) && active[w]){
                 // Change AND gate into a LUT6:
                 const Cut& cut = cutmap[w][0];
                 change(w, gate_Lut6);
+                uint sz = 0;
+                for (uint i = 0; i < cut.size(); i++){
+                    if (ftb6_inSup(ftbs[j], i)){
+                        w.set(sz, cut[i] + N);
+                        if (sz < i)
+                            ftbs[j] = ftb6_swap(ftbs[j], i, sz);
+                        sz++;
+                    }
+                }
                 ftb(w) = ftbs[j++];
-                for (uint i = 0; i < cut.size(); i++)
-                    w.set(i, cut[i] + N);
             }
         }
 

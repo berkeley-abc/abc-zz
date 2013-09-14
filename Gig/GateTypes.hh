@@ -115,7 +115,7 @@ DEF( FF       , 2    , Enum )   // Pin0 = data, Pin1 = init (implicitly muxed on
 // Inputs:
 DEF( PI       , 0    , Enum )
 DEF( Clk      , 0    , Enum )
-DEF( PPI      , 0    , Arg  )   // Numbering is not enforced for Pseudo-PIs
+DEF( PPI      , 0    , Enum )   // Pseudo-PIs
 
 // Outputs:
 DEF( PO       , 1    , Enum )

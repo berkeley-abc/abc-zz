@@ -287,11 +287,7 @@ void CnfMap::updateFanoutEst(bool instantiate)
         }
 
     }else{
-        // Build LUT representation:
-        N.is_frozen = false;
-        N.is_reach  = false;
-        N.setMode(gig_FreeForm);
-
+        // Build NPN LUT representation:
         WSeen inverted;
         For_Gates(N, w){
             if (isLogic(w)){
@@ -328,8 +324,6 @@ void CnfMap::updateFanoutEst(bool instantiate)
         N.compact();
         //**/WriteLn "compact: %t", cpuTime() - T0;
         //**/WriteLn "info: %_", info(N);
-
-        N.setMode(gig_Npn4);
     }
 }
 

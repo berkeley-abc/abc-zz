@@ -4,13 +4,13 @@
 //| Author(s)   : Niklas Een
 //| Module      : Gig
 //| Description : Maps from 'Wire' to 'T' and related types.
-//| 
+//|
 //| (C) Copyright 2010-2012, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //| The 'clear()' methods of the various WMap:s leave the 'N' netlist and 'nil' null-value intact.
-//| The same holds for 'moveTo()' which leaves the source map in the same state as after a 
+//| The same holds for 'moveTo()' which leaves the source map in the same state as after a
 //| call to 'clear()'.
 //|________________________________________________________________________________________________
 
@@ -80,7 +80,7 @@ public:
 // Signed Wire Map:
 
 
-// A 'WMapS' adds the sign bit of the input wire to the underlying index, mapping 'w' and '~w' 
+// A 'WMapS' adds the sign bit of the input wire to the underlying index, mapping 'w' and '~w'
 // to different values.
 
 template<class V>
@@ -137,6 +137,8 @@ public:
     WMapX(Gig& N_, V nil) : map(nil), N(&N_)  { map.reserve(N->size()); }
 
     void initBuiltins() { for (uint i = 0; i < gid_FirstUser; i++) map(GLit(i)) = GLit(i); }
+        // -- if mapping between two netlists, use this to set up map between builtin
+        // gates (constants, Wire_NULL etc.).
 
     V  operator[](GLit p) const { return map[p]; }
     V& operator()(GLit p)       { return map(p); }

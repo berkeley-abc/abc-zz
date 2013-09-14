@@ -149,6 +149,8 @@ void upOrder(const Gig& N, /*out*/Vec<GLit>& order)
     Vec<uchar> seen(N.size(), false);
     for (gate_id i = gid_FirstLegal; i < gid_FirstUser; i++)
         seen[i] = true;
+    for (uint i = 0; i < order.size(); i++)
+        seen[order[i].id] = true;
 
     Vec<Pair<GLit,uint> > Q(reserve_, N.size());
     order.reserve(N.size());
@@ -163,6 +165,8 @@ void upOrder(const Gig& N, const Vec<GLit>& sinks, /*out*/Vec<GLit>& order)
     Vec<uchar> seen(N.size(), false);
     for (gate_id i = gid_FirstLegal; i < gid_FirstUser; i++)
         seen[i] = true;
+    for (uint i = 0; i < order.size(); i++)
+        seen[order[i].id] = true;
 
     Vec<Pair<GLit,uint> > Q(reserve_, N.size());
     order.reserve(N.size());
@@ -234,6 +238,53 @@ bool removeUnreach(const Gig& N, /*outs*/Vec<GLit>* removed_ptr, Vec<GLit>* orde
 bool checkUnreach(const Gig& N, /*outs*/Vec<GLit>* unreach_ptr, Vec<GLit>* order_ptr)
 {
     return removeUnreach_helper<false>(N, unreach_ptr, order_ptr);
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Unstrashed AIG construction:
+
+
+/*
+There are four attribute catefories:
+
+    attr_Arg  }- These should just be copied
+    attr_LB,  }  
+    
+    attr_Num  -- These numbers are used as indices into side tables. The destination netlist may 
+                 already have gates of that use the given index.                 
+                 Types of this category: Lut6, WLut, MemR, MemW, MMux
+    
+    attr_Enum -- Enumerables (typeically external elements: PIs, POs, FFs etc.). Should preserve
+                 number in new netlist.
+
+*/
+Wire copyGate(Wire w, Gig& N, WMapX<GLit>& xlat)
+{
+    assert(!xlat[w]);
+
+    // Create gate:
+    Wire w_copy;
+    if (w.attrType() == attr_Num)
+        w_copy = N.add(w.type());
+    else
+        w_copy = N.add(w.type(), w.attr());
+    xlat(+w) = w_copy;
+
+    // Transfer fanins:
+    For_Inputs(w, v){
+        if (v == gate_Seq) continue;
+        assert(xlat[v]);
+        w_copy.set(Input_Pin(v), xlat[v]);
+    }
+
+    // Copy attribute (if any):
+    if (w.attrType() == attr_Num){
+        assert(w == gate_Lut6),     // -- only type supported so far; this will change so add this assertion as a reminder that new code should be added here
+        ftb(w_copy) = ftb(w);
+    }
+
+    return w_copy ^ w.sign;
 }
 
 
