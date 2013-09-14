@@ -124,7 +124,7 @@ macro Wire xig_Equiv(Wire x, Wire y) { return ~xig_Xor( x , y); }
 
 // LUT4:
 //
-Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4], bool just_try = false);
+Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4], bool just_try = false);    // -- will modify 'w[]'
 
 macro Wire lut4_Lut(Gig& N, ushort ftb, GLit w0 = GLit_NULL, GLit w1 = GLit_NULL, GLit w2 = GLit_NULL, GLit w3 = GLit_NULL) {
     GLit w[4];

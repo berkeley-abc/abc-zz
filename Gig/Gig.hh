@@ -667,7 +667,8 @@ inline void write_Wire(Out& out, const Wire& v)
                 FWrite(out) "[ftb=0x%.4X]", v.arg();
             else
                 FWrite(out) "[arg=%_]", v.arg();
-        }
+        }else if (v.attrType() == attr_LB)
+            FWrite(out) "<%_>", v.lb();
     }
 }
 

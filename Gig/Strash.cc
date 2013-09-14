@@ -4,11 +4,11 @@
 //| Author(s)   : Niklas Een
 //| Module      : Gig
 //| Description : Structural hashing of AIGs, XIGs, and Lut4 netlists.
-//| 
+//|
 //| (C) Copyright 2010-2012, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -521,7 +521,6 @@ Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4], bool just_try)
     uint sz = 4;
     for (uint i = 4; i > 0;){ i--;
         if (w[i] == GLit_NULL){
-            /**/if (!(!ftb4_inSup(ftb, i))) WriteLn "ftb=%.4x  ws=%_ %_ %_ %_", ftb, w[0], w[1], w[2], w[3];
             assert(!ftb4_inSup(ftb, i));    // -- FTB must not depend on disconnected inputs
             Pop(i);
         }
@@ -553,7 +552,7 @@ Wire lut4_Lut(Gig& N, ushort ftb, GLit w[4], bool just_try)
         if (!isConst(w[i])) continue;
 
         Pop(i);
-        if (w[i] == GLit_True || w[i] == ~GLit_False){
+        if (w[sz] == GLit_True || w[sz] == ~GLit_False){
             ftb &= ftb4_proj[0][sz];
             ftb |= ftb >> (1u << sz);
         }else{

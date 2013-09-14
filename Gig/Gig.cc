@@ -680,6 +680,9 @@ void Gig::load(In& in)
     Vec<uint> type_map;
     uint n_types = getu(in);
     Vec<char> buf;
+
+    Vec<bool> ban_size_change(n_types, false);
+    Vec<bool> ban_attr_change(n_types, false);
     for (uint i = 0; i < n_types; i++){
         getz(in, buf);
         uint size = getu(in);
@@ -696,8 +699,8 @@ void Gig::load(In& in)
             j = UINT_MAX;
 
         }else{
-            if (gatetype_size[j] != size) Throw (Excp_Msg) "Size has changed for gate: %_", buf;
-            if (gatetype_attr[j] != attr) Throw (Excp_Msg) "Attribute has changed for gate: %_", buf;
+            if (gatetype_size[j] != size) ban_size_change[j] = true;
+            if (gatetype_attr[j] != attr) ban_attr_change[j] = true;
         }
         type_map(i, UINT_MAX) = j;
     }
@@ -707,6 +710,10 @@ void Gig::load(In& in)
     while (size() != n_gates){
         uchar d = getb(in);
         GateType type = GateType(type_map[d & 63]);
+
+        if (ban_size_change[type]) Throw (Excp_Msg) "Size has changed for gate: %_", buf;
+        if (ban_attr_change[type]) Throw (Excp_Msg) "Attribute has changed for gate: %_", buf;
+
         uint n = d >> 6;
         if (n == 0)
             n = getu(in);
