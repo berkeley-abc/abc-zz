@@ -175,6 +175,22 @@ Wire insert(Wire w, uint d, Gig& F, Vec<WMapX<GLit> >& n2f)
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+// Extract and report counterexample
+void extractCex(uint depth, uint prop_no, const Gig& N, const MetaSat& S, EngRep& R, const Vec<WMapX<GLit> >& n2f, const WMapX<Lit>& f2s)
+{
+    Cex cex(depth, N);
+
+    For_Gatetype(N, gate_FF, w)
+        cex.ff(w) = S.value(f2s[n2f[0][w]]);          // <<== need to assure default values for outside COI is correct
+
+    for (uint d = 0; d < depth; d++)
+        For_Gatetype(N, gate_PI, w)
+            cex.pi[d](w) = S.value(f2s[n2f[d][w]]);   // <<== need to assure default values for outside COI is correct
+
+    R.cex(Prop(pt_Safe, prop_no), cex);
+}
+
+
 void bmc(Gig& N0, Params_Bmc& P, EngRep& R, const Vec<uint>& props)
 {
     // Create LUT-based representation for easier CNF generation:
@@ -204,12 +220,12 @@ void bmc(Gig& N0, Params_Bmc& P, EngRep& R, const Vec<uint>& props)
 
     for (uint depth = 0;; depth++){
         Vec<GLit> roots;    // -- conjunction of properties at time 'depth'
-        for (uint j = 0; j < unsolved.size(); j++)
-            roots.push(insert(N(gate_SafeProp, unsolved[j]), depth, F, n2f));
+        for (uint i = 0; i < unsolved.size(); i++){
+            roots.push(insert(N(gate_SafeProp, unsolved[i]), depth, F, n2f)); }
 
         lutClausify(F, roots, S, f2s);
 
-        FFWriteLn(R) "Depth %_ -- Properties left: %_ -- Unrolling: #Lut=%_  #PI=%_  #vars=%_  #clauses=%_", depth, unsolved.size(), F.typeCount(gate_Lut4), F.typeCount(gate_PI), S.nVars(), S.nClauses();
+        FFWriteLn(R) "Depth %_ -- Properties left: %_ -- Unrolling: #Lut=%_  #PI=%_  #vars=%_  #clauses=%_  [CPU-time: %t]", depth, unsolved.size(), F.typeCount(gate_Lut4), F.typeCount(gate_PI), S.nVars(), S.nClauses(), cpuTime();
 
         Vec<Lit> tmp;
         for (uint i = 0; i < roots.size(); i++)
@@ -220,13 +236,37 @@ void bmc(Gig& N0, Params_Bmc& P, EngRep& R, const Vec<uint>& props)
         lbool result = S.solve(~tmp[LAST]);
         if (result == l_True){
             // Found conterexample -- remove failing properties:
-            FFWriteLn(R) "SAT  [CPU-time: %t]", cpuTime();
-            return;
+            uint j = 0;
+            for (uint i = 0; i < unsolved.size(); i++){
+                //**/WriteLn "  status prop %_: %_", N(gate_SafeProp, unsolved[i]).num(), S.value(tmp[i]);
+                if (S.value(tmp[i]) == l_True)
+                    extractCex(depth+1, unsolved[i], N, S, R, n2f, f2s);
+                else
+                    unsolved[j++] = unsolved[i];
+            }
+            unsolved.shrinkTo(j);
+
+            if (unsolved.size() == 0){
+                FFWriteLn(R) "CPU-time: %t", cpuTime();
+                return;
+            }else
+                depth--;    // <<== hack
         }else{
             S.addClause(tmp[LAST]);     // -- disable temporary clause
         }
     }
 }
+
+/*
+Need to:
+  - Produce counterexamples (and send them)
+  - Perhaps find faster way to spin on the same depth? Or find multiple CEX at the same time?
+  - Poll for properties to drop from server (solved by other engine)
+  - Restart if new cone would be significantly smaller due to many solved properties
+  
+Out there:
+  - Clustering of properties
+*/
 
 
 void bmc(Gig& N0, Params_Bmc& P, EngRep& R)

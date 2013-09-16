@@ -53,12 +53,12 @@ public:
     typedef GLit Key;
     typedef V Value;
 
-    Gig* N;
+    const Gig* N;
 
-    WMap()               :           N(NULL) {}
-    WMap(V nil)          : map(nil), N(NULL) {}
-    WMap(Gig& N_)        :           N(&N_)  { map.reserve(N->size()); }
-    WMap(Gig& N_, V nil) : map(nil), N(&N_)  { map.reserve(N->size()); }
+    WMap()                     :           N(NULL) {}
+    WMap(V nil)                : map(nil), N(NULL) {}
+    WMap(const Gig& N_)        :           N(&N_)  { map.reserve(N->size()); }
+    WMap(const Gig& N_, V nil) : map(nil), N(&N_)  { map.reserve(N->size()); }
 
     V  operator[](GLit p) const { return map[p]; }
     V& operator()(GLit p)       { return map(p); }
@@ -91,12 +91,12 @@ public:
     typedef GLit Key;
     typedef V Value;
 
-    Gig* N;
+    const Gig* N;
 
-    WMapS()               :           N(NULL) {}
-    WMapS(V nil)          : map(nil), N(NULL) {}
-    WMapS(Gig& N_)        :           N(&N_)  { map.reserve(N->size() * 2); }
-    WMapS(Gig& N_, V nil) : map(nil), N(&N_)  { map.reserve(N->size() * 2); }
+    WMapS()                     :           N(NULL) {}
+    WMapS(V nil)                : map(nil), N(NULL) {}
+    WMapS(const Gig& N_)        :           N(&N_)  { map.reserve(N->size() * 2); }
+    WMapS(const Gig& N_, V nil) : map(nil), N(&N_)  { map.reserve(N->size() * 2); }
 
     V  operator[](GLit p) const { return map[p]; }
     V& operator()(GLit p)       { return map(p); }
@@ -129,12 +129,12 @@ public:
     typedef GLit Key;
     typedef V Value;
 
-    Gig* N;
+    const Gig* N;
 
-    WMapX()               :           N(NULL) {}
-    WMapX(V nil)          : map(nil), N(NULL) {}
-    WMapX(Gig& N_)        :           N(&N_)  { map.reserve(N->size()); }
-    WMapX(Gig& N_, V nil) : map(nil), N(&N_)  { map.reserve(N->size()); }
+    WMapX()                     :           N(NULL) {}
+    WMapX(V nil)                : map(nil), N(NULL) {}
+    WMapX(const Gig& N_)        :           N(&N_)  { map.reserve(N->size()); }
+    WMapX(const Gig& N_, V nil) : map(nil), N(&N_)  { map.reserve(N->size()); }
 
     void initBuiltins() { for (uint i = 0; i < gid_FirstUser; i++) map(GLit(i)) = GLit(i); }
         // -- if mapping between two netlists, use this to set up map between builtin
@@ -163,7 +163,7 @@ public:
 // Number-attribute Wire Map:
 
 
-// A 'WMapN' uses the 'number' attribute of the gate as index. Keys must be restricted to a 
+// A 'WMapN' uses the 'number' attribute of the gate as index. Keys must be restricted to a
 // single gate type. The sign of the wire is ignored.
 
 template<class V>
@@ -178,24 +178,24 @@ public:
     typedef GLit Key;
     typedef V Value;
 
-    Gig*     N;
+    const Gig* N;
     GateType type;
 
-    WMapN()                            :            N(NULL), type(gate_NULL) {}
-    WMapN(V nil_)                      : nil(nil_), N(NULL), type(gate_NULL) {}
-    WMapN(Gig& N_)                     :            N(&N_) , type(gate_NULL) {}
-    WMapN(Gig& N_, V nil_)             : nil(nil_), N(&N_) , type(gate_NULL) {}
-    WMapN(GateType t)                  :            N(NULL), type(t)         {}
-    WMapN(GateType t, V nil_)          : nil(nil_), N(NULL), type(t)         {}
-    WMapN(Gig& N_, GateType t)         :            N(&N_) , type(t)         { assert(isNumbered(t)); data.growTo(N->numbers[type].size()); }
-    WMapN(Gig& N_, GateType t, V nil_) : nil(nil_), N(&N_) , type(t)         { assert(isNumbered(t)); data.growTo(N->numbers[type].size(), nil); }
+    WMapN()                                  :            N(NULL), type(gate_NULL) {}
+    WMapN(V nil_)                            : nil(nil_), N(NULL), type(gate_NULL) {}
+    WMapN(const Gig& N_)                     :            N(&N_) , type(gate_NULL) {}
+    WMapN(const Gig& N_, V nil_)             : nil(nil_), N(&N_) , type(gate_NULL) {}
+    WMapN(GateType t)                        :            N(NULL), type(t)         {}
+    WMapN(GateType t, V nil_)                : nil(nil_), N(NULL), type(t)         {}
+    WMapN(const Gig& N_, GateType t)         :            N(&N_) , type(t)         { assert(isNumbered(t)); data.growTo(N->numbers[type].size()); }
+    WMapN(const Gig& N_, GateType t, V nil_) : nil(nil_), N(&N_) , type(t)         { assert(isNumbered(t)); data.growTo(N->numbers[type].size(), nil); }
 
     V  operator[](GLit p) const;
     V& operator()(GLit p);
     V  operator[](Wire w) const;
     V& operator()(Wire w);
 
-    void reserve(uint cap)           { data.growTo(N->numbers[type].size(), nil); }
+    void reserve(uint cap)           { data.growTo(cap, nil); }
     void clear(bool dispose = false) { data.clear(dispose); }
 
     void copyTo(WMapN& dst) const { data.copyTo(dst.data); dst.nil = nil; dst.N = N; }
@@ -257,10 +257,10 @@ class WZet_ : public NonCopyable {
 public:
     typedef GLit Key;
 
-    Gig* N;
+    const Gig* N;
 
-    WZet_()        : N(NULL)            {}
-    WZet_(Gig& N_) : N(&N_)             { reserve(use_sign ? N->size() * 2 : N->size()); }
+    WZet_()              : N(NULL)      {}
+    WZet_(const Gig& N_) : N(&N_)       { reserve(use_sign ? N->size() * 2 : N->size()); }
 
     void reserve(uint cap)              { set.reserve(cap); }
     uint size   () const                { return set.size(); }
@@ -314,10 +314,10 @@ class WSeen_ : public NonCopyable {
 public:
     typedef GLit Key;
 
-    Gig* N;
+    const Gig* N;
 
-    WSeen_()        : N(NULL)           {}
-    WSeen_(Gig& N_) : N(&N_)            { reserve(use_sign ? N->size() * 2 : N->size()); }
+    WSeen_()              : N(NULL)     {}
+    WSeen_(const Gig& N_) : N(&N_)      { reserve(use_sign ? N->size() * 2 : N->size()); }
 
     void reserve(uint cap)              { set.reserve(cap); }
     void clear  (bool dispose = false)  { set.clear(dispose); }
