@@ -643,26 +643,45 @@ void LibertyParser::read(String filename, SC_Lib& lib, TimingTablesMode timing_m
 
 
 static
-void adjustIndices(SC_Surface& s, const NamedSet<SC_TableTempl>& templ)
+void adjustIndices(SC_Surface& s, NamedSet<SC_TableTempl>& templ)
 {
-    if (s.index0.size() == 0){
-        uint i = templ.idx(s.templ_name);
-        if (i == UINT_MAX) throw String(("Reference to non-existing 'lu_table_template': %_", s.templ_name));
-        if (templ[i].index.size() != 2) throw String(("'lu_table_template' has wrong dimensions (should be 2): %_", s.templ_name));
+    uint i = templ.idx(s.templ_name);
+    if (i == UINT_MAX) throw String(("Reference to non-existing 'lu_table_template': %_", s.templ_name));
+    if (templ[i].index.size() != 2) throw String(("'lu_table_template' has wrong dimensions (should be 2): %_", s.templ_name));
 
-        templ[i].index[0].copyTo(s.index0);
+    // Order of variables should be: input_net_transition, total_output_net_capacitance
+    // If swapped, transpose table:
+    if (templ[i].transp == l_Undef){
+        if (eq(templ[i].var[0], "total_output_net_capacitance") && eq(templ[i].var[1], "input_net_transition")){
+            swp(templ[i].var  [0], templ[i].var  [1]);
+            swp(templ[i].index[0], templ[i].index[1]);
+            templ[i].transp = l_True;
+        }else
+            templ[i].transp = l_False;
     }
 
-    if (s.index1.size() == 0){
-        uint i = templ.idx(s.templ_name);
-        if (i == UINT_MAX) throw String(("Reference to non-existing 'lu_table_template': %_", s.templ_name));
-        if (templ[i].index.size() != 2) throw String(("'lu_table_template' has wrong dimensions (should be 2): %_", s.templ_name));
+    if (templ[i].transp == l_True)
+        swp(s.index0, s.index1);
 
+    if (s.index0.size() == 0)
+        templ[i].index[0].copyTo(s.index0);
+
+    if (s.index1.size() == 0)
         templ[i].index[1].copyTo(s.index1);
+
+    if (templ[i].transp == l_True){
+        // Transpose table:
+        Vec<Vec<float> > data(s.data[0].size());
+        for (uint i = 0; i < data.size(); i++){
+            data[i].growTo(s.data.size());
+            for (uint j = 0; j < data[i].size(); j++)
+                data[i][j] = s.data[j][i];
+        }
+        swp(s.data, data);
     }
 
     if (s.data.size() != s.index0.size()) throw String("Rows in table does not match dimension of 'index_1'.");
-    if (s.data[0].size() != s.index1.size()) throw String("Clumns in table does not match dimension of 'index_2'.");
+    if (s.data[0].size() != s.index1.size()) throw String("Columns in table does not match dimension of 'index_2'.");
 }
 
 

@@ -246,7 +246,6 @@ void readScl_internal(In& in, SC_Lib& L)
     if (version < 5)
         Throw(Excp_ParseError) "SCL reader expected version >= 5, not: %_", version;
 
-
     // Read non-composite fields:
     L.lib_name = gets(in, text);                // [bp]
     L.default_wire_load = gets(in, text);       // [bp]

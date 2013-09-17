@@ -99,6 +99,8 @@ struct SC_TableTempl {
     Str              name;
     Vec<Str>         var;       // -- name of variable (numbered from 0, not 1 as in the Liberty file)
     Vec<Vec<float> > index;     // -- this is the point of measurement in table for the given variable 
+
+    lbool            transp;    // -- if 'l_True', 'var[]' and 'index[]' has size 2 and have been swapped
 };
 
 
