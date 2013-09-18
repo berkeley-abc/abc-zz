@@ -122,10 +122,12 @@ struct EngRep {
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Prepare netlist for verification:
+// Functions:
 
 
 void prepareNetlist(Gig& N, const Vec<GLit>& sinks, Gig& M);
+void completeCex(const Gig& N, Cex& cex);
+bool verifyCex(const Gig& N, Prop prop, const Cex& cex);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

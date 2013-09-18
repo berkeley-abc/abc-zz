@@ -228,22 +228,26 @@ int l_lutmap(lua_State* L_)
 
 int rlfun_loadStd(int count, int key)
 {
+#if !defined(__APPLE__)
     rl_replace_line("dofile(\"std.lua\")", true);
     rl_redisplay();
     rl_crlf();
     rl_done = 1;
+#endif
     return 0;
 }
 
 
 int rlfun_wrapPrint(int count, int key)
 {
+#if !defined(__APPLE__)
     String text;
     FWrite(text) "print(%_)", rl_line_buffer;
     rl_replace_line(text.c_str(), true);
     rl_redisplay();
     rl_crlf();
     rl_done = 1;
+#endif
     return 0;
 }
 
@@ -286,7 +290,7 @@ void testLua()
     rl_generic_bind(ISFUNC, "\\e[27;5;13~", (char*)rlfun_wrapPrint, rl_get_keymap());
 
     // ^[OP (Q R ...)
-    //rl_bind_key_in_map ('P', rlLoadStd, Keymap map)    
+    //rl_bind_key_in_map ('P', rlLoadStd, Keymap map)
     // rl_generic_bind
     // rl_get_keymap_by_name (const char *name)
     //  rl_get_keymap

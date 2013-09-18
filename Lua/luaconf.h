@@ -11,8 +11,9 @@
 //-------------------------------------------------------------------------------------------------
 // Added by Niklas Een June 18, 2013
 
+#define LUA_COMPAT_ALL
+
 #if defined(__linux__)
-  #define LUA_COMPAT_ALL
   #define LUA_USE_LINUX
 #endif
 
