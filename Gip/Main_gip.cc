@@ -9,6 +9,7 @@ extern "C"{
 #include "ZZ_Lua.hh"
 #include "ZZ_CmdLine.hh"
 #include "ZZ_Gig.IO.hh"
+#include "ZZ_Gip.Common.hh"
 #include "Bmc.hh"
 
 using namespace ZZ;
@@ -133,30 +134,26 @@ int myTab(int count, int key)
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-/*
-    Prop                prop;
-    Vec<WMapN<lbool> >  pi;
-    WMapN<lbool>        ff;
-    uint                cycle_len;      // -- only for liveness
-*/
-
-
 struct DefaultRep : EngRep {
     const Gig& N;
 
-    void bugFreeDepth(Prop prop, uint depth)          { WriteLn "%%%% bugFreeDepth(%_, %_)", prop, depth; }
-//    void cex         (Prop prop, Cex& cex)      { WriteLn "%%%% cex(prop=%_, len=%_)", prop, cex.size(); }
+    void bugFreeDepth(Prop prop, uint depth) { WriteLn "%%%% bugFreeDepth(%_, %_)", prop, depth; }
 
+//  void cex(Prop prop, Cex& cex) { WriteLn "%%%% cex(prop=%_, len=%_)", prop, cex.size(); }
     void cex(Prop prop, Cex& cex) {
         WriteLn "%%%% cex(prop=%_, len=%_)", prop, cex.size();
-        /**/Dump(cex.ff.base());
-        /**/Dump(cex.pi[0].base());
-        /**/Dump(cex.pi[1].base());
         completeCex(N, cex);
         WriteLn "Verifying CEX: %_", verifyCex(N, prop, cex);
+
+        Write "FF: "; For_Gatetype(N, gate_FF, w) Write "%_", cex.ff[w]; NewLine;
+        for (uint d = 0; d < cex.size(); d++){
+            Write "PI[%_]: ", d; For_Gatetype(N, gate_PI, w) Write "%_", cex.pi[d][w]; NewLine;
+        }
     }
 
     void proved(Prop prop, Invar* invar = NULL) { WriteLn "%%%% proved(prop=%_)", prop; }
+
+    //**/bool wasSolved(Prop& prop, bool& status) { static uint first = true; if (first){ prop = Prop(pt_Safe, 0); status = false; first = false; return true; } return false; }
 
     DefaultRep(Gig& N_) :
         N(N_)

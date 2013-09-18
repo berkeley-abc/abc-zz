@@ -52,6 +52,8 @@ void prepareNetlist(Gig& N, const Vec<GLit>& sinks_, Gig& M)
     For_Gates(N, w){
         if (isSeqElem(w)){
             Wire wm = xlat[w] + M;
+            if (!wm) continue;
+
             For_Inputs(w, v)
                 wm.set(Input_Pin(v), xlat[v] + M);
         }

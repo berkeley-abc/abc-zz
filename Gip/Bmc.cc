@@ -216,13 +216,14 @@ void bmc(Gig& N0, Params_Bmc& P, EngRep& R, const Vec<uint>& props)
 
     MultiSat S(P.sat_solver);
     WMapX<Lit> f2s;
-    Vec<GLit> roots;
 
-    for (uint depth = 0;; depth++){
+    for (uint depth = 0;;){
+        // Add time-frame to unrolling:
         Vec<GLit> roots;    // -- conjunction of properties at time 'depth'
         for (uint i = 0; i < unsolved.size(); i++){
             roots.push(insert(N(gate_SafeProp, unsolved[i]), depth, F, n2f)); }
 
+        // Call solver:
         lutClausify(F, roots, S, f2s);
 
         FFWriteLn(R) "Depth %_ -- Properties left: %_ -- Unrolling: #Lut=%_  #PI=%_  #vars=%_  #clauses=%_  [CPU-time: %t]", depth, unsolved.size(), F.typeCount(gate_Lut4), F.typeCount(gate_PI), S.nVars(), S.nClauses(), cpuTime();
@@ -234,6 +235,8 @@ void bmc(Gig& N0, Params_Bmc& P, EngRep& R, const Vec<uint>& props)
         S.addClause(tmp);
 
         lbool result = S.solve(~tmp[LAST]);
+
+        // Extract result:
         if (result == l_True){
             // Found conterexample -- remove failing properties:
             uint j = 0;
@@ -249,10 +252,19 @@ void bmc(Gig& N0, Params_Bmc& P, EngRep& R, const Vec<uint>& props)
             if (unsolved.size() == 0){
                 FFWriteLn(R) "CPU-time: %t", cpuTime();
                 return;
-            }else
-                depth--;    // <<== hack
+            }
+
         }else{
             S.addClause(tmp[LAST]);     // -- disable temporary clause
+            depth++;
+        }
+
+        // Check for externally solved properties:
+        Prop prop;
+        bool status;
+        while (R.wasSolved(prop, status)){
+            if (prop.type == pt_Safe)
+                revPullOut(unsolved, prop.num);
         }
     }
 }

@@ -112,12 +112,18 @@ template<> fts_macro void write_(Out& out, const Prop& v)
 
 
 struct EngRep {
+    // Report textual output:
     Out* out;   // -- must be set by subclass
     operator Out&() { return *out; }
 
+    // Report solved properties:
     virtual void bugFreeDepth(Prop prop, uint depth) = 0;
     virtual void cex         (Prop prop, Cex& cex) = 0;         // -- engine cannot rely on CEX to be untouched!
     virtual void proved      (Prop prop, Invar* invar = NULL) = 0;
+
+    // Check for externally solved properties:
+    virtual bool wasSolved   (Prop& prop, bool& status){ return false; }
+        // -- can be called to see if property solved by external engine (status is FALSE for CEX, TRUE for proved)
 };
 
 
