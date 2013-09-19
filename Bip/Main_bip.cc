@@ -574,7 +574,7 @@ void outputVerificationResult(
     NetlistRef N, const Vec<Wire>& props,
     lbool result, Cex* cex, uint orig_num_pis, NetlistRef invar, int bug_free_depth, bool check_invar,
     String out_filename, bool quiet,
-    double T0, double Tr0)
+    double T0, double Tr0, int loop_len = -1)
 {
     //
     // TO FILE:
@@ -594,7 +594,12 @@ void outputVerificationResult(
             writeInvar(out, invar);
 
         // Write bug-free depth:
-        FWriteLn(out) "bug-free-depth: %_", bug_free_depth;
+        if (bug_free_depth != -1)
+            FWriteLn(out) "bug-free-depth: %_", bug_free_depth;
+
+        // Write loop length (for liveness only):
+        if (loop_len != -1)
+            FWriteLn(out) "loop-length: %_", loop_len;
     }
 
     //
@@ -609,7 +614,7 @@ void outputVerificationResult(
                 WriteLn "Netlist has memories. Counterexample could not be verified (yet).";
             else if (!cex)
                 WriteLn "Counterexample not provided.";
-            else{
+            else if (loop_len == -1){
                 Vec<uint> fails_at;
                 if (verifyCex(N, props, *cex, &fails_at)){
                     WriteLn "Counterexample VERIFIED!";
@@ -690,6 +695,7 @@ void printAbcCommands(CLI& /*later*/)
     WriteLn ",treb";
     WriteLn ",abs";
     WriteLn ",reparam";
+    WriteLn ",live";
 }
 
 
@@ -1695,10 +1701,12 @@ int main(int argc, char** argv)
         P.eng = (Params_Liveness::Engine)cli.get("eng").enum_val;
         P.bmc_max_depth = (cli.get("bmc-depth").choice == 0) ? (uint)cli.get("bmc-depth").int_val : UINT_MAX;
 
-        lbool result = liveness(N, prop_no, P);
+        Cex cex;
+        uint loop_len;
+        lbool result = liveness(N, prop_no, P, &cex, &loop_len);
 
         if (result != l_Undef)
-            ;// <<==  outputVerificationResult(N, props, result, &cex, orig_num_pis, NetlistRef(), bug_free_depth, false, output, quiet, T0, Tr0);
+            outputVerificationResult(N, props, result, &cex, orig_num_pis, NetlistRef(), -1, false, output, quiet, T0, Tr0, (result == l_True) ? -1 : (int)loop_len);
         if (!quiet) writeResourceUsage(T0, Tr0);
 
     }else if (cli.cmd == "ltl"){
