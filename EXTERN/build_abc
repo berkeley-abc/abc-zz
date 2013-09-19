@@ -82,7 +82,7 @@ def build(suffix, clean):       # -- assumes we are in directory 'ZZ/EXTERN/abc'
 
     # Call makefile:
     target = lib_name if (not clean) else "clean"
-    ret = os.system("make -s -f %s -j%s %s" % (out.name, z("N_CORES"), target))
+    ret = os.system("make READLINE=0 -s -f %s -j%s %s" % (out.name, z("N_CORES"), target))
 
     # Copy results:
     if not clean and ret == 0:

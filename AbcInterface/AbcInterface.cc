@@ -203,7 +203,7 @@ lbool runAbcScript(NetlistRef N, String cmd, /*out*/Cex& cex, /*in*/FILE* redire
 
     // Execute command:
     GiaNums nums;
-    Abc_CommandUpdate9(A, createGia(N, nums));    // -- inject netlist as a ABC "GIA"
+    Abc_FrameUpdateGia(A, createGia(N, nums));    // -- inject netlist as a ABC "GIA"
     int status = Cmd_CommandExecute(A, cmd.c_str());
 
     // Get result:
