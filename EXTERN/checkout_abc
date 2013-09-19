@@ -4,4 +4,4 @@ if ! [ -e abc ]; then
     hg clone https://bitbucket.org/alanmi/abc
 fi
 cd abc
-hg update -r7d1e92a
+hg update -r7d1e92a8b0b7
