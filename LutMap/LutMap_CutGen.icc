@@ -17,7 +17,8 @@
 
 macro bool moreThanSixBits(uint a)
 {
-  #if defined(__GNUC__) && !defined(ZZ_DEBUG)   // -- valgrind doesn't like popcount()
+  #if defined(__GNUC__) && !defined(ZZ_DEBUG) && !(__GNUC__ == 4 && __GNUC_MINOR__== 6)
+    // -- note that valgrind doesn't like popcount()
     return __builtin_popcount(a) > CUT_SIZE;
   #else
     for (uint i = 0; i < CUT_SIZE; i++)
@@ -148,7 +149,7 @@ Cut combineCuts_Tern(const Cut& cut0, const Cut& cut1, const Cut& cut2)
 
 
 // PRE-CONDITION: Inputs of 'cut0..3' are sorted.
-// Output: A cut representing the merge of 'cut0..3' after applying function 'ftb'; 
+// Output: A cut representing the merge of 'cut0..3' after applying function 'ftb';
 // or 'Cut_NULL' if more than 6 inputs would be required.
 static
 Cut combineCuts_Quad(const Cut& cut0, const Cut& cut1, const Cut& cut2, const Cut& cut3)
