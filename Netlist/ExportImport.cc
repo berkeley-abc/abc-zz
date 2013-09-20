@@ -511,7 +511,8 @@ bool writeAiger(Out& out, NetlistRef N, Array<uchar> comment)
             order.push(id(w));
         }
         if (!is_ordered)
-            upOrder(N, order);
+//            upOrder(N, order);
+            upOrder(N, order, false, false);
     }
 
     Vec<Wire> is, fs, os;

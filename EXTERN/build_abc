@@ -44,6 +44,7 @@ def make_makefile(out, obj_suffix, opt_flags, lib_name):
         text = re.sub(r"lib\$\(PROG\)\.a", lib_name, text)
         text = re.sub(r"-ldl", "", text)
         text = re.sub(r"-Wno-unused-but-set-variable", "", text)
+        text = re.sub(r"\$\(info .*", "", text)
 
         out.write(text)
         out.write("%." + obj_suffix + " : %.c\n\techo \`\` Compiling: $<\n\t$(CC) -c $(CFLAGS) $< -o $@\n")
@@ -78,7 +79,7 @@ def build(suffix, clean):       # -- assumes we are in directory 'ZZ/EXTERN/abc'
     out.flush()
 
     # Remove readline...
-    os.system("if ! grep '//#define ABC_USE_READLINE' src/base/main/mainUtils.c >/dev/null; then patch src/base/main/mainUtils.c < ../abc_mainUtils.c.patch; fi")
+    #os.system("if ! grep '//#define ABC_USE_READLINE' src/base/main/mainUtils.c >/dev/null; then patch src/base/main/mainUtils.c < ../abc_mainUtils.c.patch; fi")
 
     # Call makefile:
     target = lib_name if (not clean) else "clean"
