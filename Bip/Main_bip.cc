@@ -813,6 +813,15 @@ int main(int argc, char** argv)
         for (int i = 1; i < argc-1; i++)
             argv[i] = argv[i+1];
         argc--;
+
+      #if defined(__linux__)
+        // Kill 'bip' if parent is dead:
+        prctl(PR_SET_PDEATHSIG, SIGINT);
+
+        // We may have already missed this signal, so check if the process has been adopted by INIT:
+        if(getppid() == 1)
+            exit(1);
+      #endif
     }
 
     // ZZ Initialization:

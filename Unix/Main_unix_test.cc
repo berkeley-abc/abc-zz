@@ -13,6 +13,18 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
+    Vec<String> args;
+    args += "-R", "/home/een";
+    int pid;
+    int io[3];
+    ProcMode mode;
+    mode.stdout_file = "dir.txt";
+    mode.pdeath_sig = SIGKILL;
+    startProcess("/bin/ls", args, pid, io, mode);
+
+    return 0;
+
+#if 0
     String cmd;
     FWrite(cmd) "cat /proc/%_/stat", getpid();
     int ignore ___unused = system(cmd.c_str());
@@ -20,6 +32,7 @@ int main(int argc, char** argv)
     int pid = getpid();
     for (uint i = 1; i <= 44; i++)
         WriteLn "field %_: %_", i, getProcStatField(pid, i);
+#endif
 
 #if 0
     ProcMode mode;

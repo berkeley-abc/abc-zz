@@ -83,6 +83,7 @@ Defines that control compilation:
   #include <sys/time.h>
   #if defined(__linux__)
     #include <fpu_control.h>
+    #include <sys/prctl.h>
   #endif
   #if defined(sun)
     #include <procfs.h>

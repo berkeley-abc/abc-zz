@@ -118,6 +118,10 @@ char startProcess(const String& cmd, const Vec<String>& args, int& out_pid, int 
         //
         // CHILD:
         //
+      #if defined(__linux__)
+        if (mode.pdeath_sig != 0)
+            prctl(PR_SET_PDEATHSIG, mode.pdeath_sig);
+      #endif
 
         // Setup process mode:
         if (mode.username != "" && !setUser(mode.username)) fail(signal_pipe, 'u');
