@@ -1746,8 +1746,11 @@ lbool treb( NetlistRef          N0,
             EffortCB*           cb
             )
 {
-    if (P.use_abstr)
+    if (P.use_abstr){
+        if (Has_Pob(N0, strash))
+            Remove_Pob(N0, strash);
         addReset(N0, nextNum_Flop(N0));     // -- really shouldn't change 'N0'!
+    }
 
     Treb  treb(N0, props, cb, P);
     lbool result;
