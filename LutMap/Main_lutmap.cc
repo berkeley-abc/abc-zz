@@ -8,6 +8,7 @@
 #include "ZZ/Generics/Sort.hh"
 #include "LutMap.hh"
 #include "GigReader.hh"
+#include "PostProcess.hh"
 
 
 using namespace ZZ;
@@ -433,7 +434,7 @@ int main(int argc, char** argv)
         if (quit) return 0;
     }
 
-  #if 1
+  #if 0
     Vec<Params_LutMap> Ps(cli.get("rounds").int_val, P);
     lutMap(N, Ps);
 
@@ -446,6 +447,12 @@ int main(int argc, char** argv)
     Vec<Params_LutMap> Ps(cli.get("rounds").int_val, P);
     lutMap(N, Ps, &remap);
 
+  #if 1   /*DEBUG*/
+    removeRemapSigns(N, remap);
+    removeInverters(N, &remap);
+  #endif  /*END DEBUG*/
+
+  #if 1
     uint count = 0;
     Vec<GLit>& v = remap.base();
     for (uint i = gid_FirstUser; i < v.size(); i++){
@@ -463,6 +470,8 @@ int main(int argc, char** argv)
 
     writeBlifFile("dst.blif", N);
     WriteLn "Wrote: \a*dst.blif\a*";
+  #endif
+
   #endif
 
     double T2 = cpuTime();
@@ -513,8 +522,7 @@ int main(int argc, char** argv)
     Vec<uint> sizeC(7, 0);
     WMap<uint> depth;
     uint max_delay = 0;
-    assert(isCanonical(N));
-    For_Gates(N, w){
+    For_UpOrder(N, w){
         if (w == gate_Lut6)
             sizeC[supSize(ftb(w))]++;
 
