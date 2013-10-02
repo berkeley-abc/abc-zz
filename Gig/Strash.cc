@@ -675,11 +675,29 @@ void GigObj_Strash::strashNetlist()
             w_new = xig_Maj(w0, w1, w2);
             break;
 
+        case gate_Gamb:
+            w0 = w[0]; w1 = w[1]; w2 = w[2];
+            remove(w);
+            w_new = xig_Gamb(w0, w1, w2);
+            break;
+
+        case gate_One:
+            w0 = w[0]; w1 = w[1]; w2 = w[2];
+            remove(w);
+            w_new = xig_One(w0, w1, w2);
+            break;
+
+        case gate_Dot:
+            w0 = w[0]; w1 = w[1]; w2 = w[2];
+            remove(w);
+            w_new = xig_Dot(w0, w1, w2);
+            break;
+
         case gate_Lut4:
             w0 = w[0]; w1 = w[1]; w2 = w[2]; w3 = w[3];
             ftb = w.arg();
             remove(w);
-            w_new = lut4_Lut(ftb, w0, w1, w2, w3);
+            w_new = lut4_Lut(*N, ftb, w0, w1, w2, w3);
             break;
 
         default:

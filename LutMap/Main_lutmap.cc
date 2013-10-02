@@ -381,13 +381,23 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+#if 0   /*DEBUG -- <<== option protect logic without fanouts*/
+    {
+        Add_Gob(N, FanoutCount);
+        For_Gates(N, w)
+            if (nFanouts(w) == 0 && w != gate_PO)
+                N.add(gate_PO).init(w);
+    }
+#endif  /*END DEBUG*/
+
     // Temporary preprocessing; rewrite this:
     N.is_frozen = false;
     WriteLn "Info: %_", info(N);
-    WriteLn "Strashing";
-    N.strash();
-    WriteLn "Info: %_", info(N);
-    N.unstrash();
+    // <<== option: strash or no strash
+//    WriteLn "Strashing";
+//    N.strash();
+//    WriteLn "Info: %_", info(N);
+//    N.unstrash();
     N.is_frozen = false;
 
     if (cli.get("melt").bool_val)
@@ -434,11 +444,11 @@ int main(int argc, char** argv)
         if (quit) return 0;
     }
 
-  #if 0
+#if 0
     Vec<Params_LutMap> Ps(cli.get("rounds").int_val, P);
     lutMap(N, Ps);
 
-  #else
+#else
     // With signal tracking (for debugging)
     WMapX<GLit> remap;
     Gig N_orig;
@@ -448,11 +458,82 @@ int main(int argc, char** argv)
     lutMap(N, Ps, &remap);
 
   #if 1   /*DEBUG*/
+  {
+    double T0 = cpuTime();
+    uint n_luts = N.typeCount(gate_Lut6);
     removeRemapSigns(N, remap);
     removeInverters(N, &remap);
+    WriteLn "Inverter removal time: %t", cpuTime() - T0;
+    WriteLn "LUTs added: %_", N.typeCount(gate_Lut6) - n_luts;
+
+    For_Gates(N, w)
+        For_Inputs(w, v)
+            assert(!v.sign);
+  }
   #endif  /*END DEBUG*/
 
   #if 1
+    For_Gatetype(N_orig, gate_PO, w)
+        remove(w);
+    For_Gatetype(N, gate_PO, w)
+        remove(w);
+
+    /**/WSeen vs, ns;
+    For_Gates(N_orig, w){
+        if (w == gate_PI || w == gate_PO) continue;
+
+        if (isLogicGate(w)){
+            For_Inputs(w, v){
+                if (!isLogicGate(v) && v != gate_PI && v != gate_Const){
+                    Wire n = remap[v] + N; assert(+n); assert(n != gate_PI && n != gate_Const);
+                  #if 1
+                    /**/if (vs.has(v)) WriteLn "Duplicate in v: %_", v;
+                    /**/if (ns.has(n)) WriteLn "Duplicate in n: %_", n;
+                    /**/vs.add(v); ns.add(n);
+                    change(v, gate_PI);
+                    change(n, gate_PI);
+                    assert(v.num() == n.num());
+                  #endif
+                }
+            }
+        }else{
+            Wire m = remap[w] + N; assert(+m);
+            assert(w.size() == m.size());
+            for (uint i = 0; i < w.size(); i++){
+                if (!w[i]){ assert(!m[i]); continue; }
+                assert(m[i]);
+
+                if (!isLogicGate(w[i])) continue;
+
+                N_orig.add(gate_PO).init(w[i]);
+                N     .add(gate_PO).init(m[i]);
+            }
+        }
+    }
+
+    For_UpOrder(N_orig, w)
+        if (!isLogicGate(w) && w != gate_PI && w != gate_PO)
+            remove(w);
+
+    For_UpOrder(N, m)
+        if (!isLogicGate(m) && m != gate_PI && m != gate_PO)
+            remove(m);
+
+    For_Gates(N_orig, w)
+        For_Inputs(w, v){
+            /**/if (!(!v.isRemoved()))Dump(w);
+            assert(!v.isRemoved());
+        }
+
+    For_Gates(N, w)
+        For_Inputs(w, v)
+            assert(!v.isRemoved());
+
+    WriteLn "Transformed original: %_", info(N_orig);
+    WriteLn "Transformed mapped  : %_", info(N);
+  #endif
+
+  #if 0
     uint count = 0;
     Vec<GLit>& v = remap.base();
     for (uint i = gid_FirstUser; i < v.size(); i++){
@@ -465,6 +546,12 @@ int main(int argc, char** argv)
 
     WriteLn "Signals retained: %_", count;
 
+    //**/Write "Dumping PIs:";
+    //**/For_Gatetype(N_orig, gate_PI, w) Write " %_", w;
+    //**/NewLine;
+  #endif
+
+  #if 1
     writeBlifFile("src.blif", N_orig);
     WriteLn "Wrote: \a*src.blif\a*";
 
@@ -472,7 +559,7 @@ int main(int argc, char** argv)
     WriteLn "Wrote: \a*dst.blif\a*";
   #endif
 
-  #endif
+#endif
 
     double T2 = cpuTime();
     WriteLn "Mapping: %t", T2-T1;

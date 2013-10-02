@@ -47,8 +47,10 @@ void removeRemapSigns(Gig& N, WMapX<GLit>& remap)
                     r[i] = GLit_NULL;
             }else{
                 // Invert LUT:
-                ftb(w) = ~ftb(w);
-                flipped.add(w);
+                if (!flipped.has(w)){
+                    ftb(w) = ~ftb(w);
+                    flipped.add(w);
+                }
                 r[i] = ~r[i];
             }
         }
