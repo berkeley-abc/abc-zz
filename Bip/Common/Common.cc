@@ -1868,8 +1868,12 @@ void foldConstraints(NetlistRef N)
 
     if (Has_Pob(N, properties)){
         Get_Pob(N, properties);
-        for (uint i = 0; i < properties.size(); i++)
-            properties[i].set(0, ~N.add(And_(), ~properties[i][0], ~w_cfail));   // -- a property is true if it holds or constraints have failed
+        for (uint i = 0; i < properties.size(); i++){
+            bool s = sign(properties[i]);
+            properties[i] = +properties[i];
+            properties[i].set(0, ~N.add(And_(), ~properties[i][0] ^ s, ~w_cfail));
+                // -- a property is true if it holds or constraints have failed
+        }
     }
 
     if (was_strashed)

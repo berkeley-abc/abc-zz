@@ -1333,6 +1333,7 @@ int main(int argc, char** argv)
             if (input == output){ ShoutLn "ERROR! To overwrite input, specify output name explicitly."; exit(1); }
         }
 
+        foldConstraints(N);
         removeFlopInit(N);
         padInputs(N, orig_num_pis);
         if (!is_aiger && Has_Pob(N, properties)){

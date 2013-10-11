@@ -70,9 +70,9 @@ void completeCex(const Gig& N, Cex& cex)
 {
     For_Gatetype(N, gate_FF, w){
         if (cex.ff[w] == l_Undef){
-            if (w[1] == GLit_True)
+            if (w[1] == GLit_True || w[1] == ~GLit_False)
                 cex.ff(w) = l_True;
-            else if (w[1] == GLit_False || w[1] == GLit_Unbound)
+            else if (w[1] == GLit_False || w[1] == ~GLit_True || +w[1] == GLit_Unbound)
                 cex.ff(w) = l_False;
             else
                 assert(false);      // -- complex initialization not supported yet

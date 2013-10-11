@@ -1869,7 +1869,6 @@ void setParams(const CLI& cli, Params_Treb& P)
 
 
 /*
-
 Generalizations:
 
  - Built in abstraction!
@@ -1884,7 +1883,6 @@ Ideas:
   - Only cubes!
   - Separate main algorithm from trace-solve commands (so backwards is easy)
   - Separare high-level solve from low-level solve so that single/multiple SAT is easy
-
 */
 
 
