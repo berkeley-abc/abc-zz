@@ -61,6 +61,8 @@ Wire buildCover(NetlistRef N, const Vec<uint>& cover, const WZet& ext_pi)
 static
 void analyzeRegion(NetlistRef N, const WZet& area, const WZet& int_pi, const WZet& ext_pi, Wire w_dom, const Params_Reparam& P, /*temporary*/WMap<uchar>& val)
 {
+    assert(type(w_dom) == gate_And);
+
     uint n_words = max_(1u, (1u << ext_pi.size()) / 32);
     Vec<uint> on (n_words, 0);
     Vec<uint> off(n_words, 0);
@@ -187,6 +189,8 @@ struct ReparamTmps {
 static
 void reparamRegion(Wire w_dom, const Params_Reparam& P, ReparamTmps& tmps)
 {
+    assert(type(w_dom) == gate_And);
+
     NetlistRef N = netlist(w_dom);
     Get_Pob(N, fanout_count);
 
@@ -320,7 +324,7 @@ void reparam(NetlistRef N, const Params_Reparam& P)
                         break;
                 }
 
-            }else if (cands.has(w))
+            }else if (cands.has(w) && type(w) == gate_And)
                 reparamRegion(w, P, tmps);
         }
         if (!P.quiet) WriteLn "\rPost-processing...";
