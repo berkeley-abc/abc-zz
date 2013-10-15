@@ -436,6 +436,7 @@ def subst_conf_symbols(text):
 
     # Conditional symbols:
     text = text.replace("<rt>", "" if os_name == "Darwin" else "rt")
+    text = text.replace("<readline>", "readline" if has_readline else "")
 
     return text
 
