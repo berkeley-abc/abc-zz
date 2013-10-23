@@ -72,7 +72,6 @@ template<> fts_macro void write_(Out& out, const GateAttrType& v){
     Macro(SafeCons) \
     Macro(FairProp) \
     Macro(FairCons) \
-    Macro(OrigFF) \
     Macro(Seq) \
     Macro(And) \
     Macro(Xor) \
@@ -115,7 +114,7 @@ DEF( FF       , 2    , Enum )   // Pin0 = data, Pin1 = init (implicitly muxed on
 // Inputs:
 DEF( PI       , 0    , Enum )
 DEF( Clk      , 0    , Enum )
-DEF( PPI      , 0    , Enum )   // Pseudo-PIs
+DEF( PPI      , 0    , Enum )   // Pseudo-PIs (only used for reset logic/initial state)
 
 // Outputs:
 DEF( PO       , 1    , Enum )
@@ -123,7 +122,6 @@ DEF( SafeProp , 1    , Enum )
 DEF( SafeCons , 1    , Enum )
 DEF( FairProp , 1    , Enum )   // Takes a bit-vector ('Vec') as input.
 DEF( FairCons , 1    , Enum )
-DEF( OrigFF   , 1    , Enum )   // Marks the signal corresponding to the original flop value before retiming or initialization transformation
 
 // Special buffer:
 DEF( Seq      , 1    , NULL )   // Used to break cycles (topological sort considers these as fanout free, even when they are not)
@@ -231,7 +229,7 @@ macro bool isNumbered(GateType type) {
 #define gtm_Strashed (GTM_(And) | GTM_(Xor) | GTM_(Mux) | GTM_(Maj) | GTM_(One) | GTM_(Gamb) | GTM_(Dot) | GTM_(Lut4))
 
 #define gtm_SI (GTM_(FF) | GTM_(PI) | GTM_(Clk) | GTM_(PPI))
-#define gtm_SO (GTM_(PO) | GTM_(SafeProp) | GTM_(SafeCons) | GTM_(FairProp) | GTM_(FairCons) | GTM_(OrigFF))
+#define gtm_SO (GTM_(PO) | GTM_(SafeProp) | GTM_(SafeCons) | GTM_(FairProp) | GTM_(FairCons))
     // primary inputs and outputs for SEQUENTIAL netlists
 
 #define gtm_CI (gtm_SI | gtm_SeqElem)

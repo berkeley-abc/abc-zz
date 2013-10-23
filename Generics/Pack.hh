@@ -91,6 +91,8 @@ struct Pack {
 
     Array<T> base() const { return slice(ptr->data[0], ptr->data[ptr->sz]); }
 
+    bool subsumes(const Pack& super_set) const;   // -- is '*this' a subset of 'super_set'?
+
 protected:
   //________________________________________
   //  Helpers:
@@ -226,21 +228,28 @@ Pack<T> Pack<T>::operator+(const Pack<T>& c)
 
 
 template<class T>
-fts_macro bool subsumes(const Pack<T>& small_, const Pack<T>& big)
+fts_macro bool subsumes(const Pack<T>& sub_set, const Pack<T>& super_set)
 {
-    if (small_.abstr() & ~big.abstr()) return false;
+    if (sub_set.abstr() & ~super_set.abstr()) return false;
 
     uint j = 0;
-    for (uint i = 0; i < small_.size();){
-        if (j >= big.size())
+    for (uint i = 0; i < sub_set.size();){
+        if (j >= super_set.size())
             return false;
-        if (small_[i] == big[j]){
+        if (sub_set[i] == super_set[j]){
             i++;
             j++;
         }else
             j++;
     }
     return true;
+}
+
+
+template<class T>
+inline bool Pack<T>::subsumes(const Pack& super_set) const
+{
+    return ::ZZ::subsumes(*this, super_set);
 }
 
 

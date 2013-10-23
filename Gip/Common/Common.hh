@@ -54,17 +54,20 @@ struct Cex {
     Prop                prop;
     Vec<WMapN<lbool> >  pi;
     WMapN<lbool>        ff;
+    WMapN<lbool>        ppi;
     uint                cycle_len;      // -- only for liveness
 
-    Cex(uint size = 0)                     { init(size, 0, 0); }
-    Cex(uint size, uint n_pis, uint n_ffs) { init(size, n_pis, n_ffs); }
-    Cex(uint size, const Gig& N)           { init(size, N.enumSize(gate_PI), N.enumSize(gate_FF)); }
+    Cex(uint size = 0)                                      { init(size, 0, 0, 0); }
+    Cex(uint size, uint n_pis, uint n_ffs, uint n_ppis = 0) { init(size, n_pis, n_ffs, n_ppis); }
+    Cex(uint size, const Gig& N)                            { init(size, N.enumSize(gate_PI), N.enumSize(gate_FF), N.enumSize(gate_PPI)); }
 
-    void init(uint size, uint n_pis, uint n_ffs) {  // -- size (=number of states) is one more than depth (=number of transitions)
+    void init(uint size, uint n_pis, uint n_ffs, uint n_ppis) {
+        // -- size (= number of frames) is one more than depth (= number of transitions)
         cycle_len = 0;
         pi.growTo(size);
         for (uint i = 0; i < pi.size(); i++) pi[i].reserve(n_pis);
         ff.reserve(n_ffs);
+        ppi.reserve(n_ffs);
     }
 
     uint size() const { return pi.size(); }

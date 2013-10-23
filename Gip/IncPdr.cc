@@ -12,7 +12,10 @@
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
-
+#include "ZZ_Gip.Common.hh"
+#include "ZZ_MetaSat.hh"
+#include "ZZ/Generics/RefC.hh"
+#include "ZZ/Generics/Heap.hh"
 
 namespace ZZ {
 using namespace std;
@@ -63,7 +66,7 @@ struct Pobl : RefC<Pobl_Data> {
 
 macro bool operator<(const Pobl& x, const Pobl& y) {
     assert(x); assert(y);
-    return x->tcube.frame < y->tcube.frame || (x->tcube.frame == y->tcube.frame && x->prio < y->prio); }
+    return x->frame < y->frame || (x->frame == y->frame && x->prio < y->prio); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -85,11 +88,25 @@ struct FCube {
 class IncPdr {
     MiniSat2 S;
     MiniSat2 SI;
-    MiniSat2 SB;
+    WMapX<Lit> n2s;
+    WMapX<Lit> n2si;
 
     Vec<lbool> model;   // -- last model from a SAT call
 
     uint prioC;         // -- priority of proof-obligation (lower goes first)
+
+  //________________________________________
+  //  Helper methods:
+
+    void             clearSat();
+
+    bool             isInit(Cube target, Cube* sub_target = NULL);
+    Pair<Cube, uint> solveRel(Cube target, uint frame);
+
+    void             addCube(Cube target, uint frame);
+    void             addPobl(Cube pred, Cube target, uint frame);
+    Pair<Cube, uint> pushFwd(Cube cube, uint frame, Cube sub_cube = Cube_NULL);
+    Pair<Cube, uint> generalize(Cube cube, uint frame);
 
 public:
   //________________________________________
@@ -100,7 +117,7 @@ public:
 
     Vec<Vec<FCube> >    F;
     Vec<FCube>          F_inf;
-    KeyHeap<ProofObl>   Q;
+    KeyHeap<Pobl>       Q;
 
     Pobl                cex;    // -- set when 'solve()' returns 'ip_Cex'
 
@@ -111,9 +128,10 @@ public:
 
     uint solve(Cube target, uint frame, double effort = DBL_MAX, bool clear_Q = true);
         // -- returns the last frame in which 'target' was proved unreachable (most likely 'frame'
-        // itself). 'frame_INF' means 'target' is forever unreachable; 'frame_CEX' means
-        // counterexample was found (stored in class global 'cex'); 'frame_NULL' means effort
-        // level was exceeded (where a positive effort means '#conflicts'; negative CPU-time).
+        // itself). 'target' must be expressed in state-variables only. 'frame_INF' means 'target'
+        // is forever unreachable; 'frame_CEX' means counterexample was found (stored in class
+        // global 'cex'); 'frame_NULL' means effort level was exceeded (where a positive effort
+        // means '#conflicts'; negative CPU-time).
 
     uint subsumed(Cube target, uint frame);
         // -- returns the latest time-frame where 'target.cube' is syntactically subsumed or
@@ -122,26 +140,40 @@ public:
     void extractCex(Cex& out_cex);
 };
 
-frame_NULL -- timeout
-frame_CEX -- CEX found
-
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Implementation:
 
 
-IncPdr::IncPdr(Gig& N_, const IncPdr_Params& P_, Out* out_ = NULL) :
+IncPdr::IncPdr(Gig& N_, Out* out_) :
     prioC(UINT_MAX),
     N(N_),
-    P(P_),
     out(out_)
 {
     if (!out) out = &std_out;
+    clearSat();
+    // <<== perhaps set up a listener for gate deletion and remove cubes when state-variables are deleted
 }
 
 
-uint IncPdr::solve(Cube target, uint frame, double effort = DBL_MAX, bool clear_Q)
+void IncPdr::clearSat()
 {
+    S   .clear();
+    SI  .clear();
+    n2s .clear();
+    n2si.clear();
+    n2s .initBuiltins();
+    n2si.initBuiltins();
+}
+
+
+uint IncPdr::solve(Cube target, uint frame, double effort, bool clear_Q)
+{
+    for (uint i = 0; i < target.size(); i++)
+        assert(target[i] + N == gate_FF);
+
+    // <<== if anything was deleted, flush SAT solvers so than CNF generation will be up to date.
+
     if (clear_Q){
         Q.clear();
         prioC = UINT_MAX; }
@@ -190,15 +222,56 @@ uint IncPdr::solve(Cube target, uint frame, double effort = DBL_MAX, bool clear_
 }
 
 
-bool IncPdr::subsumed(Cube target, uint frame)
+uint IncPdr::subsumed(Cube target, uint frame)
 {
+    for (uint i = 0; i < F_inf.size(); i++)
+        if (F_inf[i].unreach.subsumes(target))
+            return frame_INF;
 
+    for (uint d = F.size(); d > frame;){ d--;
+        for (uint i = 0; i < F[d].size(); i++)
+            if (F[d][i].unreach.subsumes(target))
+                return d;
+    }
+
+    return frame_NULL;
 }
 
 
-bool IncPdr::isInit(Cube target, Cube* sub_target = NULL)
+// Checks if 'target' is consistent with the initial states. If not, it optionally returns a subset
+// a subset of 'target' enough to cause a contradiction.
+bool IncPdr::isInit(Cube target, Cube* sub_target)
 {
+    Vec<Lit> assumps;
+    for (uint i = 0; i < target.size(); i++)
+        assumps.push(clausify(N, target[i], SI, n2si, true));
+
+    // <<== more stuff here
+    return false;
 }
+
+
+// See if cube 'target' can be reached in frame 'frame' using what we know about
+// previous time frame (+ inductive assumption, using 'target' itself). 
+// If SAT: returns '(predecessor-minterm, frame_NULL)'
+// If UNSAT: returns '(subset-of-target, last-frame-target-is-unreach)'
+Pair<Cube, uint> IncPdr::solveRel(Cube target, uint frame)
+{
+    if (frame == 0){
+        Cube s;
+        return isInit(target, &s) ? tuple(s, frame_NULL) : pushFwd(s, 0);
+
+    }else{
+    // Inductive assumption:
+    // Assume 's' at state outputs:
+    // Solve:
+        // Figure out subset of 's' enough for UNSAT; do pushFwd.
+        // ...or return model
+    }
+
+    // add/recycle temporary activation literal
+}
+
 
 // Add cube, remove subsumed cube and push triggered clauses forward
 void IncPdr::addCube(Cube target, uint frame)
@@ -219,36 +292,14 @@ void IncPdr::addPobl(Cube pred, Cube target, uint frame)
 // unreachable. If SAT solver gives information for free, a subset of 'cube' may be returned.
 // This information may optionally be seeded by using 'sub_cube' (the default null-value 
 // will be replace by 'cube' itself).
-Pair<Cube, uint> pushFwd(Cube cube, uint frame, Cube sub_cube = Cube_NULL)
+Pair<Cube, uint> IncPdr::pushFwd(Cube cube, uint frame, Cube sub_cube)
 {
     // setup solve-rel problem without inductive assumptiond and without extracting model 
     // (and no special handling of initial state/frame 0.
 }
 
 
-// See if cube 'target' can be reached in frame 'frame' using what we know about
-// previous time frame (+ inductive assumption, using 'target' itself). 
-// If SAT: returns '(predecessor-minterm, frame_NULL)'
-// If UNSAT: returns '(subset-of-target, last-frame-target-is-unreach)'
-Pair<Cube, uint> solveRel(Cube target, uint frame)
-{
-    if (frame == 0){
-        Cube s;
-        return isInit(target, &s) ? tuple(s, frame_NULL) : pushFwd(s, 0);
-
-    }else{
-    // Inductive assumption:
-    // Assume 's' at state outputs:
-    // Solve:
-        // Figure out subset of 's' enough for UNSAT; do pushFwd.
-        // ...or return model
-    }
-
-    // add/recycle temporary activation literal
-}
-
-
-Pair<Cube, uint> generalize(Cube cube, uint frame)
+Pair<Cube, uint> IncPdr::generalize(Cube cube, uint frame)
 {
 }
 
@@ -256,6 +307,7 @@ Pair<Cube, uint> generalize(Cube cube, uint frame)
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+/*
 unreach kuber
 satisfierbara kuber/fulla modeller (triggers)
 
@@ -289,20 +341,7 @@ while (Q.size) > 0 && time < timeout){
 
 Vec<Set<Unr+Trig> >
 Vec<Queue<Pobl> >
-
-
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-
-
-void solve(Cube c, uint frame, bool clear_Q)
-{
-    if (clear_Q) Q.clear();
-
-    Q.add(c, frame);
-    for(;;){
-
-    }
-}
+*/
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
