@@ -83,6 +83,7 @@ void clausify(const Gig& F, const Vec<GLit>& roots, MetaSat& S, WMapX<Lit>& f2s,
                 if (f2s[+w[1]]){
                     Q.pop();
                     f2s(w) = f2s[w[1]];
+                    // <<== require flops to be connected to PPIs or allow for special gate Unbound? 
                 }else
                     Q.push(+w[1]);
             }
@@ -150,13 +151,12 @@ void clausify(const Gig& F, const Vec<GLit>& roots, MetaSat& S, WMapX<Lit>& f2s,
 }
 
 
-Lit clausify(const Gig& F, GLit root, MetaSat& S, WMapX<Lit>& f2s, bool init_ffs, Vec<GLit>* new_ffs)
+Lit clausify(Wire root, MetaSat& S, WMapX<Lit>& f2s, bool init_ffs, Vec<GLit>* new_ffs)
 {
     Vec<GLit> roots(1, root);
-    clausify(F, roots, S, f2s, init_ffs, new_ffs);
+    clausify(gig(root), roots, S, f2s, init_ffs, new_ffs);
     return f2s[root];
 }
-
 
 
 void clausify(const Gig& F, const Vec<GLit>& roots, MetaSat& S, Vec<WMapX<Lit> >& f2s, uint depth)
@@ -185,10 +185,10 @@ void clausify(const Gig& F, const Vec<GLit>& roots, MetaSat& S, Vec<WMapX<Lit> >
 }
 
 
-Lit clausify(const Gig& F, GLit root, MetaSat& S, Vec<WMapX<Lit> >& f2s, uint depth)
+Lit clausify(Wire root, MetaSat& S, Vec<WMapX<Lit> >& f2s, uint depth)
 {
     Vec<GLit> roots(1, root);
-    clausify(F, roots, S, f2s, depth);
+    clausify(gig(root), roots, S, f2s, depth);
     return f2s[depth][root];
 }
 

@@ -27,9 +27,9 @@ using namespace std;
 
 
 void clausify(const Gig& N, const Vec<GLit>& roots, MetaSat& S, WMapX<Lit>& n2s, bool init_ffs = false, Vec<GLit>* new_ffs = NULL);
-Lit  clausify(const Gig& N, GLit root             , MetaSat& S, WMapX<Lit>& n2s, bool init_ffs = false, Vec<GLit>* new_ffs = NULL);
+Lit  clausify(Wire root                           , MetaSat& S, WMapX<Lit>& n2s, bool init_ffs = false, Vec<GLit>* new_ffs = NULL);
 void clausify(const Gig& N, const Vec<GLit>& roots, MetaSat& S, Vec<WMapX<Lit> >& n2s, uint depth);
-Lit  clausify(const Gig& N, GLit root             , MetaSat& S, Vec<WMapX<Lit> >& n2s, uint depth);
+Lit  clausify(Wire root                           , MetaSat& S, Vec<WMapX<Lit> >& n2s, uint depth);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

@@ -105,18 +105,17 @@ def build():
 
     # Create library:
     local_target = "lib" + module_name + suffix + ".a"
+    public_target = z("LIB_DIR") + "/lib" + module_name + ".a"
     if changed or not os.path.exists(local_target):
         # Link:
-        public_target = z("LIB_DIR") + "/lib" + module_name + ".a"
-        local_target = "lib" + module_name + suffix + ".a"
         cmd = "ar cqs %s %s 2>&1" % (local_target, " ".join(obj_files))
         if z("VERBOSE") == "1": print "LINK:", cmd
         if os.system(cmd) != 0: abort("Linking failed")
 
-        # Copy results:
-        if not up_to_date(local_target, public_target):
-            shutil.copy2(local_target, public_target)
-            print "`` Produced library: lib" + module_name + ".a"
+    # Copy results:
+    if not up_to_date(local_target, public_target):
+        shutil.copy2(local_target, public_target)
+        print "`` Produced library: lib" + module_name + ".a"
 
 
 ##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
