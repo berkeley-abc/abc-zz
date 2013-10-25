@@ -5,7 +5,8 @@ cd SiertSat
 if ! [ -e solver-reducer ]; then
     hg clone https://bitbucket.org/siert/solver-reducer .
 fi
-hg update -rff5a14bf8cb9
+#hg update -rff5a14bf8cb9
+hg update -r9e9eaed
 
 mkdir -p glucored
 cd glucored
