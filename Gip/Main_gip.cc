@@ -11,6 +11,7 @@ extern "C"{
 #include "ZZ_Gig.IO.hh"
 #include "ZZ_Gip.Common.hh"
 #include "Bmc.hh"
+#include "IncPdr.hh"
 
 using namespace ZZ;
 
@@ -209,7 +210,8 @@ int main(int argc, char** argv)
     Params_Bmc P;
     DefaultRep rep(N);
     P.sat_solver = sat_Msc;
-    bmc(N, P, rep);
+//    bmc(N, P, rep);
+    testPdr(N);
 
 
     return 0;

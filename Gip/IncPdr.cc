@@ -25,9 +25,9 @@ using namespace std;
 // Proof Obligation:
 
 
-static const uint frame_INF  = UINT_MAX;
-static const uint frame_NULL = UINT_MAX - 1;
-static const uint frame_CEX  = UINT_MAX - 2;
+static const uint frame_INF  = UINT_MAX - 1;
+static const uint frame_NULL = UINT_MAX - 2;
+static const uint frame_CEX  = UINT_MAX - 3;
 
 
 // A proof obligation (Pobl) is a timed cube 'tcube = (cube, frame)' which has to be blocked,
@@ -83,6 +83,87 @@ struct FCube {
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Debug:
+
+
+struct Fmt_Cube {
+    const Gig&  N;
+    const Cube& c;
+    Fmt_Cube(const Gig& N_, const Cube& c_) : N(N_), c(c_) {}
+};
+
+Fmt_Cube fmt(const Gig& N, const Cube& c) { return Fmt_Cube(N, c); }
+
+
+template<> fts_macro void write_(Out& out, const Fmt_Cube& f)
+{
+    if (!f.c)
+        FWrite(out) "<<null>>";
+    else{
+        out += '<';
+        for (uind i = 0; i < f.c.size(); i++){
+            Wire w = f.N[f.c[i]];
+            if (i > 0) out += ' ';
+            if (w == gate_FF)
+                FWrite(out) "%Cs%_", sign(w)?'~':0, w.num();
+            else if (w == gate_PI)
+                FWrite(out) "%Ci%_", sign(w)?'~':0, w.num();
+            else
+                FWrite(out) "%s", w;
+        }
+        out += '>';
+    }
+}
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct Fmt_Frame {
+    uint frame;
+    Fmt_Frame(uint frame_) : frame(frame_) {}
+};
+
+template<> fts_macro void write_(Out& out, const Fmt_Frame& v)
+{
+    if      (v.frame == frame_INF)  FWrite(out) "INF";
+    else if (v.frame == frame_NULL) FWrite(out) "NULL";
+    else if (v.frame == frame_CEX)  FWrite(out) "CEX";
+    else                            FWrite(out) "%_", v.frame;
+}
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct Fmt_FCube {
+    const Gig&   N;
+    const FCube& f;
+    Fmt_FCube(const Gig& N_, const FCube& f_) : N(N_), f(f_) {}
+};
+
+Fmt_FCube fmt(const Gig& N, const FCube& f) { return Fmt_FCube(N, f); }
+
+template<> fts_macro void write_(Out& out, const Fmt_FCube& v) {
+    FWrite(out) "fcube:{unreach=%_; trigger=%_; frame=%_}", fmt(v.N, v.f.unreach), v.f.trigger, Fmt_Frame(v.f.frame); }
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+struct Fmt_Pobl {
+    const Gig& N;
+    const Pobl& pobl;
+    Fmt_Pobl(const Gig& N_, const Pobl& pobl_) : N(N_), pobl(pobl_) {}
+};
+
+Fmt_Pobl fmt(const Gig& N, const Pobl& pobl) { return Fmt_Pobl(N, pobl); }
+
+template<> fts_macro void write_(Out& out, const Fmt_Pobl& v) {
+    FWrite(out) "pobl:{cube=%_; frame=%_; prio=%_}", fmt(v.N, v.pobl->cube), v.pobl->frame, v.pobl->prio; }
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Class 'IncPdr':
 
 
@@ -106,13 +187,14 @@ class IncPdr {
     Cube  extractCore (MiniSat2& S, Cube target, Array<Lit> target_lits);
     Cube  extractModel(MiniSat2& S, WMapX<Lit>& n2s);
 
-    void  addCube(FCube f);
+    void  addCube      (FCube f);
+    void  checkTriggers(FCube f);
 
     template<class V>
     bool  isInit(const V& target, GLit except = GLit_NULL);
 
     FCube solveRel(Cube target, uint frame);
-    FCube pushFwd (Cube target, uint frame, Cube sub_cube = Cube_NULL);
+    FCube pushFwd (Cube target, uint frame, Cube sub_cube, Lit ind_act_lit);
 
     FCube generalize(FCube f);
     Cube  weaken(Cube cube, Cube target);
@@ -171,8 +253,6 @@ void IncPdr::clearSat()
     SI  .clear();
     n2s .clear();
     n2si.clear();
-    n2s .initBuiltins();
-    n2si.initBuiltins();
     act .clear();
 }
 
@@ -201,6 +281,7 @@ uint IncPdr::subsumed(Cube target, uint frame)
 }
 
 
+// <<== needs to also extract frame (execpt for S = SI)
 Cube IncPdr::extractCore(MiniSat2& S, Cube target, Array<Lit> target_lits)
 {
     Vec<Lit> confl;
@@ -231,6 +312,7 @@ Cube IncPdr::extractModel(MiniSat2& S, WMapX<Lit>& n2s)
 }
 
 
+// <<== add support for pobls at frame infinity
 uint IncPdr::solve(Cube target, uint frame, double effort, bool clear_Q)
 {
     for (uint i = 0; i < target.size(); i++)
@@ -245,6 +327,7 @@ uint IncPdr::solve(Cube target, uint frame, double effort, bool clear_Q)
 
     for(;;){
         Pobl po = Q.pop();
+        /**/WriteLn "-- Popped pobl: \a/%_\a/", fmt(N, po);
 
         if (po->frame == 0){    // <<= change later when self-abstracting is in place
             cex = po;
@@ -254,30 +337,42 @@ uint IncPdr::solve(Cube target, uint frame, double effort, bool clear_Q)
         if (d == frame_NULL){
             // Pobl was not proved yet:
             FCube f = solveRel(po->cube, po->frame);
+            /**/WriteLn "solveRel(\a/%_\a/, \a/%_\a/) -> \a/%_\a/", fmt(N, po->cube), po->frame, fmt(N, f);
             if (f.frame == frame_NULL){
                 // SAT -- extract model and create new pobl:
                 Cube c = weaken(f.unreach, po->cube);
+                /**/WriteLn "Added pobl: %_", fmt(N, Pobl(c, po->frame - 1, prioC));
                 Q.add(Pobl(c, po->frame - 1, prioC--));
 
             }else{
                 // UNSAT -- generalize cube, check triggers, check termination:
                 f = generalize(f);
+                /**/WriteLn "Adding fcube: \a/%_\a/", fmt(N, f);
                 addCube(f);
-                po->frame = f.frame + 1;
+                checkTriggers(f);
+                po->frame = f.frame;
+                d         = f.frame;
             }
 
         }else{
-            po->frame = d + 1;
+            /**/WriteLn "subsumed at depth: %_", Fmt_Frame(d);
+            po->frame = d; }
+
+        if (d != frame_NULL){
             if (!po->next){
                 // Pobl equals target and was proved:
                 assert(po->cube == target && d >= frame);
                 return d;
             }
+
+            if (po->frame != frame_INF)
+                po->frame++;
         }
 
         // Re-insert pobl at the right time-frame:
-        if (d != frame_INF)
-            Q.add(po);
+        if (po->frame < frame_INF){
+            /**/WriteLn "Re-enqueuing pobl: %_", fmt(N, po);
+            Q.add(po); }
 
 #if 0
         // Check effort:    <<==
@@ -288,24 +383,20 @@ uint IncPdr::solve(Cube target, uint frame, double effort, bool clear_Q)
 }
 
 
-// Add cube, remove subsumed cube and push triggered clauses forward
-void IncPdr::addCube(Cube cube, Cube trig, uint frame)
+// Add cube, remove subsumed cubes.
+void IncPdr::addCube(FCube f)
 {
-    assert(frame > 0);
-    assert(frame < UINT_MAX/2);
+    assert(f.frame > 0);
 
     // Remove (some) subsumed cubes:
-    uint lim = min_(frame, (uint)F.size());
-    if (frame == frame_INF)
+    uint lim = min_(f.frame, (uint)F.size());
+    if (f.frame == frame_INF)
         lim++;
     for (uint d = 0; d <= lim; d++){
-        Vec<FCube>& Fd = (d < F[d].size()) ? F[d] : F_inf;
-        if (d == F[d].size())
-            d = F_inf;
-
+        Vec<FCube>& Fd = (d < F.size()) ? F[d] : F_inf;
         for (uint i = 0; i < Fd.size();){
-            if (subsumes(cube, Fd[i].unreach)){
-                assert(cube != Fd[i] || frame > d);   // -- should never derive existing cube
+            if (subsumes(f.unreach, Fd[i].unreach)){
+                assert(f.unreach != Fd[i].unreach || f.frame > d);   // -- should never derive existing cube
                 Fd[i] = Fd.last();
                 Fd.pop();
             }else
@@ -314,17 +405,35 @@ void IncPdr::addCube(Cube cube, Cube trig, uint frame)
     }
 
     // Add cube to trace:
-    if (frame != frame_INF)
-        F[frame].push(FCube(cube, trig));
-    else
-        F_inf.push(FCube(cube, trig));
+    ((f.frame != frame_INF) ? F[f.frame] : F_inf).push(f);
 
     // Add cube to SAT solvers:
     Vec<Lit> tmp;
-    tmp.push(~actLit(frame));
-    for (uint i = 0; i < cube.size(); i++)
-        tmp.push(~clausify(cube[i] + N, S, n2s));
+    if (f.frame != frame_INF)
+        tmp.push(~actLit(f.frame));
+    for (uint i = 0; i < f.unreach.size(); i++)
+        tmp.push(~clausify(f.unreach[i] + N, S, n2s));
     S.addClause(tmp);
+}
+
+
+// Check triggers and push cubes forward.
+void IncPdr::checkTriggers(FCube f)
+{
+    for (uint d = 1; d < min_(F.size(), f.frame); d++){
+        for (uint i = 0; i < F[d].size(); i++){
+            if (f.unreach.subsumes(F[d][i].trigger)){
+                FCube g = solveRel(F[d][i].trigger, d + 1);
+                if (g.frame == frame_NULL){
+                    F[d][i].trigger = weaken(g.unreach, F[d][i].trigger);
+                }else{
+                    g = generalize(g);
+                    addCube(g);
+                    checkTriggers(g);   // <<== use queue instead of recursion?
+                }
+            }
+        }
+    }
 }
 
 
@@ -339,7 +448,6 @@ bool IncPdr::isInit(const V& target, GLit except)
     Vec<Lit> assumps;
     for (uint i = 0; i < target.size(); i++){
         if (!target[i] || target[i] == except) continue;
-        Wire w = taget[i] + N;
         assumps.push(clausify(target[i] + N, SI, n2si, true));
     }
 
@@ -354,20 +462,24 @@ bool IncPdr::isInit(const V& target, GLit except)
 // will be replace by 'cube' itself).
 FCube IncPdr::pushFwd(Cube target, uint frame, Cube sub_cube, Lit ind_act_lit)
 {
+/**/WriteLn "pushFwd(target=%_, frame=%_, sub_cube=%_, ind_act_lit=%_)", fmt(N, target), Fmt_Frame(frame), fmt(N, sub_cube), ind_act_lit;
+
     if (!sub_cube)
         sub_cube = target;
 
     Vec<Lit> assumps;
     for (uint i = 0; i < target.size(); i++)
-        assumps.push(clausify(target[i] + N)[0], Z, n2z, init));
+        assumps.push(clausify((target[i] + N)[0], S, n2s));
     Array<Lit> target_lits = assumps.slice();
 
     assumps.push(ind_act_lit);
 
+    /**/Dump(assumps);
     uint first_act = assumps.size();
     for (uind i = F.size(); i > frame;){ i--;
         assumps.push(actLit(i)); }
 
+    /**/Dump(assumps);
     for (uint d = frame; assumps.size() > first_act; d++, assumps.pop()){
         lbool result = S.solve(assumps); assert(result != l_Undef);
         if (result == l_True)
@@ -392,8 +504,10 @@ FCube IncPdr::solveRel(Cube target, uint frame)
     WMapX<Lit>& n2z  = init ? n2si : n2s;
     Vec<Lit>    assumps;
 
+    /**/WriteLn "solveRel(target=%_, frame=%_): init = %_", fmt(N, target), Fmt_Frame(frame), init;
+
     // Inductive assumption:
-    Lit tmp_act = Z.newLit();
+    Lit tmp_act = Z.addLit();
     Vec<Lit> cl;
     cl.push(~tmp_act);
     for (uint i = 0; i < target.size(); i++)
@@ -408,18 +522,21 @@ FCube IncPdr::solveRel(Cube target, uint frame)
     }
 
     // Assume 's' at state outputs:
+    /**/WriteLn "Adding to assumps: %_\t+\t+", fmt(N, target);
     uint first_target = assumps.size();
     for (uint i = 0; i < target.size(); i++){
         Wire w = target[i] + N;
         assumps.push(clausify(w[0], Z, n2z, init));
+        /**/WriteLn "%f -> %_", w[0], assumps.last();
     }
+    /**/Write "\t-\t-";
     Array<Lit> target_lits = assumps.slice(first_target);
 
     // Solve:
     lbool result = Z.solve(assumps); assert(result != l_Undef);
 
     FCube ret = (result == l_True) ? FCube(extractModel(Z, n2z)) :
-                /*otherwise*/        pushFwd(target, frame, extractCore(Z, target, target_lits));
+                /*otherwise*/        pushFwd(target, frame, extractCore(Z, target, target_lits), tmp_act);
 
     // Cleanup:
     Z.addClause(~tmp_act);
@@ -444,41 +561,24 @@ Cube IncPdr::weaken(Cube cube, Cube target)
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-/*
-unreach kuber
-satisfierbara kuber/fulla modeller (triggers)
+void testPdr(Gig& N0)
+{
+    Vec<GLit> sinks(1, N0.enumGate(gate_SafeProp, 0));
 
-när ny kub härleds vill vi hitta alla triggers (eller göra det level by level?)
-subsumering bland pobl?
+    Gig N;
+    prepareNetlist(N0, sinks, N);
 
+    IncPdr pdr(N);
+    Wire w_bad = N.enumGate(gate_SafeProp, 0)[0];
+    w_bad = N.add(gate_FF).init(w_bad, ~GLit_True);
 
-optionally clear Q
-while (Q.size) > 0 && time < timeout){
-    pobl = Q.pop()
-
-    if subsumed, move it to later timeframe (unless infinity) PLUS check if pobl was original pobl => DONE
-    else{
-        if (isInitital())
-            assert(frame == 0 || self_abstracting)
-            return CEX
-        }
-
-        solveRel();
-        if (blocked by prev. time-frame){
-            generalize cube (first depth, then size)
-            insert cube and removed subsumed cubes
-            check triggers (push cubes, recheck triggers...)
-            move pobl forward
-        }else{
-            enqueue new pobl
-        }
+#if 1   /*DEBUG*/
+    for (uint d = 1; d < 10; d++){
+        uint k = pdr.solve(Cube(w_bad), d);
+        WriteLn "\a*RETURN: depth=%_  result=%_\a*", d, Fmt_Frame(k);
     }
+#endif  /*END DEBUG*/
 }
-
-
-Vec<Set<Unr+Trig> >
-Vec<Queue<Pobl> >
-*/
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
