@@ -341,8 +341,8 @@ uint IncPdr::solve(Cube target, uint frame, double effort, bool clear_Q)
             if (f.frame == frame_NULL){
                 // SAT -- extract model and create new pobl:
                 Cube c = weaken(f.unreach, po->cube);
-                /**/WriteLn "Added pobl: %_", fmt(N, Pobl(c, po->frame - 1, prioC));
-                Q.add(Pobl(c, po->frame - 1, prioC--));
+                /**/WriteLn "Added pobl: %_", fmt(N, Pobl(c, po->frame - 1, prioC, po));
+                Q.add(Pobl(c, po->frame - 1, prioC--, po));
 
             }else{
                 // UNSAT -- generalize cube, check triggers, check termination:
@@ -361,6 +361,7 @@ uint IncPdr::solve(Cube target, uint frame, double effort, bool clear_Q)
         if (d != frame_NULL){
             if (!po->next){
                 // Pobl equals target and was proved:
+                /**/WriteLn "TERMINATION: po->cube=%_  target=%_", fmt(N, po->cube), fmt(N, target);
                 assert(po->cube == target && d >= frame);
                 return d;
             }
@@ -413,6 +414,7 @@ void IncPdr::addCube(FCube f)
         tmp.push(~actLit(f.frame));
     for (uint i = 0; i < f.unreach.size(); i++)
         tmp.push(~clausify(f.unreach[i] + N, S, n2s));
+    /**/WriteLn "~~ adding to solver: %_ = %_", fmt(N, f.unreach), tmp;
     S.addClause(tmp);
 }
 
@@ -472,7 +474,10 @@ FCube IncPdr::pushFwd(Cube target, uint frame, Cube sub_cube, Lit ind_act_lit)
         assumps.push(clausify((target[i] + N)[0], S, n2s));
     Array<Lit> target_lits = assumps.slice();
 
-    assumps.push(ind_act_lit);
+    if (ind_act_lit)
+        assumps.push(ind_act_lit);
+
+    /**/F(frame + 1);   // <<== temporary
 
     /**/Dump(assumps);
     uint first_act = assumps.size();
@@ -517,8 +522,9 @@ FCube IncPdr::solveRel(Cube target, uint frame)
 
     // Activate cubes of 'F[frame]' and later:
     if (!init){
-        for (uint i = frame; i < F.size(); i++)
-            assumps.push(actLit(i));
+        for (uint i = frame-1; i < F.size(); i++){
+            /**/WriteLn "~~ assuming: act[%_] = %_", i, actLit(i);
+            assumps.push(actLit(i)); }
     }
 
     // Assume 's' at state outputs:
@@ -536,7 +542,7 @@ FCube IncPdr::solveRel(Cube target, uint frame)
     lbool result = Z.solve(assumps); assert(result != l_Undef);
 
     FCube ret = (result == l_True) ? FCube(extractModel(Z, n2z)) :
-                /*otherwise*/        pushFwd(target, frame, extractCore(Z, target, target_lits), tmp_act);
+                /*otherwise*/        pushFwd(target, frame, extractCore(Z, target, target_lits), init ? Lit_NULL : tmp_act);
 
     // Cleanup:
     Z.addClause(~tmp_act);

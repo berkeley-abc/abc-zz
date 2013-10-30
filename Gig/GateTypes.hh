@@ -88,6 +88,8 @@ template<> fts_macro void write_(Out& out, const GateAttrType& v){
     Macro(Disj) \
     Macro(Even) \
     Macro(Odd) \
+    Macro(CardE) \
+    Macro(CardG) \
     Macro(Lut4) \
     Macro(Npn4) \
     Macro(Lut6) \
@@ -148,6 +150,8 @@ DEF( Conj     , INF  , NULL )
 DEF( Disj     , INF  , NULL )
 DEF( Even     , INF  , NULL )
 DEF( Odd      , INF  , NULL )
+DEF( CardE    , INF  , Arg  )   // Cardinality: number of inputs set equal to "arg"
+DEF( CardG    , INF  , Arg  )   // Cardinality: number of inputs set greater than or equal to "arg"
 
 // LUTs:
 DEF( Lut4     , 4    , Arg  )   // Argument stores the 16-bit FTB
