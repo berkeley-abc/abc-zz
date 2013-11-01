@@ -42,7 +42,7 @@ void readFaultTree(String tree_file, String prob_file, /*outputs:*/Gig& N, Vec<S
             splitArray(s, " ", fs);
             if (fs.size() != 3 || !eq(fs[1], "=")) Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", prob_file, s;
 
-            double prob;
+            double prob = 0;
             try{ prob = stringToDouble(fs[2]); }catch (...){ Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", prob_file, s; }
 
             Wire w;

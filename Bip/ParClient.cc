@@ -434,7 +434,61 @@ void streamOut_Netlist(Vec<uchar>& data, NetlistRef N)
         putu(data, 0);  // -- no properties
 
     // Save fairness properties and constraints:
-    // <<== to be done
+    bool has_fairness = false;
+    if (Has_Pob(N, fair_properties)){
+        Get_Pob(N, fair_properties);
+        has_fairness = fair_properties.size() > 0;
+    }
+
+    if (has_fairness || Has_Pob(N, constraints)){
+        putu(data, 1);  // -- version
+
+        // Save fairness properties: 
+        {
+            if (!has_fairness)
+                putu(data, 0);
+            else{
+                Vec<Wire> fconstr;
+                if (Has_Pob(N, fair_constraints)){
+                    Get_Pob(N, fair_constraints);
+                    for (uint i = 0; i < fair_constraints.size(); i++)
+                        fconstr.push(fair_constraints[i]);
+                }
+
+                Get_Pob(N, fair_properties);
+                uint len = 0;
+                for (uint i = 0; i < fair_properties.size(); i++)
+                    len += fair_properties[i].size() + fconstr.size() + 1;   // -- one extra for the separator
+
+                putu(data, len);
+                for (uint i = 0; i < fair_properties.size(); i++){
+                    for (uint j = 0; j < fair_properties[i].size(); j++){
+                        Wire w = fair_properties[i][j];
+                        putu(data, xlat[w[0]] ^ (int)sign(w[0]));
+                    }
+                    for (uint j = 0; j < fconstr.size(); j++){
+                        Wire w = fconstr[j];
+                        putu(data, xlat[w[0]] ^ (int)sign(w[0]));
+                    }
+                    putu(data, 0);
+                }
+            }
+        }
+
+        // Save constraints: 
+        {
+            if (!Has_Pob(N, constraints))
+                putu(data, 0);
+            else{
+                Get_Pob(N, constraints);
+                putu(data, constraints.size());
+                for (uint i = 0; i < constraints.size(); i++){
+                    Wire w = constraints[i]; assert(type(w) == gate_PO);
+                    putu(data, xlat[w[0]] ^ (int)sign(w[0]));
+                }
+            }
+        }
+    }
 }
 
 
