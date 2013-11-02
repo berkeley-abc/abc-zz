@@ -32,12 +32,12 @@ struct Params_CnfMap {
     bool    intro_muxes;        // Introduces MUXes first (faster, and often better quality)
     bool    quiet;
 
-    Params_CnfMap() :
+    Params_CnfMap(bool quiet_ = false) :
         map_to_luts(true),
         cuts_per_node(8),
         n_rounds(4),
         intro_muxes(true),
-        quiet(false)
+        quiet(quiet_)
     {}
 };
 

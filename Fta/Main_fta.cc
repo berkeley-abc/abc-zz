@@ -1,5 +1,6 @@
 #include "Prelude.hh"
 #include "Parser.hh"
+#include "Solver.hh"
 
 using namespace ZZ;
 
@@ -20,6 +21,9 @@ int main(int argc, char** argv)
         ShoutLn "PARSE ERROR! %_", msg;
         return 1;
     }
+
+    WriteLn "Parsed: %_", info(N);
+    enumerateModels(N, ev_names);
 
     return 0;
 }

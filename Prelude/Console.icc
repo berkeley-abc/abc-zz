@@ -306,7 +306,7 @@ void optimizeFlushData(Vec<ushort>& data)
     static Vec<ushort> new_data;
 
     // Split 'data' on newline:
-    static const ushort seps[1] = { '\n' };
+    static const ushort seps[2] = { '\n', 0 };
     strictSplitArray(slice(data), slice(seps[0], seps[1]), lines);
 
     // Optimize:

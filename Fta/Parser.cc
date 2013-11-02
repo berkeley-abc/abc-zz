@@ -26,6 +26,7 @@ using namespace std;
 void readFaultTree(String tree_file, String prob_file, /*outputs:*/Gig& N, Vec<String>& ev_names)
 {
     Map<String, GLit> name2gate;
+    Vec<char> ftext;    // -- fanin names are stored here
 
     // Read probabilities:
     {
@@ -66,6 +67,7 @@ void readFaultTree(String tree_file, String prob_file, /*outputs:*/Gig& N, Vec<S
         Vec<Str> fs;
         strictSplitArray(text, ";", lines);
         for (uint i = 0; i < lines.size(); i++){
+            // Split line into components:
             Str s = strip(lines[i]);
             if (s.size() == 0) continue;
 
@@ -84,14 +86,64 @@ void readFaultTree(String tree_file, String prob_file, /*outputs:*/Gig& N, Vec<S
 
             splitArray(args, ",", fs);
 
-            Dump(name, gate, fs);
-            // AND, OR, NOT, GE_3  (Conj, Disj, (sign), CardG?)
+            // Create gate:
+            Wire w;
+            if (eq(gate, "NOT")){
+                if (fs.size() != 1) Throw (Excp_ParseError) "NOT operator takes a single argument in: %_\n  -->> %_", tree_file, s;
+                w = N.add(gate_Not, fs.size());
+            }else if (eq(gate, "AND"))
+                w = N.addDyn(gate_Conj, fs.size());
+            else if (eq(gate, "OR"))
+                w = N.addDyn(gate_Disj, fs.size());
+            else if (pfx(gate, "GE_")){
+                w = N.addDyn(gate_CardG, fs.size());
+                uint k = 0;
+                try{ k = stringToUInt64(gate.slice(3)); }catch (...){ Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", prob_file, s; }
+                w.arg_set(k);
+            }
 
-            //g75 = OR(g33, e35, e47, g44, e59, g51, e37, e49, e61, e83, e87, e91, e85, e89, e93)
+            bool exists = name2gate.set(String(name), w);
+            if (exists) Throw (Excp_ParseError) "Event '%_' listed twice in: %_ + %_", name, tree_file, prob_file;
 
+            // Store fanin names:
+            for (uint i = 0; i < fs.size(); i++){
+                w.set_unchecked(i, GLit(ftext.size()));     // -- bypass fanin checking
+                append(ftext, strip(fs[i]));
+                ftext.push(0);
+            }
+        }
 
+        For_Gates(N, w){
+            if (w == gate_PI) continue;
+
+            for (uint i = 0; i < w.size(); i++){
+                uint offset = w[i].id;
+                w.set_unchecked(i, Wire_NULL);
+
+                Str name = slize(&ftext[offset]);
+                GLit w_in;
+                if (name2gate.peek(name, w_in))
+                    w.set(i, w_in);
+                else
+                    Throw (Excp_ParseError) "Missing gate '%_' used as fanin in: %_", name, tree_file;
+            }
         }
     }
+
+    Add_Gob(N, FanoutCount);
+    Wire w_top;
+    For_Gates(N, w){
+        if (nFanouts(w) == 0){
+            if (!w_top)
+                w_top = w;
+            else
+                Throw (Excp_ParseError) "Fault-tree does not have a unique top-node: %_ %_", w_top, w;
+        }
+    }
+
+    if (!w_top) Throw (Excp_ParseError) "Empty fault-tree?";
+
+    N.add(gate_PO).init(w_top);
 }
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

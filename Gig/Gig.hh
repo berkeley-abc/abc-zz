@@ -484,8 +484,6 @@ struct Gig : Gig_data, NonCopyable {
     void  compact(GigRemap& remap, bool remove_unreach = true);
         // -- Will topologically order the gates and remove any gaps in the gate tables
         // created by gate removal. By default, unreachable gates (from COs) are first removed.
-        // Once done, 'compact()' will leave the netlist in a frozen mode (unless 'set_frozen'
-        // is FALSE).
 
   //________________________________________
   //  Disk:

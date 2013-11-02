@@ -525,8 +525,6 @@ void Gig::compact(GigRemap& remap, bool remove_unreach)
 
     for (uint j = 0; j < listeners[msgidx_Compact].size(); j++)
         listeners[msgidx_Compact][j]->compacting(remap);
-
-    // Finish up:
 }
 
 
