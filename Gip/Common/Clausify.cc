@@ -111,6 +111,7 @@ void clausify(const Gig& F, const Vec<GLit>& roots, MetaSat& S, WMapX<Lit>& f2s,
             }
             break;}
 
+        case gate_Npn4:
         case gate_Lut4:{
             bool ready = true;
             For_Inputs(w, v){
@@ -123,7 +124,8 @@ void clausify(const Gig& F, const Vec<GLit>& roots, MetaSat& S, WMapX<Lit>& f2s,
                 Q.pop();
 
                 // Instantiate LUT as CNF:
-                Npn4Norm n = npn4_norm[w.arg()];
+                ftb4_t ftb = (w == gate_Lut4) ? w.arg() : npn4_repr[w.arg()];
+                Npn4Norm n = npn4_norm[ftb];
                 pseq4_t pseq = perm4_to_pseq4[n.perm];
                 uint cl = n.eq_class;
                 uint sz = npn4_repr_sz[cl];

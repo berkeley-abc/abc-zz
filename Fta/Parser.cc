@@ -22,8 +22,8 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-// Zero-probability events will be eliminated during parsing.
-void readFaultTree(String tree_file, String prob_file, /*outputs:*/Gig& N, Vec<String>& ev_names)
+// Zero/one-probability events will be eliminated during parsing.
+void readFaultTree(String tree_file, String prob_file, /*outputs:*/Gig& N, Vec<double>& ev_probs, Vec<String>& ev_names)
 {
     Map<String, GLit> name2gate;
     Vec<char> ftext;    // -- fanin names are stored here
@@ -48,8 +48,12 @@ void readFaultTree(String tree_file, String prob_file, /*outputs:*/Gig& N, Vec<S
 
             Wire w;
             if (prob > 0){
-                w = N.add(gate_PI);
-                ev_names(w.num()) = fs[0];
+                if (prob < 1){
+                    w = N.add(gate_PI);
+                    ev_names(w.num()) = fs[0];
+                    ev_probs(w.num()) = prob;
+                }else
+                    w = N.True();
             }else
                 w = ~N.True();
 

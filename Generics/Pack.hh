@@ -85,8 +85,8 @@ struct Pack {
     typedef Pack_Data<T>* Pack::*bool_type;
     operator bool_type() const { return null() ? 0 : &Pack::ptr; }
 
-    Pack operator-(T p);     // -- create a copy of this pack without element 'p' (which MUST exist)
-    Pack operator+(const Pack& c);
+    Pack operator-(T p) const;     // -- create a copy of this pack without element 'p' (which MUST exist)
+    Pack operator+(const Pack& c) const;
     Pack sub(uind start, uind end) const { return Pack(slice(ptr->data[start], ptr->data[end])); }
 
     Array<T> base() const { return slice(ptr->data[0], ptr->data[ptr->sz]); }
@@ -140,7 +140,7 @@ template<class T> fts_macro bool operator<(const Pack<T>& x, const Pack<T>& y) {
 
 
 template<class T>
-Pack<T> Pack<T>::operator-(T p)
+Pack<T> Pack<T>::operator-(T p) const
 {
     uint sz = this->size() - 1;
     Pack_Data<T>* tmp = (Pack_Data<T>*)ymalloc<char>(allocSize(sz));
@@ -163,7 +163,7 @@ Pack<T> Pack<T>::operator-(T p)
 
 // Temporary inefficient implementation
 template<class T>
-Pack<T> Pack<T>::operator+(const Pack<T>& c)
+Pack<T> Pack<T>::operator+(const Pack<T>& c) const
 {
 #if 0
     Vec<T> tmp(reserve_, this->size() + c.size());
@@ -178,7 +178,7 @@ Pack<T> Pack<T>::operator+(const Pack<T>& c)
 #else
     // Determine size of new pack:
     uint i = 0, j = 0, sz = 0;
-    Pack<T>& b = *this;
+    const Pack<T>& b = *this;
     for(;;){
         if (i >= b.size()){ sz += c.size() - j; break; }
         if (j >= c.size()){ sz += b.size() - i; break; }

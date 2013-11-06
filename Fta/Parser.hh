@@ -23,7 +23,7 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-void readFaultTree(String tree_file, String prob_file, /*outputs:*/Gig& N, Vec<String>& ev_names);
+void readFaultTree(String tree_file, String prob_file, /*outputs:*/Gig& N, Vec<double>& ev_probs, Vec<String>& ev_names);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
