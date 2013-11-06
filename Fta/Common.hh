@@ -1,0 +1,29 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : Common.hh
+//| Author(s)   : Niklas Een
+//| Module      : Fta
+//| Description : 
+//| 
+//| (C) Copyright 2013, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//|________________________________________________________________________________________________
+
+#ifndef ZZ__Fta__Common_hh
+#define ZZ__Fta__Common_hh
+namespace ZZ {
+using namespace std;
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+
+
+void convertToAig(Gig& N);
+void pushNegations(Gig& N);
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+}
+#endif

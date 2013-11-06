@@ -23,6 +23,14 @@ namespace ZZ {
 using namespace std;
 
 
+ZZ_PTimer_Add(fta_SAT);
+ZZ_PTimer_Add(fta_Heap);
+ZZ_PTimer_Add(fta_splitRegion);
+ZZ_PTimer_Add(fta_splitRegion_shrink);
+ZZ_PTimer_Add(fta_findPrime);
+ZZ_PTimer_Add(fta_newRegion);
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Supporting types:
 
@@ -35,8 +43,42 @@ struct Region {
     Region(Cube prime_, Cube bbox_, double prob_) : prime(prime_), bbox(bbox_), prob(prob_) {}
 };
 
+#if 1
 macro bool operator<(const Region& r1, const Region& r2) {
     return r1.prob > r2.prob; }     // -- intentional '>'
+
+#else
+macro bool operator<(const Region& r1, const Region& r2) {
+    if (r1.prob > r2.prob) return true;
+    if (r1.prob < r2.prob) return false;
+    uint d0 = r1.prime.size() - r1.bbox.size();
+    uint d1 = r2.prime.size() - r2.bbox.size();
+    return d0 > d1;
+}
+#endif
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Debug:
+
+
+struct Fmt_Cube {
+    const Vec<String>& var2name;
+    const Cube& cube;
+    Fmt_Cube(const Vec<String>& var2name_, const Cube& cube_) : var2name(var2name_), cube(cube_) {}
+};
+
+
+template<> fts_macro void write_(Out& out, const Fmt_Cube& v)
+{
+    out += '{';
+    for (uint i = 0; i < v.cube.size(); i++){
+        assert(!v.cube[i].sign);
+        if (i != 0) out += ", ";
+        out += v.var2name[v.cube[i].id];
+    }
+    out += '}';
+}
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -81,6 +123,12 @@ class FtaBound {
     void splitRegion(const Region& r);
     void approxTopEvent();
 
+  //________________________________________
+  //  Debug:
+
+    Vec<String> var2name;
+    Fmt_Cube fmt(const Cube& c) const { return Fmt_Cube(var2name, c); }
+
 public:
   //________________________________________
   //  Public interface:
@@ -119,23 +167,12 @@ double FtaBound::upperProb()
 // Main:
 
 
-/*
-    minterm -> prime
-    split region (may eliminate literals)
-    if region = prime -> closed
-
-    forever{
-        find minterm (break if unsat)
-        make it prime (without overlapping existing regions)
-        create region (update probability, block it in sat solver)
-    }
-*/
-
-
 // If 'prime' is non-NULL, add region to 'open' (unless 'prime == bbox').
 // <<== later: also shrink bbox by SAT (if variable can be removed without losing solutions)
 void FtaBound::newRegion(Cube prime, Cube bbox)
 {
+    ZZ_PTimer_Scope(fta_newRegion);
+
     if (!prime)
         return;
 
@@ -148,6 +185,25 @@ void FtaBound::newRegion(Cube prime, Cube bbox)
         assert(prime == bbox);
         closed.push(Region(prime, prime, prob));
     }else{
+      #if 0   // TEMPORARY
+        Vec<Lit> assumps(copy_, bbox);
+        for (uint i = 0; i < prime.size(); i++){
+            if (has(bbox, prime[i])) continue;
+
+            assumps.push(flip[prime[i].id]);
+            if (S.solve(assumps) == l_True)
+                assumps.pop();
+            else{
+                assumps.pop();
+                assumps.push(prime[i]);
+            }
+        }
+        if (assumps.size() > bbox.size()){
+            WriteLn "Tighten BBox: %_ -> %_", fmt(bbox), fmt(assumps);
+            bbox =  Cube(assumps);
+        }
+      #endif
+
         // <<== shrink bbox (probe by adding flipped prime literals missing from bbox; if that space is UNSAT the unflipped literal can be added to bbox)
         open.add(Region(prime, bbox, prob));
         //**/WriteLn "Added region with prob=%_; bbox=%_", prob, bbox;
@@ -157,8 +213,13 @@ void FtaBound::newRegion(Cube prime, Cube bbox)
 
 Cube FtaBound::findPrime(Cube bbox)
 {
+    ZZ_PTimer_Scope(fta_findPrime);
+
     Vec<Lit> assumps(copy_, bbox);
-    if (S.solve(assumps) == l_False)
+    ZZ_PTimer_Begin(fta_SAT);
+    lbool result = S.solve(assumps);
+    ZZ_PTimer_End(fta_SAT);
+    if (result == l_False)
         return Cube_NULL;
 
     Vec<Lit> model;
@@ -173,6 +234,9 @@ Cube FtaBound::findPrime(Cube bbox)
 
 void FtaBound::splitRegion(const Region& r)
 {
+    ZZ_PTimer_Scope(fta_splitRegion);
+
+    ZZ_PTimer_Begin(fta_splitRegion_shrink);
     // Shrink bounding-box with least probable literal in prime:
     double best_prob = DBL_MAX;
     Lit best_var;
@@ -181,7 +245,9 @@ void FtaBound::splitRegion(const Region& r)
         if (!has(r.bbox, p) && newMin(best_prob, var_prob[p.id]))
             best_var = p;
     }
+    ZZ_PTimer_End(fta_splitRegion_shrink);
 
+    //**/WriteLn "-- splitting on %_: bbox=%_  prime=%_", var2name[best_var.id], fmt(r.bbox), fmt(r.prime);
     newRegion(r.prime, r.bbox + Cube(best_var));
 
     Cube bbox = r.bbox + Cube(flip[best_var.id]);
@@ -196,10 +262,12 @@ void FtaBound::approxTopEvent()
 
     uint iter = 0;
     while (open.size() > 0){
+        ZZ_PTimer_Begin(fta_Heap);
         Region r = open.pop();
+        ZZ_PTimer_End(fta_Heap);
         splitRegion(r);
 
-        if (iter % 128 == 0){
+        if (iter % 128 == 0 || open.size() == 0){
             char up[128];
             char lo[128];
             sprintf(up, "%g", upperProb());
@@ -209,6 +277,13 @@ void FtaBound::approxTopEvent()
 
         iter++;
     }
+
+#if 1   /*QUICK HACK FOR BARUCH*/
+    WriteLn "Cover:";
+    for (uint i = 0; i < closed.size(); i++)
+        WriteLn "   %_", fmt(closed[i].bbox);
+#endif  /*END DEBUG*/
+
 }
 
 // paper bound: 3.47065e-08
@@ -271,6 +346,12 @@ void FtaBound::run()
     S.addClause(top);   //  -- all SAT queries will require the top node to be TRUE
     for (uint i = 0; i < n_vars; i++)
         S.addClause(~vars[i], ~vars[i + n_vars]);
+
+    // For debug:
+    for (uint i = 0; i < n_vars; i++){
+        var2name(vars[i].id) = ev_names[i];
+        var2name(vars[i + n_vars].id) = String("~") + ev_names[i];
+    }
 
     // Call approximator:
     approxTopEvent();
