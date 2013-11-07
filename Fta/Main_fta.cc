@@ -19,8 +19,8 @@ int main(int argc, char** argv)
     Vec<double> ev_probs;
 
     try{
-        readFaultTree("CEA9601.tree", "CEA9601.prob", N, ev_probs, ev_names);
-//        readFaultTree("baobab1.tree", "baobab1.prob", N, ev_probs, ev_names);
+//        readFaultTree("CEA9601.tree", "CEA9601.prob", N, ev_probs, ev_names);
+        readFaultTree("baobab1.tree", "baobab1.prob", N, ev_probs, ev_names);       // ~1.68145e-06
 //        readFaultTree("simple2.tree", "simple2.prob", N, ev_probs, ev_names);
     }catch (const Excp_Msg& msg){
         ShoutLn "PARSE ERROR! %_", msg;

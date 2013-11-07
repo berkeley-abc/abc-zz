@@ -44,8 +44,12 @@ struct Region {
     Region(Cube prime_, Cube bbox_, double volume_, double prob_) : prime(prime_), bbox(bbox_), volume(volume_), prob(prob_) {}
 };
 
-macro bool operator<(const Region& r1, const Region& r2) {
-    return r1.volume > r2.volume; }     // -- intentional '>'
+macro bool operator<(const Region& r1, const Region& r2) {      // -- intentional '>' below
+  #if 0
+    return r1.volume > r2.volume; }
+  #else
+    return r1.prob > r2.prob; }
+  #endif
 
 struct PrRange {
     double lo;
@@ -337,18 +341,22 @@ void FtaBound::approxTopEvent()
     newRegion(findPrime(Cube(empty)), Cube(empty));
 
     uint iter = 0;
+    double lim = 10;
     while (open.size() > 0){
         ZZ_PTimer_Begin(fta_Heap);
         Region r = open.pop();
         ZZ_PTimer_End(fta_Heap);
         splitRegion(r);
 
-        if (iter % 128 == 0 || open.size() == 0){
+        if (iter > lim || open.size() == 0){
+            iter = 0;
+            lim *= 1.1;
+
             char up[128];
             char lo[128];
             sprintf(up, "%g", upperProb());
             sprintf(lo, "%g", lowerProb());
-            WriteLn "open: %_   closed: %_   upper: %_   lower: %_   [%t]", open.size(), closed.size(), up, lo, cpuTime();
+            WriteLn "open: %,d   closed: %,d   upper: %_   lower: %_   [%t]", open.size(), closed.size(), up, lo, cpuTime();
         }
 
         iter++;
