@@ -5,7 +5,8 @@ import sys
 import os
 import re
 
-with open('CEA9601-basic-events.xml', 'r') as f:
+#with open('CEA9601-basic-events.xml', 'r') as f:
+with open('FaultTrees/baobab1-basic-events.xml', 'r') as f:
     text = f.read()
 
 

@@ -38,24 +38,22 @@ ZZ_PTimer_Add(fta_newRegion);
 struct Region {
     Cube   prime;
     Cube   bbox;
-    double prob;    // -- product of probabilities of 'bbox'
-    Region() : prob(-1) {}
-    Region(Cube prime_, Cube bbox_, double prob_) : prime(prime_), bbox(bbox_), prob(prob_) {}
+    double volume;      // -- product of probabilities of 'bbox'
+    double prob;        // -- more accurate upper bound on probability
+    Region() : volume(-1), prob(-1) {}
+    Region(Cube prime_, Cube bbox_, double volume_, double prob_) : prime(prime_), bbox(bbox_), volume(volume_), prob(prob_) {}
 };
 
-#if 1
 macro bool operator<(const Region& r1, const Region& r2) {
-    return r1.prob > r2.prob; }     // -- intentional '>'
+    return r1.volume > r2.volume; }     // -- intentional '>'
 
-#else
-macro bool operator<(const Region& r1, const Region& r2) {
-    if (r1.prob > r2.prob) return true;
-    if (r1.prob < r2.prob) return false;
-    uint d0 = r1.prime.size() - r1.bbox.size();
-    uint d1 = r2.prime.size() - r2.bbox.size();
-    return d0 > d1;
-}
-#endif
+struct PrRange {
+    double lo;
+    double hi;
+    PrRange()                       : lo(DBL_MAX), hi(-DBL_MAX) {}
+    PrRange(double exact)           : lo(exact)  , hi(exact)    {}
+    PrRange(double lo_, double hi_) : lo(lo_)    , hi(hi_)      {}
+};
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -97,6 +95,7 @@ class FtaBound {
   //  State variables:
 
     Gig             N;
+    Gig             N_aig;
 
     KeyHeap<Region> open;
     Vec<Region>     closed;
@@ -104,19 +103,22 @@ class FtaBound {
     MiniSat2        S;
     WMapX<Lit>      n2s;
 
-    MiniSat2        Z;
-    WMapX<Lit>      n2z;
-
     uint            n_vars;     // -- number of events (= positive variables)
     Vec<Lit>        vars;       // -- positive events followed by negative events (so twice the size of 'ev_probs' and 'ev_names')
     Vec<double>     var_prob;   // -- Maps a SAT variable of an event to the probability corresponding to that event (undefined for other SAT variables)
     Vec<Lit>        flip;       // -- Maps a SAT variable of an event to the SAT variable of the negation of that event
+    Vec<GLit>       aig_node;   // -- Maps a SAT variable of an event to PI in 'N_aig'
+
+    WMap<PrRange>   apx;     // -- approximate probability: '(lower-bound, higher-bound)'
 
   //________________________________________
   //  Internal methods:
 
     double upperProb();
     double lowerProb();
+
+    void   initTopEstimate();
+    double estimateTop(const Cube& bbox);
 
     void newRegion(Cube prime, Cube bbox);
     Cube findPrime(Cube bbox);
@@ -164,6 +166,74 @@ double FtaBound::upperProb()
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Estimate probability of bounding box:
+
+
+void FtaBound::initTopEstimate()
+{
+    apx(GLit_NULL) = 0;
+    apx(GLit_True) = 1;
+    For_Gatetype(N_aig, gate_PI, w){
+        uint n = w.num();
+        apx(w) = (n < n_vars) ? ev_probs[n] : 1 - ev_probs[n - n_vars];
+    }
+}
+
+
+double FtaBound::estimateTop(const Cube& bbox)
+{
+    // Temporarily change approximations for variables in bounding box:
+    Vec<Pair<GLit,PrRange> > undo;
+    for (uint i = 0; i < bbox.size(); i++){
+        GLit w = aig_node[bbox[i].id];
+        undo.push(tuple(w, apx[w]));
+        apx(w) = 1.0;
+
+        w = aig_node[flip[bbox[i].id].id];
+        undo.push(tuple(w, apx[w]));
+        apx(w) = 0.0;
+    }
+
+    assert(isCanonical(N_aig));
+    For_Gates(N_aig, w){
+        if (w != gate_And) continue;
+
+        // Get input probabilities:
+        PrRange in[2];
+        for (uint i = 0; i < 2; i++){
+            GLit u = w[i];
+            if (!u.sign){
+                in[i].lo = apx[u].lo;
+                in[i].hi = apx[u].hi;
+            }else{
+                in[i].lo = 1 - apx[u].hi;
+                in[i].hi = 1 - apx[u].lo;
+            }
+        }
+
+        // Compute output probability:
+        apx(w).lo = max_(0.0, in[0].lo + in[1].lo - 1);
+        apx(w).hi = min_(in[0].hi, in[1].hi);
+
+        //**/WriteLn "w=%_  lo=%_  hi=%_", w, apx[w].lo, apx[w].hi;
+    }
+
+    // Restore approximations:
+    for (uint i = 0; i < undo.size(); i++)
+        apx(undo[i].fst) = undo[i].snd;
+
+    // Compute probability of the bounding box itself:
+    double prob = 1;
+    for (uint i = 0; i < bbox.size(); i++){
+        assert(!bbox[i].sign);
+        prob *= var_prob[bbox[i].id]; }
+
+    Wire w_top = N_aig(gate_PO, 0)[0];
+    return prob * (!w_top.sign ? apx(w_top).hi : (1 - apx(w_top).lo));
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Main:
 
 
@@ -176,14 +246,20 @@ void FtaBound::newRegion(Cube prime, Cube bbox)
     if (!prime)
         return;
 
-    double prob = 1;
+    double volume = 1;
     for (uint i = 0; i < bbox.size(); i++){
         assert(!bbox[i].sign);
-        prob *= var_prob[bbox[i].id]; }
+        volume *= var_prob[bbox[i].id]; }
+#if 0
+    double prob = volume;
+#else
+    double prob = estimateTop(bbox);
+    assert(volume >= prob);     // -- sanity; maybe need to put in an epsilon?
+#endif
 
     if (subsumes(prime, bbox)){
         assert(prime == bbox);
-        closed.push(Region(prime, prime, prob));
+        closed.push(Region(prime, prime, volume, prob));
     }else{
       #if 0   // TEMPORARY
         Vec<Lit> assumps(copy_, bbox);
@@ -205,7 +281,7 @@ void FtaBound::newRegion(Cube prime, Cube bbox)
       #endif
 
         // <<== shrink bbox (probe by adding flipped prime literals missing from bbox; if that space is UNSAT the unflipped literal can be added to bbox)
-        open.add(Region(prime, bbox, prob));
+        open.add(Region(prime, bbox, volume, prob));
         //**/WriteLn "Added region with prob=%_; bbox=%_", prob, bbox;
     }
 }
@@ -292,21 +368,24 @@ void FtaBound::approxTopEvent()
 // upper: 0.000000181161463500765   
 // lower: 0.0000000284454046663883
 
-// open: 10,722,642   closed: 54,349   upper: 3.6037e-08   lower: 3.43725e-08   [1:09 h]
+// open: 10,722,642   closed: 54,349   upper: 3.6037e-08    lower: 3.43725e-08   [1:09 h]
+// open:  1,175,537   closed:  1,489   upper: 3.60291e-08   lower: 3.18799e-08   [5:31 mn]  -- with new area approx
 
 
 void FtaBound::run()
 {
     // Prepare fault-tree:
-    N0.copyTo(N);
-    WriteLn "FTA input : %_", info(N);
+    WriteLn "FTA input : %_", info(N0);
 
-    convertToAig(N);
-    WriteLn "FTA AIG   : %_", info(N);
+    N0.copyTo(N_aig);
+    convertToAig(N_aig);
+    WriteLn "FTA AIG   : %_", info(N_aig);
 
-    pushNegations(N);
-    WriteLn "FTA unate : %_", info(N);
+    pushNegations(N_aig);
+    N_aig.compact();
+    WriteLn "FTA unate : %_", info(N_aig);
 
+    N_aig.copyTo(N);
     Params_CnfMap P_cnf;
     P_cnf.quiet = true;
     P_cnf.map_to_luts = false;
@@ -327,14 +406,13 @@ void FtaBound::run()
         var_prob[p.id] = (n < n_vars) ? ev_probs[n] : 1 - ev_probs[n - n_vars];
     }
 
-#if 1   // -- quick hack
     for (uint n = 0; n < 2*n_vars; n++){
+        // -- introduce dummy variables for unused negated events (a bit of a hack):
         if (!vars[n]){
             vars[n] = S.addLit();
             var_prob(vars[n].id) = (n < n_vars) ? ev_probs[n] : 1 - ev_probs[n - n_vars];
         }
     }
-#endif
 
     flip.growTo(S.nVars());
     for (uint i = 0; i < n_vars; i++){
@@ -342,6 +420,10 @@ void FtaBound::run()
         flip[vars[i + n_vars].id] = vars[i];
         //**/WriteLn "Flip: %_ <-> %_", vars[i], vars[i + n_vars];
     }
+
+    aig_node.growTo(S.nVars());
+    for (uint i = 0; i < 2 * n_vars; i++)
+        aig_node[vars[i].id] = N_aig(gate_PI, i);
 
     S.addClause(top);   //  -- all SAT queries will require the top node to be TRUE
     for (uint i = 0; i < n_vars; i++)
@@ -354,6 +436,7 @@ void FtaBound::run()
     }
 
     // Call approximator:
+    initTopEstimate();
     approxTopEvent();
 }
 

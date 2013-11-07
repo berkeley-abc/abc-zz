@@ -20,6 +20,7 @@ int main(int argc, char** argv)
 
     try{
         readFaultTree("CEA9601.tree", "CEA9601.prob", N, ev_probs, ev_names);
+//        readFaultTree("baobab1.tree", "baobab1.prob", N, ev_probs, ev_names);
 //        readFaultTree("simple2.tree", "simple2.prob", N, ev_probs, ev_names);
     }catch (const Excp_Msg& msg){
         ShoutLn "PARSE ERROR! %_", msg;

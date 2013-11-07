@@ -5,13 +5,15 @@ import sys
 import os
 import re
 
-with open('CEA9601.xml', 'r') as f:
+#with open('CEA9601.xml', 'r') as f:
+with open('FaultTrees/baobab1.xml', 'r') as f:
     text = f.read()
 
 
 text = re.sub(r'\<define-gate name="([^"]*)" *\>\n', "\\1 = ", text)
 text = re.sub(r'\</define-gate *\>\n', ";", text)
 text = re.sub(r'\<basic-event name="([^"]*)" *\/>\n', "\\1, ", text)
+text = re.sub(r'\<event name="([^"]*)" *\/>\n', "\\1, ", text)
 text = re.sub(r'\<gate name="([^"]*)" *\/>\n', "\\1, ", text)
 text = re.sub(r'\<or *>\n', "OR(", text)
 text = re.sub(r'\<and *>\n', "AND(", text)

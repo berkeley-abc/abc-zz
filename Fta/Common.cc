@@ -3,7 +3,7 @@
 //| Name        : Common.cc
 //| Author(s)   : Niklas Een
 //| Module      : Fta
-//| Description : 
+//| Description :
 //| 
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
@@ -60,13 +60,23 @@ void convertToAig(Gig& N)
 
         case gate_CardG:{
             // Temporary:
-            assert(w.arg() == 3);
+            assert(w.arg() == 2 || w.arg() == 3);
             assert(w.size() == 4);
-            Wire u0 = mkAnd(w[0], mkAnd(w[2], w[3]));
-            Wire u1 = mkAnd(w[1], mkAnd(w[2], w[3]));
-            Wire u2 = mkAnd(w[2], mkAnd(w[0], w[1]));
-            Wire u3 = mkAnd(w[3], mkAnd(w[0], w[1]));
-            xlat(w) = mkOr(mkOr(u0, u1), mkOr(u2, u3));
+            if (w.arg() == 2){
+                Wire u0 = mkAnd(w[0], w[1]);
+                Wire u1 = mkAnd(w[0], w[2]);
+                Wire u2 = mkAnd(w[0], w[3]);
+                Wire u3 = mkAnd(w[1], w[2]);
+                Wire u4 = mkAnd(w[1], w[3]);
+                Wire u5 = mkAnd(w[2], w[3]);
+                xlat(w) = mkOr(mkOr(mkOr(u0, u1), mkOr(u2, u3)), mkOr(u4, u5));
+            }else{
+                Wire u0 = mkAnd(w[0], mkAnd(w[2], w[3]));
+                Wire u1 = mkAnd(w[1], mkAnd(w[2], w[3]));
+                Wire u2 = mkAnd(w[2], mkAnd(w[0], w[1]));
+                Wire u3 = mkAnd(w[3], mkAnd(w[0], w[1]));
+                xlat(w) = mkOr(mkOr(u0, u1), mkOr(u2, u3));
+            }
             break; }
 
         default:
