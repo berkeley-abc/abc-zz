@@ -286,7 +286,7 @@ double FtaBound::estimateTop(const Cube& bbox)
         }
 
         // Compute output probability:
-        if (P.use_tree_nodes && (tree_nodes.has(w[0]) && tree_nodes.has(w[1]))){
+        if (P.use_tree_nodes && (tree_nodes.has(w[0]) || tree_nodes.has(w[1]))){
             // <<== add support computation and use better approximation for combining inputs with disjoint support
             apx(w).lo = in[0].lo * in[1].lo;
             apx(w).hi = in[0].hi * in[1].hi;
@@ -467,6 +467,9 @@ void FtaBound::approxTopEvent()
 // open: 10,722,642   closed: 54,349   upper: 3.6037e-08    lower: 3.43725e-08   [1:09 h]
 // open:  1,175,537   closed:  1,489   upper: 3.60291e-08   lower: 3.18799e-08   [5:31 mn]  -- with new area approx
 // open:  1,203,086   closed:  1,489   upper: 3.59688e-08   lower: 3.18799e-08   [3:45 mn]  -- with splitRegion() speedup
+// open:    685,501   closed:    722   upper: 3.56177e-08   lower: 2.96488e-08   [3:28 mn]  -- with tree nodes
+
+// 831.FTP:  lim 1e-12  =>  9.729e-2 (= 0.09729)  (Xfta says: 0.03082)
 
 
 void FtaBound::run()
@@ -561,11 +564,14 @@ fta_splitRegion:                            304.29 s  (99.01 %)
 fta_splitRegion_shrink:                       1.37 s  (0.45 %)
 fta_splitRegion_newRegion:                  174.82 s  (56.88 %)
 fta_splitRegion_findPrime:                  128.05 s  (41.66 %)
+
 fta_findPrime:                              126.11 s  (41.03 %)
 fta_findPrime_SAT:                           83.29 s  (27.10 %)
+
 fta_newRegion:                              173.09 s  (56.32 %)
 fta_newRegion_estimateTop:                  170.53 s  (55.48 %)
 fta_newRegion_estimateTop_findTreeNodes:     86.51 s  (28.15 %)
+
 fta_sumUp:                                    1.37 s  (0.45 %)
 fta_Heap_pop:                                 1.53 s  (0.50 %)
 
