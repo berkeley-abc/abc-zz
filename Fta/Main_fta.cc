@@ -20,9 +20,11 @@ int main(int argc, char** argv)
 
     cli.add("input", "string", arg_REQUIRED, "Input fault-tree (.tree file).", 0);
     cli.add("output", "string", "", "Output file.");
+    cli.add("profile", "bool", "yes", "Print profiling information at exit.");
 
     CLI cli_bound;
     cli_bound.add("dump-cover", "bool", "no", "Dump cover upon complete enumeration.");
+    cli_bound.add("tree-nodes", "bool", "no", "Use tree-node computation in probability approximation.");
     cli.addCommand("bound", "Compute an upper bound on the probability of the top-node.", &cli_bound);
 
     cli.addCommand("save-xml", "Save fault-tree in OpenPSA XML format.");
@@ -43,7 +45,10 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    /**/Dump(cli.cmd);
+    if (cli.get("profile").bool_val){
+        suppress_profile_output = false;
+        setupSignalHandlers();
+    }
 
     if (cli.cmd == "save-dot"){
         if (output == "")
@@ -58,10 +63,11 @@ int main(int argc, char** argv)
         WriteLn "Wrote: \a*%_\a*", output;
 
     }else{ assert(cli.cmd == "bound");
-        suppress_profile_output = false;
-        setupSignalHandlers();
+        Params_FtaBound P;
+        P.use_tree_nodes = cli_bound.get("tree-nodes").bool_val;
+        P.dump_cover = cli_bound.get("dump-cover").bool_val;
 
-        ftaBound(N, ev_probs, ev_names);
+        ftaBound(N, ev_probs, ev_names, P);
     }
 
     return 0;

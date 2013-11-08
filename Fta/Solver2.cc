@@ -23,14 +23,17 @@ namespace ZZ {
 using namespace std;
 
 
-ZZ_PTimer_Add(fta_SAT);
-ZZ_PTimer_Add(fta_Heap);
 ZZ_PTimer_Add(fta_splitRegion);
 ZZ_PTimer_Add(fta_splitRegion_shrink);
+ZZ_PTimer_Add(fta_splitRegion_newRegion);
+ZZ_PTimer_Add(fta_splitRegion_findPrime);
 ZZ_PTimer_Add(fta_findPrime);
+ZZ_PTimer_Add(fta_findPrime_SAT);
 ZZ_PTimer_Add(fta_newRegion);
-// <<== estimate top
-// <<== heap pop operation
+ZZ_PTimer_Add(fta_newRegion_estimateTop);
+ZZ_PTimer_Add(fta_newRegion_estimateTop_findTreeNodes);
+ZZ_PTimer_Add(fta_sumUp);
+ZZ_PTimer_Add(fta_Heap_pop);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -97,6 +100,8 @@ class FtaBound {
     const Vec<double>& ev_probs;
     const Vec<String>& ev_names;
 
+    const Params_FtaBound& P;
+
   //________________________________________
   //  State variables:
 
@@ -118,19 +123,25 @@ class FtaBound {
     WMap<PrRange>   apx;        // -- approximate probability: '(lower-bound, higher-bound)'
     Vec<uchar>      in_bbox;    // -- temporary used in 'splitRegion()'
 
+    WMap<lbool>     xsim;
+    WMap<uint>      fcount;
+    WZet            tree_nodes; // -- a tree-node is a node with at most one fanout and only tree-nodes for children 
+
   //________________________________________
   //  Internal methods:
 
-    double upperProb();
-    double lowerProb();
+    double  upperProb();
+    double  lowerProb();
 
-    void   initTopEstimate();
-    double estimateTop(const Cube& bbox);
+    void    findTreeNodes(const Cube& bbox);
+    void    initTopEstimate();
+    double  estimateTop(const Cube& bbox);
 
-    void newRegion(Cube prime, Cube bbox);
-    Cube findPrime(Cube bbox);
-    void splitRegion(const Region& r);
-    void approxTopEvent();
+    void    newRegion(Cube prime, Cube bbox);
+    Cube    findPrime(Cube bbox);
+    void    splitRegion(const Region& r);
+
+    void    approxTopEvent();
 
   //________________________________________
   //  Debug:
@@ -142,8 +153,8 @@ public:
   //________________________________________
   //  Public interface:
 
-    FtaBound(const Gig& N0_, const Vec<double>& ev_probs_, const Vec<String>& ev_names_) :
-        N0(N0_), ev_probs(ev_probs_), ev_names(ev_names_) {}
+    FtaBound(const Gig& N0_, const Vec<double>& ev_probs_, const Vec<String>& ev_names_, const Params_FtaBound& P_) :
+        N0(N0_), ev_probs(ev_probs_), ev_names(ev_names_), P(P_) {}
 
     void run();
 };
@@ -156,6 +167,7 @@ public:
 static
 double sumUp(const Vec<Region>& rs)
 {
+    ZZ_PTimer_Scope(fta_sumUp);
     if (rs.size() == 0)
         return 0;
 
@@ -193,8 +205,54 @@ void FtaBound::initTopEstimate()
 }
 
 
+// Will return set through member variable 'tree_nodes'
+void FtaBound::findTreeNodes(const Cube& bbox)
+{
+    ZZ_PTimer_Scope(fta_newRegion_estimateTop_findTreeNodes);
+    assert(isCanonical(N_aig));
+
+    // Initialize PIs from bounding box:
+    For_Gatetype(N_aig, gate_PI, w)
+        xsim(w) = l_Undef;
+
+    for (uint i = 0; i < bbox.size(); i++){
+        GLit w = aig_node[bbox[i].id];
+        xsim(w) = w.sign ? l_False : l_True;
+    }
+
+    // Ternary simulate:
+    For_Gates(N_aig, w)
+        if (w == gate_And)
+            xsim(w) = (xsim[w[0]] ^ w[0].sign) & (xsim[w[1]] ^ w[1].sign);
+
+    // Count fanouts to non-constant nodes:
+    fcount.clear();
+    For_Gates(N_aig, w){
+        if (w == gate_And && xsim[w] == l_Undef) {
+            fcount(w[0])++;
+            fcount(w[1])++;
+        }
+    }
+
+    // Extract tree-nodes:
+    tree_nodes.clear();
+    For_Gates(N_aig, w){
+        if (fcount[w] <= 1){
+            For_Inputs(w, v)
+                if (!tree_nodes.has(v))
+                    goto NoTree;
+            tree_nodes.add(w);
+          NoTree:;
+        }
+    }
+}
+
+
 double FtaBound::estimateTop(const Cube& bbox)
 {
+    ZZ_PTimer_Scope(fta_newRegion_estimateTop);
+    assert(isCanonical(N_aig));
+
     // Temporarily change approximations for variables in bounding box:
     Vec<Pair<GLit,PrRange> > undo;
     for (uint i = 0; i < bbox.size(); i++){
@@ -207,7 +265,10 @@ double FtaBound::estimateTop(const Cube& bbox)
         apx(w) = 0.0;
     }
 
-    assert(isCanonical(N_aig));
+    if (P.use_tree_nodes)
+        findTreeNodes(bbox);
+
+    // Propagate probabilities upwards:    
     For_Gates(N_aig, w){
         if (w != gate_And) continue;
 
@@ -225,8 +286,15 @@ double FtaBound::estimateTop(const Cube& bbox)
         }
 
         // Compute output probability:
-        apx(w).lo = max_(0.0, in[0].lo + in[1].lo - 1);
-        apx(w).hi = min_(in[0].hi, in[1].hi);
+        if (P.use_tree_nodes && (tree_nodes.has(w[0]) && tree_nodes.has(w[1]))){
+            // <<== add support computation and use better approximation for combining inputs with disjoint support
+            apx(w).lo = in[0].lo * in[1].lo;
+            apx(w).hi = in[0].hi * in[1].hi;
+        }else{
+            apx(w).lo = max_(0.0, in[0].lo + in[1].lo - 1);
+            apx(w).hi = min_(in[0].hi, in[1].hi);
+                // <<== worth representing numbers as distance from either 0 or 1?
+        }
 
         //**/WriteLn "w=%_  lo=%_  hi=%_", w, apx[w].lo, apx[w].hi;
     }
@@ -305,9 +373,9 @@ Cube FtaBound::findPrime(Cube bbox)
     ZZ_PTimer_Scope(fta_findPrime);
 
     Vec<Lit> assumps(copy_, bbox);
-    ZZ_PTimer_Begin(fta_SAT);
+    ZZ_PTimer_Begin(fta_findPrime_SAT);
     lbool result = S.solve(assumps);
-    ZZ_PTimer_End(fta_SAT);
+    ZZ_PTimer_End(fta_findPrime_SAT);
     if (result == l_False)
         return Cube_NULL;
 
@@ -339,24 +407,34 @@ void FtaBound::splitRegion(const Region& r)
     ZZ_PTimer_End(fta_splitRegion_shrink);
 
     //**/WriteLn "-- splitting on %_: bbox=%_  prime=%_", var2name[best_var.id], fmt(r.bbox), fmt(r.prime);
+    ZZ_PTimer_Begin(fta_splitRegion_newRegion);
     newRegion(r.prime, r.bbox + Cube(best_var));
+    ZZ_PTimer_End(fta_splitRegion_newRegion);
 
+    ZZ_PTimer_Begin(fta_splitRegion_findPrime);
     Cube bbox = r.bbox + Cube(flip[best_var.id]);
-    newRegion(findPrime(bbox), bbox);
+    Cube prime = findPrime(bbox);
+    ZZ_PTimer_End(fta_splitRegion_findPrime);
+
+    ZZ_PTimer_Begin(fta_splitRegion_newRegion);
+    newRegion(prime, bbox);
+    ZZ_PTimer_End(fta_splitRegion_newRegion);
 }
 
 
 void FtaBound::approxTopEvent()
 {
+    // <<== if worth the CPU time, co-factor on high-fanout PIs?
+
     Vec<GLit> empty;    // <<== fix this later (add empty cube to 'Pack.hh')
     newRegion(findPrime(Cube(empty)), Cube(empty));
 
     uint iter = 0;
     double lim = 10;
     while (open.size() > 0){
-        ZZ_PTimer_Begin(fta_Heap);
+        ZZ_PTimer_Begin(fta_Heap_pop);
         Region r = open.pop();
-        ZZ_PTimer_End(fta_Heap);
+        ZZ_PTimer_End(fta_Heap_pop);
         splitRegion(r);
 
         if (iter > lim || open.size() == 0){
@@ -373,18 +451,17 @@ void FtaBound::approxTopEvent()
         iter++;
     }
 
-#if 1   /*QUICK HACK FOR BARUCH*/
-    WriteLn "Cover:";
-    for (uint i = 0; i < closed.size(); i++)
-        WriteLn "   %_", fmt(closed[i].bbox);
-#endif  /*END DEBUG*/
-
+    if (P.dump_cover){
+        WriteLn "Cover:";
+        for (uint i = 0; i < closed.size(); i++)
+            WriteLn "   %_", fmt(closed[i].bbox);
+    }
 }
 
 // paper bound: 3.47065e-08
 
 // paper: 0.0000000347065
-// upper: 0.000000181161463500765   
+// upper: 0.000000181161463500765
 // lower: 0.0000000284454046663883
 
 // open: 10,722,642   closed: 54,349   upper: 3.6037e-08    lower: 3.43725e-08   [1:09 h]
@@ -467,12 +544,29 @@ void FtaBound::run()
 // Wrapper function:
 
 
-void ftaBound(const Gig& N, const Vec<double>& ev_probs, const Vec<String>& ev_names)
+void ftaBound(const Gig& N, const Vec<double>& ev_probs, const Vec<String>& ev_names, const Params_FtaBound& P)
 {
-    FtaBound fb(N, ev_probs, ev_names);
+    FtaBound fb(N, ev_probs, ev_names, P);
     fb.run();
 }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
+
+
+/*
+
+fta_splitRegion:                            304.29 s  (99.01 %)
+fta_splitRegion_shrink:                       1.37 s  (0.45 %)
+fta_splitRegion_newRegion:                  174.82 s  (56.88 %)
+fta_splitRegion_findPrime:                  128.05 s  (41.66 %)
+fta_findPrime:                              126.11 s  (41.03 %)
+fta_findPrime_SAT:                           83.29 s  (27.10 %)
+fta_newRegion:                              173.09 s  (56.32 %)
+fta_newRegion_estimateTop:                  170.53 s  (55.48 %)
+fta_newRegion_estimateTop_findTreeNodes:     86.51 s  (28.15 %)
+fta_sumUp:                                    1.37 s  (0.45 %)
+fta_Heap_pop:                                 1.53 s  (0.50 %)
+
+*/
