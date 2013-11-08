@@ -1,13 +1,16 @@
 #include "Prelude.hh"
+#include "ZZ_Gig.IO.hh"
 #include "Parser.hh"
 #include "Solver.hh"
 #include "Solver2.hh"
 #include "Common.hh"
+#include "Export.hh"
 
 using namespace ZZ;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Main:
 
 
 int main(int argc, char** argv)
@@ -19,13 +22,17 @@ int main(int argc, char** argv)
     Vec<double> ev_probs;
 
     try{
-//        readFaultTree("CEA9601.tree", "CEA9601.prob", N, ev_probs, ev_names);
-        readFaultTree("baobab1.tree", "baobab1.prob", N, ev_probs, ev_names);       // ~1.68145e-06
+        readFaultTree("CEA9601.tree", "CEA9601.prob", N, ev_probs, ev_names);
+//        readFaultTree("baobab1.tree", "baobab1.prob", N, ev_probs, ev_names);       // ~1.68145e-06
 //        readFaultTree("simple2.tree", "simple2.prob", N, ev_probs, ev_names);
+//        readFaultTree("831.tree", "831.prob", N, ev_probs, ev_names);
     }catch (const Excp_Msg& msg){
         ShoutLn "PARSE ERROR! %_", msg;
         return 1;
     }
+    //**/writeDot("ft.dot", N);
+    //**/writeXml("ft.xml", N, ev_probs, ev_names);
+    //**/exit(0);
 
     suppress_profile_output = false;
     setupSignalHandlers();

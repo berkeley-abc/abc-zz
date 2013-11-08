@@ -4,37 +4,37 @@
 //| Author(s)   : Niklas Een
 //| Module      : Gig
 //| Description : Defines convenient netlist iteration macros.
-//| 
+//|
 //| (C) Copyright 2010-2012, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //| Netlist iteration:
-//| 
+//|
 //|   For_Gates(N, w)           -- Iterate over all "user" gates (skipping constants)
 //|   For_All_Gates(N, w)       -- Iterate over all legal gates (skipping only Wire_NULL/ERROR)
-//|   For_Gatetype(N, type, w)  -- Iterate over all gates of given type (must be a "numbered" type)  
-//| 
+//|   For_Gatetype(N, type, w)  -- Iterate over all gates of given type (must be a "numbered" type)
+//|
 //|   For_UpOrder(netlist, w)
 //|   For_DownOrder(netlist, w)
-//| 
+//|
 //| Fanin iteration:
-//| 
-//|   For_Inputs(wire, w) 
+//|
+//|   For_Inputs(wire, w)
 //|   Input_Pin(w) Iter_Var(w)
-//| 
+//|
 //| Gig objects, expression macros:
-//| 
+//|
 //|   Has_Gob   (N, obj_name)   -- checks if netlist has an object
 //|   Add_Gob   (N, obj_name)   -- creates an object that must NOT already exist.
 //|   Assure_Gob(N, obj_name)   -- creates an object IF it does not already exist.
 //|   Remove_Gob(N, obj_name)   -- removes an object from the netlist
-//| 
+//|
 //| Gig objects, statement macros:
-//| 
+//|
 //|   Scoped_Gob(N, obj_name)   -- 'Add' with automatic 'Remove' at the end of the scope
 //|   Auto_Gob  (N, obj_name)   -- 'Assure' with conditional 'Remove' at the end of the scope
-//|   Bury_Gob  (N, obj_name)   -- Inverse of 'Auto'; remove object if exists, then reintroduce 
+//|   Bury_Gob  (N, obj_name)   -- Inverse of 'Auto'; remove object if exists, then reintroduce
 //|                                it at the end of the scope
 //|________________________________________________________________________________________________
 
@@ -62,7 +62,7 @@ struct Gig_Iter {
 };
 
 
-// Iterate over all non-deleted gates, starting from either 'gid_FirstUser' (i.e. excluding 
+// Iterate over all non-deleted gates, starting from either 'gid_FirstUser' (i.e. excluding
 // constants) or 'gid_FirstLegal (excluding only 'Wire_NULL' and 'Wire_ERROR').
 // NOTE! 'netlist' is used as an expression, 'w' as a name
 //
@@ -129,6 +129,9 @@ struct MacroWire {
 };
 
 
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#if 0   // -- problematic when netlist get resized duing iteration...
+
 // Iterate over all non-NULL inputs of a given gate 'wire'.
 // NOTE 'wire' is an expression, but 'w' is a name.
 //
@@ -146,6 +149,23 @@ struct MacroWire {
     for (Wire w; i__##w < a__##w.size(); i__##w++)              \
         if (a__##w[i__##w].null()); else                        \
         if (w = (*N__##w)[ a__##w[i__##w] ], false); else
+#endif
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+// Iterate over all non-NULL inputs of a given gate 'wire'.
+// NOTE 'wire' is an expression, but 'w' is a name.
+//
+#define For_Inputs(wire, w)                                     \
+    if (MacroWire w0__##w = 0); else                            \
+    if ((Wire&)w0__##w = (wire), false); else                   \
+                                                                \
+    if (const Gig* N__##w = NULL); else                         \
+    if (N__##w = ((Wire&)w0__##w).gig(), false); else           \
+                                                                \
+    if (uint i__##w = 0); else                                  \
+    for (Wire w; i__##w < ((Wire&)w0__##w).size(); i__##w++)             \
+        if (w = (*N__##w)[ ((Wire&)w0__##w)[i__##w] ], !w); else
 
 
 #define Input_Pin(w) Iter_Var(w)

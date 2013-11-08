@@ -29,6 +29,8 @@ ZZ_PTimer_Add(fta_splitRegion);
 ZZ_PTimer_Add(fta_splitRegion_shrink);
 ZZ_PTimer_Add(fta_findPrime);
 ZZ_PTimer_Add(fta_newRegion);
+// <<== estimate top
+// <<== heap pop operation
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -45,7 +47,7 @@ struct Region {
 };
 
 macro bool operator<(const Region& r1, const Region& r2) {      // -- intentional '>' below
-  #if 0
+  #if 1
     return r1.volume > r2.volume; }
   #else
     return r1.prob > r2.prob; }
@@ -113,7 +115,8 @@ class FtaBound {
     Vec<Lit>        flip;       // -- Maps a SAT variable of an event to the SAT variable of the negation of that event
     Vec<GLit>       aig_node;   // -- Maps a SAT variable of an event to PI in 'N_aig'
 
-    WMap<PrRange>   apx;     // -- approximate probability: '(lower-bound, higher-bound)'
+    WMap<PrRange>   apx;        // -- approximate probability: '(lower-bound, higher-bound)'
+    Vec<uchar>      in_bbox;    // -- temporary used in 'splitRegion()'
 
   //________________________________________
   //  Internal methods:
@@ -150,23 +153,29 @@ public:
 // Compute probabilities:
 
 
-double FtaBound::lowerProb()
+static
+double sumUp(const Vec<Region>& rs)
 {
-    double total = 0;
-    for (uint i = 0; i < closed.size(); i++)
-        total += closed[i].prob;
-    return total;
+    if (rs.size() == 0)
+        return 0;
+
+    KeyHeap<double> Q;
+    for (uint i = 0; i < rs.size(); i++)
+        Q.add(rs[i].prob);
+
+    while (Q.size() > 1)
+        Q.add(Q.pop() + Q.pop());
+
+    return Q.pop();
 }
 
 
-double FtaBound::upperProb()
-{
+double FtaBound::lowerProb() {
+    return sumUp(closed); }
+
+double FtaBound::upperProb() {
     const Vec<Region>& rs = open.base();
-    double total = 0;
-    for (uint i = 0; i < rs.size(); i++)    // <<== should do this using heap to make it numerically stable
-        total += rs[i].prob;
-    return total + lowerProb();
-}
+    return sumUp(rs) + sumUp(closed); }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -320,11 +329,13 @@ void FtaBound::splitRegion(const Region& r)
     // Shrink bounding-box with least probable literal in prime:
     double best_prob = DBL_MAX;
     Lit best_var;
+    for (uint i = 0; i < r.bbox.size(); i++) in_bbox[r.bbox[i].id] = true;
     for (uint i = 0; i < r.prime.size(); i++){
         Lit p = r.prime[i]; assert(!p.sign);
-        if (!has(r.bbox, p) && newMin(best_prob, var_prob[p.id]))
+        if (!in_bbox[p.id] && newMin(best_prob, var_prob[p.id]))
             best_var = p;
     }
+    for (uint i = 0; i < r.bbox.size(); i++) in_bbox[r.bbox[i].id] = false;
     ZZ_PTimer_End(fta_splitRegion_shrink);
 
     //**/WriteLn "-- splitting on %_: bbox=%_  prime=%_", var2name[best_var.id], fmt(r.bbox), fmt(r.prime);
@@ -350,7 +361,7 @@ void FtaBound::approxTopEvent()
 
         if (iter > lim || open.size() == 0){
             iter = 0;
-            lim *= 1.1;
+            lim *= 1.3;
 
             char up[128];
             char lo[128];
@@ -378,6 +389,7 @@ void FtaBound::approxTopEvent()
 
 // open: 10,722,642   closed: 54,349   upper: 3.6037e-08    lower: 3.43725e-08   [1:09 h]
 // open:  1,175,537   closed:  1,489   upper: 3.60291e-08   lower: 3.18799e-08   [5:31 mn]  -- with new area approx
+// open:  1,203,086   closed:  1,489   upper: 3.59688e-08   lower: 3.18799e-08   [3:45 mn]  -- with splitRegion() speedup
 
 
 void FtaBound::run()
@@ -436,6 +448,8 @@ void FtaBound::run()
     S.addClause(top);   //  -- all SAT queries will require the top node to be TRUE
     for (uint i = 0; i < n_vars; i++)
         S.addClause(~vars[i], ~vars[i + n_vars]);
+
+    in_bbox.growTo(S.nVars(), 0);
 
     // For debug:
     for (uint i = 0; i < n_vars; i++){

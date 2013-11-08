@@ -54,6 +54,14 @@ public:
     const Vec<Key_>& base() const { return heap; }
 };
 
+/*
+    void   heapify() {
+        if (heap.size() > 0){
+            for (uind i = heap.size() / 2; i > 0;) i--,
+                siftDown(i, heap[i]); } }
+    void   push(ElemT elem) { assert(!has(elem)); uind pos = heap.size(); heap.push(); set(pos, elem); }   // -- must be followed by a 'heapify()'
+*/
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Heap:

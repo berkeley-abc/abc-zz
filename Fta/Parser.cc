@@ -60,6 +60,7 @@ void readFaultTree(String tree_file, String prob_file, /*outputs:*/Gig& N, Vec<d
             bool exists = name2gate.set(String(fs[0]), w);
             if (exists) Throw (Excp_ParseError) "Event '%_' listed twice in: %_", fs[0], prob_file;
         }
+        dispose(text);
     }
 
     // Read tree:
@@ -132,6 +133,7 @@ void readFaultTree(String tree_file, String prob_file, /*outputs:*/Gig& N, Vec<d
                     Throw (Excp_ParseError) "Missing gate '%_' used as fanin in: %_", name, tree_file;
             }
         }
+        dispose(text);
     }
 
     Add_Gob(N, FanoutCount);
