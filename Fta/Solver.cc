@@ -3,12 +3,12 @@
 //| Name        : Solver.cc
 //| Author(s)   : Niklas Een
 //| Module      : Fta
-//| Description : 
-//| 
+//| Description :
+//|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -20,72 +20,6 @@
 
 namespace ZZ {
 using namespace std;
-
-
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-
-
-struct FtModel {
-    const MetaSat& S;
-    const WMapX<Lit>& n2s;
-    FtModel(const MetaSat& S_, const WMapX<Lit>& n2s_) : S(S_), n2s(n2s_) {}
-
-    bool operator[](GLit w) const {
-        Lit p = n2s[w]; assert(p);
-        lbool v = S.value(p); assert(v != l_Undef);
-        return v == l_True;
-    }
-};
-
-
-
-void justify(const Gig& N, const FtModel& model, /*outputs:*/WSeen& seen, Vec<GLit>& prime)
-{
-    #define Push(w) (seen.add(+(w)) || (Q.push(+(w).lit()), true))
-
-    Vec<GLit> Q;
-    seen.add(GLit_True);
-    Push(+N(gate_PO, 0)[0]);
-
-    // Justification loop:
-    while (Q.size() > 0){
-        Wire w = Q.popC() + N; assert(!sign(w));
-
-        if (w == gate_PI)
-            prime.push(w);
-
-        else{
-            assert(w == gate_Npn4);
-            uint cl = w.arg();
-            uint a = 0;
-            For_Inputs(w, v)
-                if (model[v])
-                    a |= 1u << Iter_Var(v);
-            uint just = npn4_just[cl][a];       // -- look up all minimal justifications
-
-            // Follow one justification:
-            for (uint i = 0; i < 4; i++){
-                if (just & (1u << i))
-                    Push(w[i]);
-            }
-        }
-    }
-
-    // Add signs to prime literal:
-    for (uint i = 0; i < prime.size(); i++)
-        if (!model[prime[i]])
-            prime[i] = ~prime[i];
-
-    #undef Push
-}
-
-
-void weaken(const Gig& N, const FtModel& model, /*out*/Vec<GLit>& prime)
-{
-    WSeen seen;
-    justify(N, model, seen, prime);
-    //ternary sim...
-}
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -137,59 +71,119 @@ lbool sim(Wire w, const Vec<GLit>& prime, const Gig& N_prime)
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+void shrink(Vec<Lit>& zcube, MiniSat2& Z, const IntMap<uint, double>& zprob)
+{
+    lbool result = Z.solve(zcube);
+    assert(result == l_False);
+
+    //Z.getConflict(zcube);
+
+    // Temporary selection sort:
+    for (uint i = 0; i < zcube.size()-1; i++){
+        double best_prob = zprob[zcube[i].id];
+        uint best_idx = i;
+        for (uint j = i+1; j < zcube.size(); j++){
+            if (newMin(best_prob, zprob[zcube[j].id]))
+                best_idx = j;
+        }
+        swp(zcube[i], zcube[best_idx]);
+    }
+
+    for (uint i = 0; i < zcube.size(); i++){
+        Lit p = zcube[i];
+        zcube[i] = Z.True();
+        if (Z.solve(zcube) == l_True)
+            zcube[i] = p;
+    }
+
+    for (uint i = 0; i < zcube.size(); i++)
+        if (zcube[i] == Z.True() || zprob[zcube[i].id] > 0.99)  // <<== make this threshold a parameter
+            zcube[i] = Lit_NULL;
+
+    filterOut(zcube, isNull<Lit>);
+}
+
+
 // Takes a fault-tree 'N' (which will be massaged into a more optimized form) and computes
 // all satisfying assignments.
-void enumerateModels(Gig& N, const Vec<double>& ev_probs, const Vec<String>& ev_names)
+void enumerateModels(Gig& N, const Vec<double>& ev_probs0, const Vec<String>& ev_names)
 {
+    assert(N.enumSize(gate_PO) == 1);
+
+    // Change to AIG encoding with one literal for each polarity of a basic event:
     convertToAig(N);
+    uint n_vars = N.enumSize(gate_PI);
 
-    Gig N_ref;
-    N.copyTo(N_ref);
+    pushNegations(N);
+    WriteLn "Unmapped unate netlist: %_", info(N);
 
-#if 0   /*QUICK HACK*/
-    For_UpOrder(N, w){
-        if (w == gate_PI)
-            WriteLn "%_ = PI [%_]", w.lit(), w.num();
-        else if (w == gate_And)
-            WriteLn "%_ = And(%_, %_)", w.lit(), w[0].lit(), w[1].lit();
-        else { assert(w == gate_PO);
-            WriteLn "%_ = PO(%_) [%_]", w.lit(), w[0].lit(), w.num(); }
-    }
-#endif  /*END HACK*/
+    // Setup probabilities for new encoding:
+    Vec<double> ev_probs;
+    for (uint i = 0; i < ev_probs0.size(); i++) ev_probs.push(ev_probs0[i]);
+    for (uint i = 0; i < ev_probs0.size(); i++) ev_probs.push(1 - ev_probs0[i]);
 
+    // Generate Cnf:
     Params_CnfMap P_cnf;
     P_cnf.quiet = true;
     P_cnf.map_to_luts = false;
     cnfMap(N, P_cnf);
 
-    WriteLn "Mapped: %_", info(N);
+    MiniSat2 S, Z;
+    WMapX<Lit> n2s, n2z;
+    S.addClause( clausify(N.enumGate(gate_PO, 0), S, n2s));
+    Z.addClause(~clausify(N.enumGate(gate_PO, 0), Z, n2z));
 
-    assert(N.enumSize(gate_PO) == 1);
-    MiniSat2 S;
-    WMapX<Lit> n2s;
-    Lit p_top = clausify(N.enumGate(gate_PO, 0), S, n2s);
+    // Add dummy variable for irrelevant polarities:
+    for (uint i = 0; i < 2*n_vars; i++){
+        Wire w = N(gate_PI, i);
+        if (!n2s[w]) n2s(w) = S.addLit();
+        if (!n2z[w]) n2z(w) = Z.addLit();
+    }
 
+    // Back maps:
+    IntMap<uint, GLit> z2n;   // -- literal ID of variable in 'Z' -> PI in 'N'
+    IntMap<uint, double> zprob;
+    for (uint i = 0; i < 2*n_vars; i++){
+        Lit p = n2z[N(gate_PI, i)]; assert(!p.sign);
+        z2n(p.id) = N(gate_PI, i);
+        zprob(p.id) = ev_probs[i];
+    }
+
+
+    // Print some stats:
+    WriteLn "Mapped unate netlist: %_   (#clauses: %_)", info(N), S.nClauses();
+
+    // Enumerate primes:
     double total_prob = 0;
     for(;;){
-        printf("\r#clauses: %u   (prob: %g)", (uint)S.nClauses(), total_prob); fflush(stdout);
+        printf("\r#clauses: %u   (prob est.: %g)", (uint)S.nClauses(), total_prob); fflush(stdout);
 
-        lbool result = S.solve(p_top);
-        FtModel model(S, n2s);
+        lbool result = S.solve();
 
         if (result == l_True){
+            // Extract cube:
+            Vec<GLit> zcube;
+            For_Gatetype(N, gate_PI, w){
+                lbool v = S.value(n2z[w]);
+                if (v == l_True)
+                    zcube.push(n2z[w]);
+            }
+
+            // Shrink it to a prime:
+            shrink(zcube, Z, zprob);
+
             Vec<GLit> prime;
-            weaken(N, model, prime);
-            //WriteLn "prime: %_", Fmt_Prime(N, prime, ev_names);
-            //WriteLn "sim says: %_", sim(N_ref(gate_PO, 0), prime, N);
+            for (uint i = 0; i < zcube.size(); i++)
+                prime.push(z2n[zcube[i].id]);
 
             // Compute probability:
             double prob = 1;
             for (uint i = 0; i < prime.size(); i++){
                 Wire w = prime[i] + N;
-                double x = ev_probs[w.num()];
-                prob *= w.sign ? (1 - x) : x;
+                prob *= ev_probs[w.num()];
             }
-            total_prob += prob;     // <<== this is not numerically sound, nor is it a proper lower bound since primes may overlap
+            //**/Dump(zcube.size(), prob);
+            total_prob += prob;     // -- this is not numericaly sound, nor is it a proper lower bound since primes may overlap
 
             // Add clause:
             Vec<Lit> tmp;
@@ -200,6 +194,7 @@ void enumerateModels(Gig& N, const Vec<double>& ev_probs, const Vec<String>& ev_
         }else
             break;
     }
+    printf("\n"); fflush(stdout);
 
     WriteLn "CPU-time: %t", cpuTime();
 }

@@ -27,6 +27,7 @@ int main(int argc, char** argv)
     cli_bound.add("apx"       , "int[0:3]", "3", "Probability approximation level for SAT regions. 0=no approx, 1=std over approx, 2=use tree nodes, 3=also use support.");
     cli.addCommand("bound", "Compute an upper bound on the probability of the top-node.", &cli_bound);
 
+    cli.addCommand("enum", "Enumerate cubes and sum up their probability [experimental].");
     cli.addCommand("save-xml", "Save fault-tree in OpenPSA XML format.");
     cli.addCommand("save-dot", "Save fault-tree in 'dotty' format (no probabilities).");
 
@@ -62,7 +63,7 @@ int main(int argc, char** argv)
         writeXml(output, N, ev_probs, ev_names);
         WriteLn "Wrote: \a*%_\a*", output;
 
-    }else{ assert(cli.cmd == "bound");
+    }else if (cli.cmd == "bound"){
         Params_FtaBound P;
         P.use_prob_approx = cli_bound.get("apx").int_val >= 1;
         P.use_tree_nodes  = cli_bound.get("apx").int_val >= 2;
@@ -70,7 +71,12 @@ int main(int argc, char** argv)
         P.dump_cover = cli_bound.get("dump-cover").bool_val;
 
         ftaBound(N, ev_probs, ev_names, P);
-    }
+
+    }else if (cli.cmd == "enum"){
+        enumerateModels(N, ev_probs, ev_names);
+
+    }else
+        assert(false);
 
     return 0;
 }

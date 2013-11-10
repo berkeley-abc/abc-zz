@@ -4,16 +4,17 @@
 //| Author(s)   : Niklas Een
 //| Module      : Fta
 //| Description :
-//| 
+//|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
 #include "ZZ_Gig.hh"
-
+#include "ZZ/Generics/Map.hh"
+#include "ZZ/Generics/Sort.hh"
 
 namespace ZZ {
 using namespace std;
@@ -106,7 +107,7 @@ GLit pushNeg(Wire w, WMap<GLit>& pmap, WMap<GLit>& nmap)
 
     }else{
         if (!nmap[w]){
-            // Add OR gate:   <<== for now
+            // Add "OR" gate:  
             assert(w == gate_And);
             Wire wn = gig(w).add(gate_And);
             wn.set(0, ~pushNeg(~w[0], pmap, nmap));
@@ -140,6 +141,81 @@ void pushNegations(Gig& N)
 
     For_Gatetype(N, gate_PO, w)
         w.set(0, pushNeg(w[0], pmap, nmap));
+
+    N.compact();
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Constraints:
+
+
+class BddCutOff {
+    // Problem definition:
+    Gig&        N;
+    double      cutoff_lo;
+    double      cutoff_hi;
+    Vec<GLit>   vars;       // -- basic events as PIs in 'N'; should be sorted from smallest prob. to largest.
+    Vec<double> costs;
+
+    // Memoization:    
+    Map<Pair<uint,double>, GLit> memo;
+        // -- NOTE! The 'memo' is only doing work if some probabilities are repeated. This can be 
+        // improved by preprocessing the probabilities.
+
+    Wire build(uint idx, double sum, double material_left);
+
+public:
+    BddCutOff(Gig& N_, double cutoff_lo_, double cutoff_hi_, const Vec<GLit>& vars_, const Vec<double>& costs_);
+
+    Wire top;   // -- after constructor is done, points to the top-node of the constraint (not protected by a PO)
+};
+
+
+BddCutOff::BddCutOff(Gig& N_, double cutoff_lo_, double cutoff_hi_, const Vec<GLit>& vars_, const Vec<double>& costs_) :
+    N(N_), cutoff_lo(cutoff_lo_), cutoff_hi(cutoff_hi_), vars(copy_, vars_), costs(copy_, costs_)
+{
+    assert(vars.size() == costs.size());
+
+    sobSort(ordByFirst(sob(costs), sob(vars)));
+
+    double material_left = 0;
+    for (uint i = 0; i < costs.size(); i++)
+        material_left += costs[i];
+
+    top = build(vars.size(), 0, material_left);
+}
+
+
+Wire BddCutOff::build(uint idx, double sum, double material_left)
+{
+    double lo_lim = (cutoff_lo == DBL_MAX) ? DBL_MAX : cutoff_lo - sum;
+    double hi_lim = (cutoff_hi == DBL_MAX) ? DBL_MAX : cutoff_hi - sum;
+
+    if (lo_lim <= 0 && hi_lim >= material_left)
+        return N.True();
+    else if (lo_lim > material_left || hi_lim < 0)
+        return ~N.True();
+
+    Pair<uint, double> key = tuple(idx, lo_lim);
+    GLit* ret;
+
+    if (!memo.get(key, ret)){
+        assert(idx > 0);
+        idx--;
+        Wire w1 = build(idx, sum + costs[idx], material_left - costs[idx]);
+        Wire w0 = build(idx, sum             , material_left - costs[idx]);
+        *ret = xig_Mux(vars[idx] + N, w1, w0);
+    }
+
+    return *ret + N;
+}
+
+
+Wire addCutoff(Gig& N, double cutoff_lo, double cutoff_hi, const Vec<GLit>& vars, const Vec<double>& costs)
+{
+    BddCutOff dummy(N, cutoff_lo, cutoff_hi, vars, costs);
+    return dummy.top;
 }
 
 

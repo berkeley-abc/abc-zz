@@ -89,8 +89,6 @@ void clausify(const Gig& F, const Vec<GLit>& roots, MetaSat& S, WMapX<Lit>& f2s,
             }
             break;
 
-        // + XIG gates
-
         case gate_And:{
             bool ready = true;
             For_Inputs(w, v){
@@ -110,6 +108,56 @@ void clausify(const Gig& F, const Vec<GLit>& roots, MetaSat& S, WMapX<Lit>& f2s,
                 f2s(w) = t;
             }
             break;}
+
+        case gate_Xor:{
+            bool ready = true;
+            For_Inputs(w, v){
+                if (!f2s[+v]){
+                    Q.push(+v);
+                    ready = false;
+                }
+            }
+            if (ready){
+                Q.pop();
+                Lit p = f2s[w[0]];
+                Lit q = f2s[w[1]];
+                Lit t = S.addLit();
+                S.addClause(~p, ~q, ~t);
+                S.addClause(~p,  q,  t);
+                S.addClause( p, ~q,  t);
+                S.addClause( p,  q, ~t);
+                f2s(w) = t;
+            }
+            break;}
+
+        case gate_Mux:{  // x ? y : z        (x = pin0, y = pin1, z = pin2)
+            bool ready = true;
+            For_Inputs(w, v){
+                if (!f2s[+v]){
+                    Q.push(+v);
+                    ready = false;
+                }
+            }
+            if (ready){
+                Q.pop();
+                Lit x = f2s[w[0]];
+                Lit y = f2s[w[1]];
+                Lit z = f2s[w[2]];
+                Lit t = S.addLit();
+                S.addClause(~x,  y, ~t);
+                S.addClause(~x, ~y,  t);
+                S.addClause( x, ~z,  t);
+                S.addClause( x,  z, ~t);
+                f2s(w) = t;
+            }
+            break;}
+
+/*
+        case gate_Maj:   // x + y + z >= 2
+        case gate_One:   // x + y + z = 1
+        case gate_Gamb:  // x + y + z = 0 or 3
+        case gate_Dot:   // (x ^ y) | (x & z)
+*/
 
         case gate_Npn4:
         case gate_Lut4:{

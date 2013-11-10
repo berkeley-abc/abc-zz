@@ -123,9 +123,9 @@ class FtaBound {
     WMap<PrRange>   apx;        // -- approximate probability: '(lower-bound, higher-bound)'
     Vec<uchar>      in_bbox;    // -- temporary used in 'splitRegion()'
 
-    WMap<lbool>     xsim;       // -- Values of nodes during ternary simulation 
+    WMap<lbool>     xsim;       // -- Values of nodes during ternary simulation
     WMap<uint>      fcount;     // -- Fanout count under bounding-box assumptions
-    WZet            tree_nodes; // -- A tree-node is a node with at most one fanout and only tree-nodes for children 
+    WZet            tree_nodes; // -- A tree-node is a node with at most one fanout and only tree-nodes for children
     WMap<uint64>    sup;        // -- Approximation of support
 
   //________________________________________
@@ -310,7 +310,7 @@ double FtaBound::estimateTop(const Cube& bbox)
 #endif  /*END DEBUG*/
 
 
-        // Compute output probability: 
+        // Compute output probability:
         if (P.use_tree_nodes && (tree_nodes.has(w[0]) || tree_nodes.has(w[1]) || (P.use_support && (sup[w[0]] & sup[w[1]]) == 0))){
             apx(w).lo = in[0].lo * in[1].lo;
             apx(w).hi = in[0].hi * in[1].hi;
@@ -489,8 +489,8 @@ void FtaBound::approxTopEvent()
 // open:  1,203,086   closed:  1,489   upper: 3.59688e-08   lower: 3.18799e-08   [3:45 mn]  -- with splitRegion() speedup
 // open:    685,501   closed:    722   upper: 3.56177e-08   lower: 2.96488e-08   [3:28 mn]  -- with tree nodes
 
-// 831.FTP:  lim 1e-12  =>  9.729e-2 (= 0.09729)  (Xfta says: 0.03082)
-
+// 831.FTP     :  lim 1e-12  =>  0.03082      }
+// baobab1.tree:  lim 1e-20  =>  1.68146e-06  }- Xfta results
 
 void FtaBound::run()
 {
