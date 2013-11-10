@@ -11,11 +11,15 @@ using namespace std;
 
 
 struct Params_FtaBound {
+    bool use_prob_approx;
     bool use_tree_nodes;
+    bool use_support;       // -- if TRUE then 'use_tree_nodes' must also be set (otherwise nothing happens)
     bool dump_cover;
 
     Params_FtaBound() :
+        use_prob_approx(false),
         use_tree_nodes(false),
+        use_support(false),
         dump_cover(false)
     {}
 };

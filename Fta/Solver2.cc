@@ -123,9 +123,10 @@ class FtaBound {
     WMap<PrRange>   apx;        // -- approximate probability: '(lower-bound, higher-bound)'
     Vec<uchar>      in_bbox;    // -- temporary used in 'splitRegion()'
 
-    WMap<lbool>     xsim;
-    WMap<uint>      fcount;
-    WZet            tree_nodes; // -- a tree-node is a node with at most one fanout and only tree-nodes for children 
+    WMap<lbool>     xsim;       // -- Values of nodes during ternary simulation 
+    WMap<uint>      fcount;     // -- Fanout count under bounding-box assumptions
+    WZet            tree_nodes; // -- A tree-node is a node with at most one fanout and only tree-nodes for children 
+    WMap<uint64>    sup;        // -- Approximation of support
 
   //________________________________________
   //  Internal methods:
@@ -244,6 +245,13 @@ void FtaBound::findTreeNodes(const Cube& bbox)
             tree_nodes.add(w);
           NoTree:;
         }
+
+        if (P.use_support){
+            if (w == gate_PI)
+                sup(w) = (xsim[w] == l_Undef) ? (1ull << (w.num() & 63)) : 0;
+            else if (w == gate_And)
+                sup(w) = sup[w[0]] | sup[w[1]];
+        }
     }
 }
 
@@ -268,7 +276,7 @@ double FtaBound::estimateTop(const Cube& bbox)
     if (P.use_tree_nodes)
         findTreeNodes(bbox);
 
-    // Propagate probabilities upwards:    
+    // Propagate probabilities upwards:
     For_Gates(N_aig, w){
         if (w != gate_And) continue;
 
@@ -285,9 +293,25 @@ double FtaBound::estimateTop(const Cube& bbox)
             }
         }
 
-        // Compute output probability:
-        if (P.use_tree_nodes && (tree_nodes.has(w[0]) || tree_nodes.has(w[1]))){
-            // <<== add support computation and use better approximation for combining inputs with disjoint support
+#if 0   /*DEBUG*/
+        if (P.use_tree_nodes){
+            bool is_t = (tree_nodes.has(w[0]) || tree_nodes.has(w[1]));
+            bool is_s = ((sup[w[0]] & sup[w[1]]) == 0);
+            Write "[%_%_]", is_t ? 'T' : '.', is_s ? 'S' : '.';
+          #if 0
+            if (is_t && !is_s){
+                WriteLn "#vars: %_", n_vars;
+                WriteLn "w[0]: %:.64b", sup[w[0]];
+                WriteLn "w[1]: %:.64b", sup[w[1]];
+                exit(1);
+            }
+          #endif
+        }
+#endif  /*END DEBUG*/
+
+
+        // Compute output probability: 
+        if (P.use_tree_nodes && (tree_nodes.has(w[0]) || tree_nodes.has(w[1]) || (P.use_support && (sup[w[0]] & sup[w[1]]) == 0))){
             apx(w).lo = in[0].lo * in[1].lo;
             apx(w).hi = in[0].hi * in[1].hi;
         }else{
@@ -331,12 +355,8 @@ void FtaBound::newRegion(Cube prime, Cube bbox)
     for (uint i = 0; i < bbox.size(); i++){
         assert(!bbox[i].sign);
         volume *= var_prob[bbox[i].id]; }
-#if 0
-    double prob = volume;
-#else
-    double prob = estimateTop(bbox);
-    assert(volume >= prob);     // -- sanity; maybe need to put in an epsilon?
-#endif
+
+    double prob = !P.use_prob_approx ? volume : estimateTop(bbox);
 
     if (subsumes(prime, bbox)){
         assert(prime == bbox);
@@ -356,8 +376,8 @@ void FtaBound::newRegion(Cube prime, Cube bbox)
             }
         }
         if (assumps.size() > bbox.size()){
-            WriteLn "Tighten BBox: %_ -> %_", fmt(bbox), fmt(assumps);
-            bbox =  Cube(assumps);
+            //WriteLn "Tighten BBox: %_ -> %_", fmt(bbox), fmt(assumps);
+            bbox = Cube(assumps);
         }
       #endif
 
