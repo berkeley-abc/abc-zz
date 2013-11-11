@@ -22,7 +22,7 @@ using namespace std;
 
 void convertToAig(Gig& N);
 void pushNegations(Gig& N);
-Wire addCutoff(Gig& N, double cutoff_lo, double cutoff_hi, const Vec<GLit>& vars, const Vec<double>& probs);
+Wire addCutoff(Gig& N, double cutoff_lo, double cutoff_hi, const Vec<GLit>& vars, const Vec<double>& probs, double quanta);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

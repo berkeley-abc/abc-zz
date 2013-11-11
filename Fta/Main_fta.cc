@@ -27,7 +27,12 @@ int main(int argc, char** argv)
     cli_bound.add("apx"       , "int[0:3]", "3", "Probability approximation level for SAT regions. 0=no approx, 1=std over approx, 2=use tree nodes, 3=also use support.");
     cli.addCommand("bound", "Compute an upper bound on the probability of the top-node.", &cli_bound);
 
-    cli.addCommand("enum", "Enumerate cubes and sum up their probability [experimental].");
+    CLI cli_enum;
+    cli_enum.add("cutoff", "float", "1e-12", "Enumerate MCSs downto this probability.");
+    cli_enum.add("quant" , "float", "1",     "Quanta to approximate cutoff. Should be a negative power of 2.");
+    cli_enum.add("hprob" , "float", "0.75",  "Threshold for \"high probability\" literals to be excluded from MCSs.");
+    cli.addCommand("enum", "Enumerate cubes and sum up their probability [experimental].", &cli_enum);
+
     cli.addCommand("save-xml", "Save fault-tree in OpenPSA XML format.");
     cli.addCommand("save-dot", "Save fault-tree in 'dotty' format (no probabilities).");
 
@@ -73,7 +78,11 @@ int main(int argc, char** argv)
         ftaBound(N, ev_probs, ev_names, P);
 
     }else if (cli.cmd == "enum"){
-        enumerateModels(N, ev_probs, ev_names);
+        Params_FtaEnum P;
+        P.mcs_cutoff      = cli_enum.get("cutoff").float_val;
+        P.cutoff_quant    = cli_enum.get("quant").float_val;
+        P.high_prob_thres = cli_enum.get("hprob").float_val;
+        enumerateModels(N, ev_probs, ev_names, P);
 
     }else
         assert(false);

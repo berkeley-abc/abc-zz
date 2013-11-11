@@ -71,7 +71,7 @@ lbool sim(Wire w, const Vec<GLit>& prime, const Gig& N_prime)
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-void shrink(Vec<Lit>& zcube, MiniSat2& Z, const IntMap<uint, double>& zprob)
+void shrink(Vec<Lit>& zcube, MiniSat2& Z, const IntMap<uint, double>& zprob, const Params_FtaEnum& P)
 {
 #if 1
     lbool result = Z.solve(zcube);
@@ -100,11 +100,9 @@ void shrink(Vec<Lit>& zcube, MiniSat2& Z, const IntMap<uint, double>& zprob)
   #endif
 #endif
 
-#if 1
     for (uint i = 0; i < zcube.size(); i++)
-        if (zcube[i] == Z.True() || zprob[zcube[i].id] > 0.75)  // <<== make this threshold a parameter
+        if (zcube[i] == Z.True() || zprob[zcube[i].id] > P.high_prob_thres)
             zcube[i] = Lit_NULL;
-#endif
 
     filterOut(zcube, isNull<Lit>);
 }
@@ -112,7 +110,7 @@ void shrink(Vec<Lit>& zcube, MiniSat2& Z, const IntMap<uint, double>& zprob)
 
 // Takes a fault-tree 'N' (which will be massaged into a more optimized form) and computes
 // all satisfying assignments.
-void enumerateModels(Gig& N, const Vec<double>& ev_probs0, const Vec<String>& ev_names)
+void enumerateModels(Gig& N, const Vec<double>& ev_probs0, const Vec<String>& ev_names, const Params_FtaEnum& P)
 {
     assert(N.enumSize(gate_PO) == 1);
 
@@ -130,18 +128,21 @@ void enumerateModels(Gig& N, const Vec<double>& ev_probs0, const Vec<String>& ev
 
     // Add cutoff:
     {
-        double cutoff = 1e-12;      // <<== make this a parameter
+        double cutoff = P.mcs_cutoff;
         N.strash();
+        uint sz = N.count();
         Vec<GLit> vars;
         Vec<double> costs;
         for (uint i = 0; i < 2*n_vars; i++){
-            if (ev_probs[i] > 0.75) continue;    // <<== this too
+            if (ev_probs[i] > P.high_prob_thres) continue;
             vars.push(N(gate_PI, i));
             costs.push(-log(ev_probs[i]));
         }
 
-        N.add(gate_PO).init(addCutoff(N, 0, -log(cutoff), vars, costs));
+        N.add(gate_PO).init(addCutoff(N, 0, -log(cutoff), vars, costs, P.cutoff_quant));
         N.unstrash();
+
+        WriteLn "Cutoff logic: %_ gates", N.count() - sz;
     }
 
     // Generate Cnf:
@@ -192,10 +193,21 @@ void enumerateModels(Gig& N, const Vec<double>& ev_probs0, const Vec<String>& ev
     // Enumerate primes:
     double total_prob = 0;
     uint n_cubes = 0;
+
+    uint  iter = 0;
+    double lim = 10;
     for(;;){
-        printf("\r#MCS: %u   (prob est.: %-12g)  [%.2f s]       ", n_cubes, total_prob, cpuTime()); fflush(stdout);
 
         lbool result = S.solve();
+
+        if (iter > lim || result == l_False){
+            iter = 0;
+            lim *= 1.3;
+
+            char pr[128];
+            sprintf(pr, "%g", total_prob);
+            WriteLn "#MCS: %_    Prob: %<12%_   [%t]", n_cubes, pr, cpuTime();
+        }
 
         if (result == l_True){
             // Extract cube:
@@ -209,7 +221,7 @@ void enumerateModels(Gig& N, const Vec<double>& ev_probs0, const Vec<String>& ev
             }
 
             // Shrink it to a prime:
-            shrink(zcube, Z, zprob);
+            shrink(zcube, Z, zprob, P);
 
             Vec<GLit> prime;
             for (uint i = 0; i < zcube.size(); i++)
@@ -239,6 +251,7 @@ void enumerateModels(Gig& N, const Vec<double>& ev_probs0, const Vec<String>& ev
             S.addClause(tmp);
 
             n_cubes++;
+            iter++;
 
         }else
             break;

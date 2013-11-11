@@ -107,7 +107,7 @@ GLit pushNeg(Wire w, WMap<GLit>& pmap, WMap<GLit>& nmap)
 
     }else{
         if (!nmap[w]){
-            // Add "OR" gate:  
+            // Add "OR" gate:
             assert(w == gate_And);
             Wire wn = gig(w).add(gate_And);
             wn.set(0, ~pushNeg(~w[0], pmap, nmap));
@@ -119,7 +119,7 @@ GLit pushNeg(Wire w, WMap<GLit>& pmap, WMap<GLit>& nmap)
 }
 
 
-// Assumes 'N' is an AIG; will push negations to the leaves, introducing ORs (coded as ANDs + 
+// Assumes 'N' is an AIG; will push negations to the leaves, introducing ORs (coded as ANDs +
 // inverters). Leaves will also be negation free; instead a new variable will be introduced
 // for negative PIs (doubling the number of PIs).
 void pushNegations(Gig& N)
@@ -157,6 +157,7 @@ class BddCutOff {
     double      cutoff_hi;
     Vec<GLit>   vars;       // -- basic events as PIs in 'N'; should be sorted from smallest prob. to largest.
     Vec<double> costs;
+    double      quanta;
 
     // Memoization:    
     Map<Pair<uint,double>, GLit> memo;
@@ -166,26 +167,29 @@ class BddCutOff {
     Wire build(uint idx, double sum, double material_left);
 
 public:
-    BddCutOff(Gig& N_, double cutoff_lo_, double cutoff_hi_, const Vec<GLit>& vars_, const Vec<double>& costs_);
+    BddCutOff(Gig& N_, double cutoff_lo_, double cutoff_hi_, const Vec<GLit>& vars_, const Vec<double>& costs_, double quanta_);
 
     Wire top;   // -- after constructor is done, points to the top-node of the constraint (not protected by a PO)
 };
 
 
-BddCutOff::BddCutOff(Gig& N_, double cutoff_lo_, double cutoff_hi_, const Vec<GLit>& vars_, const Vec<double>& costs_) :
-    N(N_), cutoff_lo(cutoff_lo_), cutoff_hi(cutoff_hi_), vars(copy_, vars_), costs(copy_, costs_)
+BddCutOff::BddCutOff(Gig& N_, double cutoff_lo_, double cutoff_hi_, const Vec<GLit>& vars_, const Vec<double>& costs_, double quanta_) :
+    N(N_), cutoff_lo(cutoff_lo_), cutoff_hi(cutoff_hi_), vars(copy_, vars_), costs(copy_, costs_), quanta(quanta_)
 {
     assert(vars.size() == costs.size());
 
-#if 1   /*DEBUG*/
-    for (uint i = 0; i < costs.size(); i++)
-        costs[i] = ceil(costs[i] * 8) / 8;
-#endif  /*END DEBUG*/
+    if (quanta != 0){
+        for (uint i = 0; i < costs.size(); i++)
+            costs[i] = floor(costs[i] * quanta) / quanta;
+
+        assert(cutoff_lo == 0);
+        cutoff_hi = ceil(cutoff_hi * quanta) / quanta;
+    }
 
     sobSort(ordByFirst(sob(costs), sob(vars)));
 
-    /**/Dump(costs);
-    /**/Dump(cutoff_lo, cutoff_hi);
+    //**/Dump(costs);
+    //**/Dump(cutoff_lo, cutoff_hi);
     double material_left = 0;
     for (uint i = 0; i < costs.size(); i++)
         material_left += costs[i];
@@ -230,9 +234,9 @@ Wire BddCutOff::build(uint idx, double sum, double material_left)
 }
 
 
-Wire addCutoff(Gig& N, double cutoff_lo, double cutoff_hi, const Vec<GLit>& vars, const Vec<double>& costs)
+Wire addCutoff(Gig& N, double cutoff_lo, double cutoff_hi, const Vec<GLit>& vars, const Vec<double>& costs, double quanta)
 {
-    BddCutOff dummy(N, cutoff_lo, cutoff_hi, vars, costs);
+    BddCutOff dummy(N, cutoff_lo, cutoff_hi, vars, costs, quanta);
     return dummy.top;
 }
 
