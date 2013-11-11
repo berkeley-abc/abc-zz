@@ -177,8 +177,15 @@ BddCutOff::BddCutOff(Gig& N_, double cutoff_lo_, double cutoff_hi_, const Vec<GL
 {
     assert(vars.size() == costs.size());
 
+#if 1   /*DEBUG*/
+    for (uint i = 0; i < costs.size(); i++)
+        costs[i] = ceil(costs[i] * 8) / 8;
+#endif  /*END DEBUG*/
+
     sobSort(ordByFirst(sob(costs), sob(vars)));
 
+    /**/Dump(costs);
+    /**/Dump(cutoff_lo, cutoff_hi);
     double material_left = 0;
     for (uint i = 0; i < costs.size(); i++)
         material_left += costs[i];
@@ -192,14 +199,24 @@ Wire BddCutOff::build(uint idx, double sum, double material_left)
     double lo_lim = (cutoff_lo == DBL_MAX) ? DBL_MAX : cutoff_lo - sum;
     double hi_lim = (cutoff_hi == DBL_MAX) ? DBL_MAX : cutoff_hi - sum;
 
+#if 0
     if (lo_lim <= 0 && hi_lim >= material_left)
         return N.True();
     else if (lo_lim > material_left || hi_lim < 0)
         return ~N.True();
+#else
+    const double eps = 1e-8;
+    if (lo_lim <= eps && hi_lim >= material_left - eps)
+        return N.True();
+    else if (lo_lim > material_left - eps || hi_lim < eps)
+        return ~N.True();
+#endif
+    // <<== need to handle numeric imprecision here!
 
     Pair<uint, double> key = tuple(idx, lo_lim);
     GLit* ret;
 
+    //**/Dump(idx, sum, material_left, lo_lim, hi_lim, cutoff_lo, cutoff_hi);
     if (!memo.get(key, ret)){
         assert(idx > 0);
         idx--;
@@ -207,6 +224,7 @@ Wire BddCutOff::build(uint idx, double sum, double material_left)
         Wire w0 = build(idx, sum             , material_left - costs[idx]);
         *ret = xig_Mux(vars[idx] + N, w1, w0);
     }
+    //**/else putchar('.'), fflush(stdout);
 
     return *ret + N;
 }

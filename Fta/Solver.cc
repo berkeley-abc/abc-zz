@@ -73,11 +73,13 @@ lbool sim(Wire w, const Vec<GLit>& prime, const Gig& N_prime)
 
 void shrink(Vec<Lit>& zcube, MiniSat2& Z, const IntMap<uint, double>& zprob)
 {
+#if 1
     lbool result = Z.solve(zcube);
     assert(result == l_False);
 
-    //Z.getConflict(zcube);
+    Z.getConflict(zcube);
 
+  #if 0
     // Temporary selection sort:
     for (uint i = 0; i < zcube.size()-1; i++){
         double best_prob = zprob[zcube[i].id];
@@ -95,10 +97,14 @@ void shrink(Vec<Lit>& zcube, MiniSat2& Z, const IntMap<uint, double>& zprob)
         if (Z.solve(zcube) == l_True)
             zcube[i] = p;
     }
+  #endif
+#endif
 
+#if 1
     for (uint i = 0; i < zcube.size(); i++)
-        if (zcube[i] == Z.True() || zprob[zcube[i].id] > 0.99)  // <<== make this threshold a parameter
+        if (zcube[i] == Z.True() || zprob[zcube[i].id] > 0.75)  // <<== make this threshold a parameter
             zcube[i] = Lit_NULL;
+#endif
 
     filterOut(zcube, isNull<Lit>);
 }
@@ -122,16 +128,35 @@ void enumerateModels(Gig& N, const Vec<double>& ev_probs0, const Vec<String>& ev
     for (uint i = 0; i < ev_probs0.size(); i++) ev_probs.push(ev_probs0[i]);
     for (uint i = 0; i < ev_probs0.size(); i++) ev_probs.push(1 - ev_probs0[i]);
 
+    // Add cutoff:
+    {
+        double cutoff = 1e-12;      // <<== make this a parameter
+        N.strash();
+        Vec<GLit> vars;
+        Vec<double> costs;
+        for (uint i = 0; i < 2*n_vars; i++){
+            if (ev_probs[i] > 0.75) continue;    // <<== this too
+            vars.push(N(gate_PI, i));
+            costs.push(-log(ev_probs[i]));
+        }
+
+        N.add(gate_PO).init(addCutoff(N, 0, -log(cutoff), vars, costs));
+        N.unstrash();
+    }
+
     // Generate Cnf:
     Params_CnfMap P_cnf;
     P_cnf.quiet = true;
     P_cnf.map_to_luts = false;
     cnfMap(N, P_cnf);
 
+    Wire w_top = N.enumGate(gate_PO, 0);
+    Wire w_cut = N.enumGate(gate_PO, 1);
     MiniSat2 S, Z;
     WMapX<Lit> n2s, n2z;
-    S.addClause( clausify(N.enumGate(gate_PO, 0), S, n2s));
-    Z.addClause(~clausify(N.enumGate(gate_PO, 0), Z, n2z));
+    S.addClause( clausify(w_top, S, n2s));
+    S.addClause( clausify(w_cut, S, n2s));
+    Z.addClause(~clausify(w_top, Z, n2z));
 
     // Add dummy variable for irrelevant polarities:
     for (uint i = 0; i < 2*n_vars; i++){
@@ -139,6 +164,17 @@ void enumerateModels(Gig& N, const Vec<double>& ev_probs0, const Vec<String>& ev
         if (!n2s[w]) n2s(w) = S.addLit();
         if (!n2z[w]) n2z(w) = Z.addLit();
     }
+
+    // A variable can't be both true and false:
+    Vec<GLit> vars(2 * n_vars);
+    For_Gatetype(N, gate_PI, w){
+        uint n = w.num();
+        Lit  p = n2s[w]; assert(!p.sign);       // -- we don't want basic events to have a negated encoding (why should they?)
+        vars[n] = p;
+    }
+
+    for (uint i = 0; i < n_vars; i++)
+        S.addClause(~vars[i], ~vars[i + n_vars]);
 
     // Back maps:
     IntMap<uint, GLit> z2n;   // -- literal ID of variable in 'Z' -> PI in 'N'
@@ -155,17 +191,20 @@ void enumerateModels(Gig& N, const Vec<double>& ev_probs0, const Vec<String>& ev
 
     // Enumerate primes:
     double total_prob = 0;
+    uint n_cubes = 0;
     for(;;){
-        printf("\r#clauses: %u   (prob est.: %g)", (uint)S.nClauses(), total_prob); fflush(stdout);
+        printf("\r#MCS: %u   (prob est.: %-12g)  [%.2f s]       ", n_cubes, total_prob, cpuTime()); fflush(stdout);
 
         lbool result = S.solve();
 
         if (result == l_True){
             // Extract cube:
             Vec<GLit> zcube;
+            //**/Vec<GLit> scube;
             For_Gatetype(N, gate_PI, w){
-                lbool v = S.value(n2z[w]);
+                lbool v = S.value(n2s[w]);
                 if (v == l_True)
+                    //**/scube.push(n2s[w]),
                     zcube.push(n2z[w]);
             }
 
@@ -182,14 +221,24 @@ void enumerateModels(Gig& N, const Vec<double>& ev_probs0, const Vec<String>& ev
                 Wire w = prime[i] + N;
                 prob *= ev_probs[w.num()];
             }
-            //**/Dump(zcube.size(), prob);
-            total_prob += prob;     // -- this is not numericaly sound, nor is it a proper lower bound since primes may overlap
+            //**/Dump(scube, prob);
+            total_prob += prob;     // -- this is not numerically sound, nor is it a proper lower bound since primes may overlap
 
             // Add clause:
             Vec<Lit> tmp;
+#if 0
             for (uint i = 0; i < prime.size(); i++)
                 tmp.push(~n2s[prime[i]]);
+#else
+            for (uint i = 0; i < prime.size(); i++){
+                Wire w = prime[i] + N;
+                uint num = (w.num() < n_vars) ? w.num() + n_vars : w.num() - n_vars;
+                tmp.push(n2s[N(gate_PI, num)]);
+            }
+#endif
             S.addClause(tmp);
+
+            n_cubes++;
 
         }else
             break;
