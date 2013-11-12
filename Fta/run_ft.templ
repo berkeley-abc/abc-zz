@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!DOCTYPE xfta>
+<xfta>
+  <load>
+    <model input="ft.xml" />
+  </load>
+  <build>
+    <minimal-cutsets top-event="__TOP__" handle="MCS" minimum-probability="%%CUTOFF%%" />
+  </build>
+  <set>
+    <option name="print-minimal-cutset-rank" value="on" />
+    <option name="print-minimal-cutset-order" value="on" />
+    <option name="print-minimal-cutset-probability" value="on" />
+    <option name="print-minimal-cutset-contribution" value="on" />
+  </set>
+  <print>
+    <minimal-cutsets top-event="__TOP__" handle="MCS" output="mcs.txt" />
+  </print>
+  <compute>
+    <probability top-event="__TOP__" handle="MCS" output="pr.txt" />
+    <importance-factors top-event="__TOP__" handle="MCS" output="if.txt" />
+  </compute>
+</xfta>
