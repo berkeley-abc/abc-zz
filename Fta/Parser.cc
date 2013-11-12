@@ -84,14 +84,23 @@ void readFaultTree(String tree_file, /*outputs:*/Gig& N, Vec<double>& ev_probs, 
             if (fs.size() != 2) Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", tree_file, s;
 
             Str name = strip(fs[0]);
+            Str gate;
+            Str args;
 
-            splitArray(fs[1], "(", fs);
-            if (fs.size() != 2) Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", tree_file, s;
-            Str gate = strip(fs[0]);
+            if (!has(fs[1], '(')){
+                // Assume 'a = b' statement (treat it as a single-input AND):
+                gate = slize("AND");
+                args = strip(fs[1]);
 
-            Str args = strip(fs[1]);
-            if (args.size() == 0 || args.last() != ')') Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", tree_file, s;
-            args.pop();
+            }else{
+                splitArray(fs[1], "(", fs);
+                if (fs.size() != 2) Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", tree_file, s;
+                gate = strip(fs[0]);
+
+                args = strip(fs[1]);
+                if (args.size() == 0 || args.last() != ')') Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", tree_file, s;
+                args.pop();
+            }
 
             splitArray(args, ",", fs);
 
@@ -133,9 +142,14 @@ void readFaultTree(String tree_file, /*outputs:*/Gig& N, Vec<double>& ev_probs, 
                 w.set_unchecked(i, Wire_NULL);
 
                 Str name = slize(&ftext[offset]);
+                bool s = false;
+                if (name[0] == '~'){
+                    name = name.slice(1);
+                    s = true; }
+
                 GLit w_in;
                 if (name2gate.peek(name, w_in))
-                    w.set(i, w_in);
+                    w.set(i, w_in ^ s);
                 else
                     Throw (Excp_ParseError) "Missing gate '%_' used as fanin in: %_", name, tree_file;
             }

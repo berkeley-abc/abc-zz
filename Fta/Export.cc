@@ -21,8 +21,17 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-void writeXml(String filename, const Gig& N, const Vec<double>& ev_probs, const Vec<String>& ev_names)
+void writeXml(String filename, const Gig& N0, const Vec<double>& ev_probs, const Vec<String>& ev_names)
 {
+    Gig N;
+    N0.copyTo(N);
+    For_Gates(N, w){
+        For_Inputs(w, v){
+            if (v.sign)
+                w.set(Input_Pin(v), N.add(gate_Not).init(+v));
+        }
+    }
+
     // Write header:
     OutFile out(filename);
     FWriteLn(out) "<?xml version=\"1.0\"?> <!DOCTYPE open-psa> <open-psa>";

@@ -21,6 +21,83 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Sorting network:
+
+
+macro void cmp2(Gig& N, Vec<GLit>& fs, uint pos)
+{
+    Wire a = fs[pos] + N;
+    Wire b = fs[pos + 1] + N;
+    fs[pos]     = mkOr (a, b);
+    fs[pos + 1] = mkAnd(a, b);
+}
+
+
+static
+void riffle(Vec<GLit>& fs)
+{
+    Vec<GLit> tmp(copy_, fs);
+    for (uint i = 0; i < fs.size() / 2; i++){
+        fs[i*2]     = tmp[i];
+        fs[i*2 + 1] = tmp[i+fs.size() / 2];
+    }
+}
+
+
+static
+void unriffle(Vec<GLit>& fs)
+{
+    Vec<GLit> tmp(copy_, fs);
+    for (uint i = 0; i < fs.size() / 2; i++){
+        fs[i]                 = tmp[i*2];
+        fs[i + fs.size() / 2] = tmp[i*2 + 1];
+    }
+}
+
+
+static
+void oddEvenMerge(Gig& N, Vec<GLit>& fs, uint begin, uint end)
+{
+    assert(end - begin > 1);
+    if (end - begin == 2)
+        cmp2(N, fs, begin);
+
+    else{
+        uint      mid = (end - begin) / 2;
+        Vec<GLit> tmp;
+        for (uint i = 0; i < end - begin; i++)
+            tmp.push(fs[begin+i]);
+
+        unriffle(tmp);
+        oddEvenMerge(N, tmp, 0  , mid);
+        oddEvenMerge(N, tmp, mid, tmp.size());
+        riffle(tmp);
+
+        for (uint i = 1; i < tmp.size()-1; i += 2)
+            cmp2(N, tmp, i);
+        for (uint i = 0; i < tmp.size(); i++)
+            fs[i + begin] = tmp[i];
+    }
+}
+
+// 'fs' should contain the inputs to the sorting network and will be overwritten by the outputs.
+// NOTE: The number of comparisons is bounded by: n * log n * (log n + 1)
+void oddEvenSort(Gig& N, Vec<GLit>& fs)
+{
+    uint orig_sz = fs.size();
+    uint sz;
+    for (sz = 1; sz < fs.size(); sz *= 2);
+    fs.growTo(sz, ~GLit_True);
+
+    for (uint i = 1; i < fs.size(); i *= 2)
+        for (uint j = 0; j + 2*i <= fs.size(); j += 2*i)
+            oddEvenMerge(N, fs, j, j+2*i);
+
+    fs.shrinkTo(orig_sz);
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Prepare netlist for CNF mapping:
 
 
@@ -67,36 +144,14 @@ void convertToAig(Gig& N)
             break; }
 
         case gate_CardG:{
-            // Temporary:
-            assert(w.arg() == 2 || w.arg() == 3);
-            assert(w.size() == 3 || w.size() == 4);
-            if (w.size() == 3){
-                if (w.arg() == 2){
-                    Wire u0 = mkAnd(w[0], w[1]);
-                    Wire u1 = mkAnd(w[0], w[2]);
-                    Wire u2 = mkAnd(w[1], w[2]);
-                    xlat(w) = mkOr(mkOr(u0, u1), u2);
-                }else{
-                    Wire u0 = mkAnd(mkAnd(w[0], w[1]), w[2]);
-                    xlat(w) = u0;
-                }
-
-            }else{
-                if (w.arg() == 2){
-                    Wire u0 = mkAnd(w[0], w[1]);
-                    Wire u1 = mkAnd(w[0], w[2]);
-                    Wire u2 = mkAnd(w[0], w[3]);
-                    Wire u3 = mkAnd(w[1], w[2]);
-                    Wire u4 = mkAnd(w[1], w[3]);
-                    Wire u5 = mkAnd(w[2], w[3]);
-                    xlat(w) = mkOr(mkOr(mkOr(u0, u1), mkOr(u2, u3)), mkOr(u4, u5));
-                }else{
-                    Wire u0 = mkAnd(w[0], mkAnd(w[2], w[3]));
-                    Wire u1 = mkAnd(w[1], mkAnd(w[2], w[3]));
-                    Wire u2 = mkAnd(w[2], mkAnd(w[0], w[1]));
-                    Wire u3 = mkAnd(w[3], mkAnd(w[0], w[1]));
-                    xlat(w) = mkOr(mkOr(u0, u1), mkOr(u2, u3));
-                }
+            if (w.arg() > w.size())
+                xlat(w) = ~GLit_True;
+            else if (w.arg() == 0)
+                xlat(w) = GLit_True;
+            else{
+                Vec<GLit> fs(copy_, w.fanins());
+                oddEvenSort(N, fs);
+                xlat(w) = fs[w.arg() - 1];
             }
             break; }
 
@@ -169,7 +224,7 @@ void pushNegations(Gig& N)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Constraints:
+// Cut-off constraint:
 
 
 class BddCutOff {

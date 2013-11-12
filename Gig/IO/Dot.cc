@@ -75,7 +75,7 @@ void writeBox(Out& out, Gig& N, Wire w, Vec<char>& namebuf, Vec<String>* uif_nam
     String name1 = N.names().get(+w, namebuf);  // -- first line; must not be empty
   #else
     String name1;
-    FWrite(name1) "%_", +w;
+    FWrite(name1) "%w", +w.lit();
   #endif
     String name2 = GateType_name[w.type()];     // -- second line; can be empty
     String color = "";
@@ -161,7 +161,7 @@ void writeDot(String filename, Gig& N, const WZet& region, Vec<String>* uif_name
     for (uind i = 0; i < region.list().size(); i++){
         Wire w = region.list()[i] + N;
         if (!region.has(w)) continue;   // -- may not be compacted
-        if (w == gate_Const && fanouts(w).size() == 0) continue;
+        if ((w == gate_Const || w == gate_Reset) && fanouts(w).size() == 0) continue;
 
         // Output node:
         FWrite(out) "w%_ [", id(w);
