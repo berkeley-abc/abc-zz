@@ -38,6 +38,8 @@ void writeXml(String filename, const Gig& N, const Vec<double>& ev_probs, const 
     type_name(gate_Conj) = slize("and");
     type_name(gate_Or) = slize("or");
     type_name(gate_Disj) = slize("or");
+    type_name(gate_Xor) = slize("xor");
+    type_name(gate_Odd) = slize("xor");
     type_name(gate_CardG) = slize("atleast");
 
     Wire w_top = N(gate_PO, 0)[0];
