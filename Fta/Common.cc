@@ -69,21 +69,34 @@ void convertToAig(Gig& N)
         case gate_CardG:{
             // Temporary:
             assert(w.arg() == 2 || w.arg() == 3);
-            assert(w.size() == 4);
-            if (w.arg() == 2){
-                Wire u0 = mkAnd(w[0], w[1]);
-                Wire u1 = mkAnd(w[0], w[2]);
-                Wire u2 = mkAnd(w[0], w[3]);
-                Wire u3 = mkAnd(w[1], w[2]);
-                Wire u4 = mkAnd(w[1], w[3]);
-                Wire u5 = mkAnd(w[2], w[3]);
-                xlat(w) = mkOr(mkOr(mkOr(u0, u1), mkOr(u2, u3)), mkOr(u4, u5));
+            assert(w.size() == 3 || w.size() == 4);
+            if (w.size() == 3){
+                if (w.arg() == 2){
+                    Wire u0 = mkAnd(w[0], w[1]);
+                    Wire u1 = mkAnd(w[0], w[2]);
+                    Wire u2 = mkAnd(w[1], w[2]);
+                    xlat(w) = mkOr(mkOr(u0, u1), u2);
+                }else{
+                    Wire u0 = mkAnd(mkAnd(w[0], w[1]), w[2]);
+                    xlat(w) = u0;
+                }
+
             }else{
-                Wire u0 = mkAnd(w[0], mkAnd(w[2], w[3]));
-                Wire u1 = mkAnd(w[1], mkAnd(w[2], w[3]));
-                Wire u2 = mkAnd(w[2], mkAnd(w[0], w[1]));
-                Wire u3 = mkAnd(w[3], mkAnd(w[0], w[1]));
-                xlat(w) = mkOr(mkOr(u0, u1), mkOr(u2, u3));
+                if (w.arg() == 2){
+                    Wire u0 = mkAnd(w[0], w[1]);
+                    Wire u1 = mkAnd(w[0], w[2]);
+                    Wire u2 = mkAnd(w[0], w[3]);
+                    Wire u3 = mkAnd(w[1], w[2]);
+                    Wire u4 = mkAnd(w[1], w[3]);
+                    Wire u5 = mkAnd(w[2], w[3]);
+                    xlat(w) = mkOr(mkOr(mkOr(u0, u1), mkOr(u2, u3)), mkOr(u4, u5));
+                }else{
+                    Wire u0 = mkAnd(w[0], mkAnd(w[2], w[3]));
+                    Wire u1 = mkAnd(w[1], mkAnd(w[2], w[3]));
+                    Wire u2 = mkAnd(w[2], mkAnd(w[0], w[1]));
+                    Wire u3 = mkAnd(w[3], mkAnd(w[0], w[1]));
+                    xlat(w) = mkOr(mkOr(u0, u1), mkOr(u2, u3));
+                }
             }
             break; }
 
@@ -104,11 +117,12 @@ GLit pushNeg(Wire w, WMap<GLit>& pmap, WMap<GLit>& nmap)
 {
     if (!w.sign){
         if (!pmap[w]){
-            // Reuse this AND gate:
+            // Add AND gate:
             assert(w == gate_And);
-            w.set(0, pushNeg(w[0], pmap, nmap));
-            w.set(1, pushNeg(w[1], pmap, nmap));
-            pmap(w) = w;
+            Wire wp = gig(w).add(gate_And);
+            wp.set(0, pushNeg(w[0], pmap, nmap));
+            wp.set(1, pushNeg(w[1], pmap, nmap));
+            pmap(w) = wp;
         }
         return pmap[w];
 
@@ -145,6 +159,7 @@ void pushNegations(Gig& N)
         pmap(w) = w;
         nmap(w) = w_neg;
     }
+
 
     For_Gatetype(N, gate_PO, w)
         w.set(0, pushNeg(w[0], pmap, nmap));
