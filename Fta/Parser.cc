@@ -104,12 +104,15 @@ void readFaultTree(String tree_file, /*outputs:*/Gig& N, Vec<double>& ev_probs, 
                 w = N.addDyn(gate_Conj, fs.size());
             else if (eq(gate, "OR"))
                 w = N.addDyn(gate_Disj, fs.size());
+            else if (eq(gate, "XOR"))
+                w = N.addDyn(gate_Odd, fs.size());
             else if (pfx(gate, "GE_")){
                 w = N.addDyn(gate_CardG, fs.size());
                 uint k = 0;
                 try{ k = stringToUInt64(gate.slice(3)); }catch (...){ Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", tree_file, s; }
                 w.arg_set(k);
-            }
+            }else
+                Throw (Excp_ParseError) "No such gate type '%_' in: %_", gate, tree_file;
 
             bool exists = name2gate.set(String(name), w);
             if (exists) Throw (Excp_ParseError) "Event '%_' listed twice in: %_ + %_", name, tree_file, tree_file;

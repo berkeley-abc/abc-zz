@@ -59,6 +59,13 @@ void convertToAig(Gig& N)
             xlat(w) = ~acc;
             break; }
 
+        case gate_Odd:{
+            Wire acc = N.True();
+            For_Inputs(w, v)
+                acc = mkXor(acc, ~v);
+            xlat(w) = ~acc;
+            break; }
+
         case gate_CardG:{
             // Temporary:
             assert(w.arg() == 2 || w.arg() == 3);
