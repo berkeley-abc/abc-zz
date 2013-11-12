@@ -80,6 +80,7 @@ void oddEvenMerge(Gig& N, Vec<GLit>& fs, uint begin, uint end)
     }
 }
 
+
 // 'fs' should contain the inputs to the sorting network and will be overwritten by the outputs.
 // NOTE: The number of comparisons is bounded by: n * log n * (log n + 1)
 void oddEvenSort(Gig& N, Vec<GLit>& fs)
@@ -236,9 +237,9 @@ class BddCutOff {
     Vec<double> costs;
     double      quanta;
 
-    // Memoization:    
+    // Memoization:
     Map<Pair<uint,double>, GLit> memo;
-        // -- NOTE! The 'memo' is only doing work if some probabilities are repeated. This can be 
+        // -- NOTE! The 'memo' is only doing work if some probabilities are repeated. This can be
         // improved by preprocessing the probabilities.
 
     Wire build(uint idx, double sum, double material_left);

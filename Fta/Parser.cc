@@ -48,24 +48,24 @@ void readFaultTree(String tree_file, /*outputs:*/Gig& N, Vec<double>& ev_probs, 
             Str s = strip(lines[i]);
             if (s.size() == 0) continue;
 
-            splitArray(s, " ", fs);
-            if (fs.size() != 3 || !eq(fs[1], "=")) Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", tree_file, s;
+            splitArray(s, "=", fs);
+            if (fs.size() != 2) Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", tree_file, s;
 
             double prob = 0;
-            try{ prob = stringToDouble(fs[2]); }catch (...){ Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", tree_file, s; }
+            try{ prob = stringToDouble(strip(fs[1])); }catch (...){ Throw (Excp_ParseError) "Invalid line in: %_\n  -->> %_", tree_file, s; }
 
             Wire w;
             if (prob > 0){
                 if (prob < 1){
                     w = N.add(gate_PI);
-                    ev_names(w.num()) = fs[0];
+                    ev_names(w.num()) = strip(fs[0]);
                     ev_probs(w.num()) = prob;
                 }else
                     w = N.True();
             }else
                 w = ~N.True();
 
-            bool exists = name2gate.set(String(fs[0]), w);
+            bool exists = name2gate.set(String(strip(fs[0])), w);
             if (exists) Throw (Excp_ParseError) "Event '%_' listed twice in: %_", fs[0], tree_file;
         }
     }
