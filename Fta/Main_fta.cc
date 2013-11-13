@@ -25,6 +25,7 @@ int main(int argc, char** argv)
     CLI cli_bound;
     cli_bound.add("dump-cover", "bool", "no", "Dump cover upon complete enumeration.");
     cli_bound.add("apx"       , "int[0:3]", "3", "Probability approximation level for SAT regions. 0=no approx, 1=std over approx, 2=use tree nodes, 3=also use support.");
+    cli_bound.add("exact"     , "float", "-1", "If not '-1', compute an exact value for the top-event using this timeout.");
     cli.addCommand("bound", "Compute an upper bound on the probability of the top-node.", &cli_bound);
 
     CLI cli_enum;
@@ -73,7 +74,11 @@ int main(int argc, char** argv)
         P.use_prob_approx = cli_bound.get("apx").int_val >= 1;
         P.use_tree_nodes  = cli_bound.get("apx").int_val >= 2;
         P.use_support     = cli_bound.get("apx").int_val >= 3;
-        P.dump_cover = cli_bound.get("dump-cover").bool_val;
+        P.dump_cover      = cli_bound.get("dump-cover").bool_val;
+        P.exact_sol       = cli_bound.get("exact").float_val;
+
+        if (P.exact_sol >= 0)
+            suppress_profile_output = true;
 
         ftaBound(N, ev_probs, ev_names, P);
 

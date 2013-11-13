@@ -444,6 +444,8 @@ void FtaBound::splitRegion(const Region& r)
 
 void FtaBound::approxTopEvent()
 {
+    bool quiet = P.exact_sol >= 0;
+
     // <<== if worth the CPU time, co-factor on high-fanout PIs?
 
     Vec<GLit> empty;    // <<== fix this later (add empty cube to 'Pack.hh')
@@ -452,6 +454,10 @@ void FtaBound::approxTopEvent()
     uint iter = 0;
     double lim = 10;
     while (open.size() > 0){
+        if (P.exact_sol >= 0 && cpuTime() > P.exact_sol){
+            WriteLn "-1";
+            return; }
+
         ZZ_PTimer_Begin(fta_Heap_pop);
         Region r = open.pop();
         ZZ_PTimer_End(fta_Heap_pop);
@@ -465,11 +471,15 @@ void FtaBound::approxTopEvent()
             char lo[128];
             sprintf(up, "%g", upperProb());
             sprintf(lo, "%g", lowerProb());
-            WriteLn "open: %,d   closed: %,d   upper: %_   lower: %_   [%t]", open.size(), closed.size(), up, lo, cpuTime();
+            if (!quiet) WriteLn "open: %,d   closed: %,d   upper: %_   lower: %_   [%t]", open.size(), closed.size(), up, lo, cpuTime();
         }
 
         iter++;
     }
+
+    if (P.exact_sol >= 0){
+        WriteLn "%_", lowerProb();
+        return; }
 
     if (P.dump_cover){
         WriteLn "Cover:";
@@ -494,23 +504,25 @@ void FtaBound::approxTopEvent()
 
 void FtaBound::run()
 {
+    bool quiet = P.exact_sol >= 0;
+
     // Prepare fault-tree:
-    WriteLn "FTA input : %_", info(N0);
+    if (!quiet) WriteLn "FTA input : %_", info(N0);
 
     N0.copyTo(N_aig);
     convertToAig(N_aig);
-    WriteLn "FTA AIG   : %_", info(N_aig);
+    if (!quiet) WriteLn "FTA AIG   : %_", info(N_aig);
 
     pushNegations(N_aig);
     N_aig.compact();
-    WriteLn "FTA unate : %_", info(N_aig);
+    if (!quiet) WriteLn "FTA unate : %_", info(N_aig);
 
     N_aig.copyTo(N);
     Params_CnfMap P_cnf;
     P_cnf.quiet = true;
     P_cnf.map_to_luts = false;
     cnfMap(N, P_cnf);
-    WriteLn "FTA mapped: %_", info(N);
+    if (!quiet) WriteLn "FTA mapped: %_", info(N);
 
     // Generate CNF:
     assert(N.enumSize(gate_PO) == 1);
