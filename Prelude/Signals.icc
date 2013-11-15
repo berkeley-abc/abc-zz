@@ -65,7 +65,7 @@ extern "C" void interruptHandler(int signum)
 
     if (!silent_interrupt){
         char buf[64];
-        sprintf(buf, "\n*** INTERRUPTED *** [signal %d]\n", signum);
+        sprintf(buf, "\n**** INTERRUPTED **** [signal %d]\n", signum);
         ssize_t ignore ___unused = write(2/*stderr*/, buf, strlen(buf));
     }
 
@@ -95,7 +95,7 @@ extern "C" void crashHandler(int signum)
 
     if (!silent_crash){
         char buf[64];
-        sprintf(buf, "\n*** CRASHED *** [signal %d]\n", signum);
+        sprintf(buf, "\n**** CRASHED **** [signal %d]\n", signum);
         ssize_t ignore ___unused = write(2/*stderr*/, buf, strlen(buf));
     }
 

@@ -721,7 +721,8 @@ void LutMap::updateFanoutEst(bool instantiate)
     }
 #endif
 
-    /**/exactLocalArea(fanouts);
+    /**/if (round > 0)
+    /**/    exactLocalArea(fanouts);
 
 #if 0   // recompute departure/fanouts (redundant???)
     fanouts.clear();
