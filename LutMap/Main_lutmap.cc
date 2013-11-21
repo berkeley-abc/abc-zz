@@ -293,6 +293,7 @@ void writePnlFile(String filename, Gig& N)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Main:
 
 
 int main(int argc, char** argv)
@@ -315,6 +316,8 @@ int main(int argc, char** argv)
     cli.add("comb"   , "bool"  , "no"        , "Remove white/black boxes and sequential elements (may change delay profile).");
     cli.add("mux"    , "bool"  , "yes"       , "Do MUX and XOR extraction first.");
     cli.add("melt"   , "bool"  , "no"        , "Undo the 3-input LUT mapping of HDL-ICE.");
+    cli.add("ela"    , "bool"  , "yes"       , "Use exact-local-area post-processing after each mapping phase.");
+    cli.add("fmux"   , "bool"  , "no"        , "Use special F7MUX and F8MUX in Xilinx series 7.");
     cli.add("batch"  , "bool"  , "no"        , "Add last line summary for batch jobs.");
     cli.parseCmdLine(argc, argv);
 
@@ -328,13 +331,17 @@ int main(int argc, char** argv)
     P.delay_factor  = cli.get("df").float_val;
     P.map_for_delay = cli.get("dopt").bool_val;
     P.recycle_cuts  = cli.get("recycle").bool_val;
+    P.use_ela       = cli.get("ela").bool_val;
+    P.use_fmux      = cli.get("fmux").bool_val;
 
     if (cli.get("cost").enum_val == 0){
         for (uint i = 0; i <= 6; i++)
             P.lut_cost[i] = 1;
+        P.mux_cost = 0;
     }else{
         for (uint i = 0; i <= 6; i++)
             P.lut_cost[i] = i;
+        P.mux_cost = 1;
     }
 
     // Read input file:
@@ -444,7 +451,7 @@ int main(int argc, char** argv)
         if (quit) return 0;
     }
 
-#if 0
+#if 1
     Vec<Params_LutMap> Ps(cli.get("rounds").int_val, P);
     lutMap(N, Ps);
 
@@ -533,7 +540,7 @@ int main(int argc, char** argv)
     WriteLn "Transformed mapped  : %_", info(N);
   #endif
 
-  #if 0
+  #if 1
     uint count = 0;
     Vec<GLit>& v = remap.base();
     for (uint i = gid_FirstUser; i < v.size(); i++){
@@ -619,9 +626,12 @@ int main(int argc, char** argv)
             uint d = 0;
             For_Inputs(w, v)
                 newMax(d, depth[v]);
-            if (isLogicGate(w))
-                depth(w) = d + 1;
-            else if (w == gate_Delay)
+            if (isLogicGate(w)){
+                if (w == gate_Mux)
+                    depth(w) = d;
+                else
+                    depth(w) = d + 1;
+            }else if (w == gate_Delay)
                 depth(w) = d + w.arg();     // -- should use DELAY_FRACTION here
             else
                 depth(w) = d;
@@ -637,18 +647,25 @@ int main(int argc, char** argv)
             WriteLn "    LUT %_: %>11%,d  (%.1f %%)", i, sizeC[i], double(sizeC[i]) / N.typeCount(gate_Lut6) * 100;
     NewLine;
     WriteLn "    LUTs : %>11%,d", N.typeCount(gate_Lut6);
-    WriteLn "    Edges: %>11%,d", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6];
+    if (P.use_fmux)
+        WriteLn "    MUXs : %>11%,d", N.typeCount(gate_Mux);
+    WriteLn "    Edges: %>11%,d", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6] + N.typeCount(gate_Mux);
     WriteLn "    Delay: %>11%,d", max_delay;
     NewLine;
     WriteLn "    CPU-time: %t", cpuTime();
 
     if (cli.get("batch").bool_val){
         Write "%>11%,d    ", N.typeCount(gate_Lut6);
-        Write "%>11%,d    ", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6];
+        Write "%>11%,d    ", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6] + N.typeCount(gate_Mux);
         Write "%>6%d    ", max_delay;
         Write "%>10%t", cpuTime();
         NewLine;
     }
+
+#if 1   /*DEBUG*/
+    if (P.use_fmux && !P.quiet && !cli.get("batch").bool_val)
+        checkFmuxes(N);
+#endif  /*END DEBUG*/
 
     return 0;
 }

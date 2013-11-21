@@ -15,11 +15,24 @@
 #define CUT_SIZE 6      // -- allow smaller cuts at compile time (for experimentation)
 
 
-macro bool moreThanSixBits(uint a)
+macro bool moreThanCutSize(uint a)
 {
   #if defined(__GNUC__) && !defined(ZZ_DEBUG) && !(__GNUC__ == 4 && __GNUC_MINOR__== 6)
     // -- note that valgrind doesn't like popcount()
     return __builtin_popcount(a) > CUT_SIZE;
+  #else
+    for (uint i = 0; i < CUT_SIZE; i++)
+        a &= a - 1;
+    return a;
+  #endif
+}
+
+
+macro bool moreThanCutSize(uint64 a)
+{
+  #if defined(__GNUC__) && !defined(ZZ_DEBUG) && !(__GNUC__ == 4 && __GNUC_MINOR__== 6)
+    // -- note that valgrind doesn't like popcount()
+    return __builtin_popcountll(a) > CUT_SIZE;
   #else
     for (uint i = 0; i < CUT_SIZE; i++)
         a &= a - 1;
@@ -77,7 +90,7 @@ bool applySubsumptionAndAddCut(const Cut& cut, Vec<Cut>& out)
 static
 Cut combineCuts_Bin(const Cut& cut1, const Cut& cut2)
 {
-    if (moreThanSixBits(cut1.abstr | cut2.abstr))
+    if (moreThanCutSize(cut1.abstr | cut2.abstr))
         return Cut_NULL;
 
     Cut   result(empty_);
@@ -122,7 +135,7 @@ Cut combineCuts_Bin(const Cut& cut1, const Cut& cut2)
 static
 Cut combineCuts_Tern(const Cut& cut0, const Cut& cut1, const Cut& cut2)
 {
-    if (moreThanSixBits(cut0.abstr | cut1.abstr | cut2.abstr))
+    if (moreThanCutSize(cut0.abstr | cut1.abstr | cut2.abstr))
         return Cut_NULL;
 
     // Merge inputs from cuts:
@@ -154,7 +167,7 @@ Cut combineCuts_Tern(const Cut& cut0, const Cut& cut1, const Cut& cut2)
 static
 Cut combineCuts_Quad(const Cut& cut0, const Cut& cut1, const Cut& cut2, const Cut& cut3)
 {
-    if (moreThanSixBits(cut0.abstr | cut1.abstr | cut2.abstr | cut3.abstr))
+    if (moreThanCutSize(cut0.abstr | cut1.abstr | cut2.abstr | cut3.abstr))
         return Cut_NULL;
 
     // Merge inputs from cuts:
@@ -193,7 +206,6 @@ void LutMap::generateCuts_LogicGate(Wire w, Vec<Cut>& out)
     for (sz = 0; sz < w.size(); sz++){
         if (+w[sz] == Wire_NULL) break;
         l_tuple(triv[sz], cs[sz]) = getCuts(w[sz], cutmap);
-//        lim[sz] = keep.has(w[sz]) ? 0 : (int)cs[sz].size();
         lim[sz] = (int)cs[sz].size();
     }
 
@@ -216,6 +228,36 @@ void LutMap::generateCuts_LogicGate(Wire w, Vec<Cut>& out)
     }
 
     case 3:{
+        if (P.use_fmux){
+            assert_debug(w == gate_Lut4);
+            Npn4Norm n = npn4_norm[w.arg()];
+            if (n.eq_class == npn4_cl_MUX){
+                // We care about pins 'seq[1]' and 'seq[2]'; they must not have mux_depth > 1
+                pseq4_t seq = perm4_to_pseq4[n.perm];
+                Wire u = w[pseq4Get(seq, 1)];
+                Wire v = w[pseq4Get(seq, 2)];
+                uint du = (cutmap[u].size() == 0) ? 0 : cutmap[u][0].mux_depth;
+                uint dv = (cutmap[v].size() == 0) ? 0 : cutmap[v][0].mux_depth;
+              #if 1
+                uint d = max_(du, dv);
+              #else
+                Wire z = w[pseq4Get(seq, 0)];
+                uint dz = (cutmap[z].size() == 0) ? 0 : cutmap[z][0].mux_depth;
+                uint d = max_(du, max_(dv, dz));
+              #endif
+                if (d <= 1){
+                    // Add special MUX cut:
+                    Cut cut(empty_);
+                    cut.mux_depth = d + 1;
+                    cut.push(w[0].id);
+                    cut.push(w[1].id);
+                    cut.push(w[2].id);
+                    bool ok = applySubsumptionAndAddCut(cut, out); assert(ok);
+                    //**/putchar(cut.mux_depth == 1 ? '.' : '!'); fflush(stdout);
+                }
+            }
+        }
+
         for (int i0 = -1; i0 < lim[0]; i0++){ const Cut& c0 = (i0 == -1) ? triv[0] : cs[0][i0];
         for (int i1 = -1; i1 < lim[1]; i1++){ const Cut& c1 = (i1 == -1) ? triv[1] : cs[1][i1];
         for (int i2 = -1; i2 < lim[2]; i2++){ const Cut& c2 = (i2 == -1) ? triv[2] : cs[2][i2];

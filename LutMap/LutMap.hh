@@ -17,6 +17,9 @@ struct Params_LutMap {
     bool    map_for_delay;      // Otherwise, prioritize area.
     bool    recycle_cuts;       // Faster but sacrifice some quality
     uint    lut_cost[7];        // Cost of a LUT for each size.
+    uint    mux_cost;           // Cost of a F7- or F8MUX.
+    bool    use_ela;            // Use exact local area optimizaton.
+    bool    use_fmux;           // Some architectures have a free MUX that can combine the outputs of two LUT6 with a third signal.
     bool    quiet;
 
     Params_LutMap() :
@@ -25,16 +28,22 @@ struct Params_LutMap {
         delay_factor(1.0),
         map_for_delay(false),
         recycle_cuts(true),
+        use_ela(true),
+        use_fmux(false),
         quiet(false)
     {
         for (uint i = 0; i < elemsof(lut_cost); i++)
             lut_cost[i] = 1;    // -- default is unit cost
+        mux_cost = 0;
     }
 };
 
 
 void lutMap(Gig& N, Params_LutMap P, WMapX<GLit>* remap = NULL);
 void lutMap(Gig& N, const Vec<Params_LutMap>& P, WMapX<GLit>* remap = NULL);
+
+// Debug:
+void checkFmuxes(Gig& N);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

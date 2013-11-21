@@ -148,6 +148,14 @@ void writeBlif(Out& out, Gig& N)
 
             break;}
 
+        case gate_Mux:{
+            FWriteLn(out) ".names %_ %_ %_ %_", nam[w[0]], nam[w[1]], nam[w[2]], nam[w];
+            FWriteLn(out) "%_%_%_ 1", w[0].sign ? 1 : 0, w[1].sign ? 1 : 0, w[2].sign ? 0 : 1;
+            FWriteLn(out) "%_%_%_ 1", w[0].sign ? 1 : 0, w[1].sign ? 0 : 1, w[2].sign ? 0 : 1;
+            FWriteLn(out) "%_%_%_ 1", w[0].sign ? 0 : 1, w[1].sign ? 0 : 1, w[2].sign ? 1 : 0;
+            FWriteLn(out) "%_%_%_ 1", w[0].sign ? 0 : 1, w[1].sign ? 0 : 1, w[2].sign ? 0 : 1;
+            break;}
+
         default:
             ShoutLn "INTERNAL ERROR! Gate type not (yet) supported in 'writeBlif()': %_", w.type();
             assert(false);

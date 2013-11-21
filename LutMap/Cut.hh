@@ -24,13 +24,14 @@ class LutMap_Cut {                // -- this class represents 6-input cuts.
     void extendAbstr(gate_id g) { abstr |= 1u << (g & 31); }
 
     gate_id inputs[6];
-    uint    sz;
+    ushort  sz;
 public:
+    ushort  mux_depth;
     uint    abstr;
 
-    LutMap_Cut(Tag_empty) : sz(0), abstr(0) {}
-    LutMap_Cut(gate_id g) : sz(1), abstr(0) { inputs[0] = g; extendAbstr(g); }
-    LutMap_Cut()          : sz(7)           {}
+    LutMap_Cut(Tag_empty) : sz(0), mux_depth(0), abstr(0) {}
+    LutMap_Cut(gate_id g) : sz(1), mux_depth(0), abstr(0) { inputs[0] = g; extendAbstr(g); }
+    LutMap_Cut()          : sz(7)                         {}
 
     uint    size()                const { return sz; }
     gate_id operator[](int index) const { return inputs[index]; }

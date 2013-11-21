@@ -922,6 +922,14 @@ void sendMsg_Reparam(NetlistRef N)
 }
 
 
+void sendMsg_Netlist(NetlistRef N)
+{
+    Vec<uchar> data;
+    streamOut_Netlist(data, N);
+    sendMsg(106/*Netlist*/, data.slice());
+}
+
+
 void sendMsg_Abort(String text)
 {
     sendMsg(5/*Abort*/, slice((uchar&)text[0], (uchar&)text.end_()));

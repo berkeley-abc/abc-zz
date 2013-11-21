@@ -73,6 +73,7 @@ void sendMsg_Abstr(const WZetL& abstr, NetlistRef N);
 void sendMsg_AbstrBad();
 
 void sendMsg_Reparam(NetlistRef N);
+void sendMsg_Netlist(NetlistRef N);
 
 void sendMsg_Abort(String text);
 

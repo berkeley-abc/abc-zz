@@ -24,6 +24,7 @@
 
 #define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
 #define ELA_GLOBAL_LIM 500      // -- if more nodes than this is dereferenced, MFFC is too big to consider
+#define ELA_TIMING
 
 namespace ZZ {
 using namespace std;
@@ -31,6 +32,70 @@ using namespace std;
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Helpers:
+
+
+void checkFmuxes(Gig& N)
+{
+    // Max two levels of MUXes:
+    For_Gates(N, w){
+        if (w == gate_Mux){
+            if (w[1] == gate_Mux){
+                /**/if (!(w[1][1] != gate_Mux)) putchar('*'), fflush(stdout);
+                assert(w[1][1] != gate_Mux);
+                /**/if (!(w[1][2] != gate_Mux)) putchar('*'), fflush(stdout);
+                assert(w[1][2] != gate_Mux);
+            }
+
+            if (w[2] == gate_Mux){
+                /**/if (!(w[2][1] != gate_Mux)) putchar('*'), fflush(stdout);
+                assert(w[2][1] != gate_Mux);
+                /**/if (!(w[2][2] != gate_Mux)) putchar('*'), fflush(stdout);
+                assert(w[2][2] != gate_Mux);
+            }
+        }
+    }
+
+    // Count potential violations (assuming selector signal is NOT independent):
+    {
+        uint total = 0;
+        uint failC = 0;
+        For_Gates(N, w){
+            if (w == gate_Mux && w[0] == gate_Lut6 && w[1] == gate_Lut6){
+                total++;
+                if (w[0][5] && w[1][5])
+                    failC++;
+            }
+        }
+
+        WriteLn "Potential MUX routing violations: %_ / %_  (= %.2f %%)", failC, total, double(failC) / total * 100;
+    }
+    {
+        Auto_Gob(N, FanoutCount);
+        WMap<uint> mux_fanouts(0);
+
+        uint total = 0;
+        uint inv_failC = 0;
+        uint out_failC = 0;
+        For_Gates(N, w){
+            if (w == gate_Mux){
+                total++;
+                if ((w[1].sign && nFanouts(w[1]) > 1) || (w[2].sign && nFanouts(w[2]) > 1))
+                    inv_failC++;
+
+                for (uint i = 1; i <= 2; i++){
+                    if (w[i] == gate_Mux){
+                        mux_fanouts(w[i])++;
+                        if (mux_fanouts[w[i]] >= 2)
+                            out_failC++;
+                    }
+                }
+            }
+        }
+
+        WriteLn "Potential MUX inverter violations: %_ / %_  (= %.2f %%)", inv_failC, total, double(inv_failC) / total * 100;
+        WriteLn "Actual MUX fanout violations: %_ / %_  (= %.2f %%)", out_failC, total, double(out_failC) / total * 100;
+    }
+}
 
 
 macro bool isLogic(Wire w) {
@@ -224,7 +289,15 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
             costs[i].area += area_est[w];
             costs[i].avg_fanout += fanout_est[w];
         }
-        costs[i].area += P.lut_cost[cuts[i].size()];
+        if (cuts[i].mux_depth == 0){
+            // Normal LUT:
+            costs[i].area += P.lut_cost[cuts[i].size()];
+            costs[i].delay += 1.0f;
+        }else{
+            costs[i].area += P.mux_cost;
+            /**/costs[i].area *= fanout_est[w];
+            // <<==FT do something about delay for selector here?
+        }
         costs[i].avg_fanout /= cuts[i].size();
     }
 
@@ -263,20 +336,47 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
         swp(cuts[i], cuts[w]);
     }
 
+    // Make sure best cut is MUX feasible:
+    if (P.use_fmux){
+        uint best_i = UINT_MAX;
+        for (uint i = 0; i < cuts.size(); i++){
+            if (cuts[i].mux_depth > 0){     // -- let's be a little bit sloppy here for now and include the selector...
+                uint d = 0;
+                for (uint j = 0; j < cuts[i].size(); j++){
+                    Wire w = cuts[i][j] + N;
+                    if (cutmap[w].size() != 0)
+                        newMax(d, cutmap[w][0].mux_depth);
+                }
+                cuts[i].mux_depth = d + 1;
+            }
+
+            if (best_i == UINT_MAX && cuts[i].mux_depth <= 2)
+                best_i = i;
+        }
+        assert(best_i != UINT_MAX);
+
+        if (best_i != 0)
+            swp(cuts[0], cuts[best_i]);
+    }
+
     // Store area flow and arrival time:
     area_est(w) = costs[0].area / fanout_est[w];
-    arrival(w) = costs[0].delay + 1.0f;
+    arrival(w) = costs[0].delay;
 }
 
 
 // Applied during instantiation where some 'area_est[w]' is set to zero.
 void LutMap::reprioritizeCuts(Wire w, Array<Cut> cuts)
 {
+//**/return;
     float best_delay = FLT_MAX;
     float best_area  = FLT_MAX;
     uint  best_i = 0;
 
+    uint allowed_mux_depth = cuts[0].mux_depth;
     for (uint i = 0; i < cuts.size(); i++){
+        if (cuts[i].mux_depth > allowed_mux_depth) continue;
+
         float this_delay = 0.0f;
         float this_area  = 0.0f;
         for (uint j = 0; j < cuts[i].size(); j++){
@@ -284,7 +384,14 @@ void LutMap::reprioritizeCuts(Wire w, Array<Cut> cuts)
             this_area += area_est[v];
             newMax(this_delay, arrival[v]);
         }
-        /**/this_area += P.lut_cost[cuts[i].size()];
+
+        if (cuts[i].mux_depth == 0){
+            this_area += P.lut_cost[cuts[i].size()];
+            this_delay += 1.0f;
+        }else{
+            this_area += P.mux_cost;
+            /**/this_area *= fanout_est[w];
+        }
 
         if (i == 0){
             best_delay = this_delay;
@@ -341,25 +448,8 @@ void LutMap::generateCuts(Wire w)
             Vec<Cut>& cuts = tmp_cuts;
             cuts.clear();   // -- keep last winner
             if (!winner[w].null())
-                cuts.push(winner[w]);
+                cuts.push(winner[w]);     // <<==FT cannot push last winner if mux_depth gets too big
             generateCuts_LogicGate(w, cuts);
-#if 0   /*DEBUG*/
-{
-            Params_Dsd Pd;
-            Pd.cofactor = false;
-            Pd.use_kary = false;
-            Vec<uchar> prog;
-
-            uint j = 0;
-            for (uint i = 0; i < cuts.size(); i++){
-                uint64 ftb = computeFtb(w, cuts[i], in_memo, memo);
-                dsd6(ftb, prog, Pd);
-                if (!hasBox(prog))
-                    cuts[j++] = cuts[i];
-            }
-            cuts.shrinkTo(j);
-}
-#endif  /*END DEBUG*/
 
             cuts_enumerated += cuts.size();
             prioritizeCuts(w, cuts.slice());
@@ -459,7 +549,7 @@ private:
 
 bool RefDerefCut::deref(const Cut& cut)
 {
-    acc += P.lut_cost[cut.size()];
+    acc += cut.mux_depth ? P.mux_cost : P.lut_cost[cut.size()];
     if (acc > lim) return false;
 
     for (uint i = 0; i < cut.size(); i++){
@@ -481,7 +571,7 @@ bool RefDerefCut::deref(const Cut& cut)
 
 bool RefDerefCut::ref(const Cut& cut)
 {
-    acc += P.lut_cost[cut.size()];
+    acc += cut.mux_depth ? P.mux_cost : P.lut_cost[cut.size()];
     if (acc > lim) return false;
 
     for (uint i = 0; i < cut.size(); i++){
@@ -525,11 +615,11 @@ void RefDerefCut::undoRef()
 
 ZZ_PTimer_Add(LutMap_ELA);
 
-#define ELA_TIMING
 
 // <<== need to make this delay aware (as well as unmapping)
 void LutMap::exactLocalArea(WMap<uint>& fanouts)
 {
+    // <<==FT should not chose cut with higher mux depth
     ZZ_PTimer_Scope(LutMap_ELA);
 
     RefDerefCut R(N, cutmap, P, fanouts, active);
@@ -549,6 +639,19 @@ void LutMap::exactLocalArea(WMap<uint>& fanouts)
             uint best_i = 0;
             for (uint i = 1; i < cutmap[w].size(); i++){
                 Cut& cut = cutmap[w][i];
+
+                if (cut.mux_depth > 0){     // -- let's be a little bit sloppy here for now and include the selector...
+                    uint d = 0;
+                    for (uint j = 0; j < cut.size(); j++){
+                        Wire w = cut[j] + N;
+                        if (cutmap[w].size() != 0)
+                            newMax(d, cutmap[w][0].mux_depth);
+                    }
+                    cut.mux_depth = d + 1;
+                }
+
+                if (cut.mux_depth > cutmap[w][0].mux_depth) continue;
+
               #if defined(ELA_TIMING)
                 // Check if meets timing:       <<== delay/area trade-off
                 float arr = 0;
@@ -628,7 +731,6 @@ void LutMap::updateFanoutEst(bool instantiate)
 
     active.clear();
 
-#if 1   /*EXPERIMENTAL*/
     InstOrder lt(arrival, depart);
     KeyHeap<GLit, false, InstOrder> ready(lt);
     For_Gates(N, w){
@@ -676,7 +778,8 @@ void LutMap::updateFanoutEst(bool instantiate)
                 for (uint i = 0; i < cut.size(); i++){
                     Wire v = cut[i] + N;
                     fanouts(v)++;
-                    newMax(depart(v), depart[w] + 1.0f);
+                    newMax(depart(v), depart[w] + ((cut.mux_depth == 0) ? 1.0f : 0.0f));
+//                    newMax(depart(v), depart[w] + 1.0f);
                 }
             }else
                 depart(w) = FLT_MAX;    // -- marks deactivated node
@@ -690,75 +793,15 @@ void LutMap::updateFanoutEst(bool instantiate)
         }
     }
 
-#else  /*END EXPERIMENTAL*/
-    depart.clear();
-    For_All_Gates_Rev(N, w){
-        if (isLogic(w)){
-            if (fanouts[w] > 0){
-                /**/prioritizeCuts(w, cutmap[w]);
-                const Cut& cut = cutmap[w][0];
-
-                for (uint i = 0; i < cut.size(); i++){
-                    Wire v = cut[i] + N;
-                    fanouts(v)++;
-                    newMax(depart(v), depart[w] + 1.0f);
-                    /**/area_est(v) = 0;
-                }
-                active(w) = true;
-            }else{
-                // <<== depart. est. heuristic goes here (leave last, reset, conservative etc.)
-                depart(w) = FLT_MAX;    // -- marks deactivated node
-                active(w) = false;
-            }
-
-        }else if (!isCI(w)){
-            float delay = (w != gate_Delay) ? 0.0f : w.arg() / DELAY_FRACTION;
-            For_Inputs(w, v){
-                fanouts(v)++;
-                newMax(depart(v), depart[w] + delay);
-            }
-        }
-    }
-#endif
-
-    /**/if (round > 0)
-    /**/    exactLocalArea(fanouts);
-
-#if 0   // recompute departure/fanouts (redundant???)
-    fanouts.clear();
-    depart.clear();
-    For_All_Gates_Rev(N, w){
-        if (isLogic(w)){
-            if (active[w]){
-                const Cut& cut = cutmap[w][0];
-                for (uint i = 0; i < cut.size(); i++){
-                    Wire v = cut[i] + N;
-                    fanouts(v)++;
-                    newMax(depart(v), depart[w] + 1.0f);
-                }
-            }else
-                depart(w) = FLT_MAX;    // -- marks deactivated node
-
-        }else if (!isCI(w)){
-            float delay = (w != gate_Delay) ? 0.0f : w.arg() / DELAY_FRACTION;
-            For_Inputs(w, v){
-                fanouts(v)++;
-                newMax(depart(v), depart[w] + delay);
-            }
-        }
-    }
-
-#endif  /*END DEBUG*/
-
-
-    //**/For_All_Gates_Rev(N, w) Dump(w, (int)active[w], fanouts[w]);
+    if (round > 0 && P.use_ela)
+        exactLocalArea(fanouts);
 
     mapped_delay = 0.0f;
     For_Gates(N, w)
         if (isCI(w))
             newMax(mapped_delay, depart[w]);
 
-#if 1   // -- temporary solution for computing estimated departure for inactive nodes
+    // -- temporary solution for computing estimated departure for inactive nodes
     WMap<float> tmpdep;
     depart.copyTo(tmpdep);
     For_Gates_Rev(N, w){
@@ -778,14 +821,11 @@ void LutMap::updateFanoutEst(bool instantiate)
     For_Gates(N, w)
         if (depart[w] == FLT_MAX && tmpdep[w] != FLT_MAX)
             depart(w) = tmpdep[w];
-#endif
-
-    //**/exactLocalArea(fanouts);
 
     mapped_area = 0;
     For_Gates(N, w){
         if (active[w] && isLogic(w))
-            mapped_area += P.lut_cost[cutmap[w][0].size()];
+            mapped_area += cutmap[w][0].mux_depth ? P.mux_cost : P.lut_cost[cutmap[w][0].size()];
     }
 
     if (!instantiate){
@@ -799,7 +839,7 @@ void LutMap::updateFanoutEst(bool instantiate)
             For_Gates(N, w){
                 if (isLogic(w)){
                     fanout_est(w) = alpha * max_(fanouts[w], 1u)
-//                    fanout_est(w) = alpha * max_(double(fanouts[w]), 0.95)   // -- slightly less than 1 leads to better delay
+//                  fanout_est(w) = alpha * max_(double(fanouts[w]), 0.95)   // -- slightly less than 1 leads to better delay
                                   + beta  * fanout_est[w];
                 }
             }
@@ -824,8 +864,8 @@ void LutMap::updateFanoutEst(bool instantiate)
         uint j = 0;
         For_Gates(N, w){
             if (isLogic(w) && active[w]){
-                // Change AND gate into a LUT6:
                 const Cut& cut = cutmap[w][0];
+                // Change AND gate into a LUT6:
                 change(w, gate_Lut6);
                 uint sz = 0;
                 for (uint i = 0; i < cut.size(); i++){
@@ -837,6 +877,25 @@ void LutMap::updateFanoutEst(bool instantiate)
                     }
                 }
                 ftb(w) = ftbs[j++];
+
+                if (cut.mux_depth != 0){
+                    // Special F7 or F8 MUX; represent it as a 'Mux':
+                    uint64 ftb_ = ftb(w);
+                    Npn4Norm n = npn4_norm[ftb_ & 0xFFFF];
+                    if (n.eq_class == npn4_cl_MUX){     // -- sometimes the MUX is actually, an OR2, EQU2, BUF, or TRUE...
+                        for (uint i = 0; i < 3; i++) assert(ftb6_inSup(ftb_, i));
+                        for (uint i = 4; i < 6; i++) assert(!ftb6_inSup(ftb_, i));
+
+                        pseq4_t seq = perm4_to_pseq4[n.perm];
+                        Wire w0 = w[pseq4Get(seq, 0)] ^ bool(n.negs & (1 << pseq4Get(seq, 0)));
+                        Wire w1 = w[pseq4Get(seq, 2)] ^ bool(n.negs & (1 << pseq4Get(seq, 2)));
+                        Wire w2 = w[pseq4Get(seq, 1)] ^ bool(n.negs & (1 << pseq4Get(seq, 1)));
+
+                        change(w, gate_Mux);
+                        w.init(w0, w1, w2);
+                    }
+                    //**/else putchar('!'), fflush(stdout);
+                }
             }
         }
 
@@ -847,6 +906,11 @@ void LutMap::updateFanoutEst(bool instantiate)
         N.compact(m);
         if (remap)
             m.applyTo(remap->base());
+
+#if 1   /*DEBUG*/
+        if (P.use_fmux && !P.quiet){
+            checkFmuxes(N); }
+#endif  /*END DEBUG*/
     }
 }
 
@@ -916,6 +980,7 @@ void LutMap::run()
 
 // <<== put preprocessing here, not in Main_lutmap.cc
 
+
 LutMap::LutMap(Gig& N_, Params_LutMap P_, WMapX<GLit>* remap_) :
     P(P_), N(N_), remap(remap_)
 {
@@ -947,6 +1012,10 @@ LutMap::LutMap(Gig& N_, Params_LutMap P_, WMapX<GLit>* remap_) :
 
     // Run mapper:
     run();
+  #if 1   /*DEBUG*/
+    if (P.use_fmux && !P.quiet){
+        checkFmuxes(N); }
+  #endif  /*END DEBUG*/
 
     // Free memory:
     for (uint i = 0; i < cutmap.base().size(); i++)
@@ -1073,4 +1142,6 @@ delay optimal everywhere
 globally delay optimal, use slack for area recovery
 
 hur få diversity med? varför svårt att hitta delay optimal med få cuts när Alan lyckas?
+
+<<== FT cut-recycling, sista problemet?
 */

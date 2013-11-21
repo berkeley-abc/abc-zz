@@ -140,5 +140,10 @@ void removeInverters(Gig& N, WMapX<GLit>* remap)
 }
 
 
+//void pushNegsDownMuxes(Gig& N, WMapX<GLit>* remap)
+//{
+//}
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }

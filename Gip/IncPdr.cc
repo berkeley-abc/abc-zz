@@ -579,7 +579,7 @@ void testPdr(Gig& N0)
     w_bad = N.add(gate_FF).init(w_bad, ~GLit_True);
 
 #if 1   /*DEBUG*/
-    for (uint d = 1; d < 10; d++){
+    for (uint d = 1; d < 6; d++){
         uint k = pdr.solve(Cube(w_bad), d);
         WriteLn "\a*RETURN: depth=%_  result=%_\a*", d, Fmt_Frame(k);
     }
