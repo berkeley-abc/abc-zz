@@ -244,7 +244,5 @@ void readAigerFile(String filename, Gig& N, bool verif_problem)
 }
 
 
-
-
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }

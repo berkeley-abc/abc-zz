@@ -55,8 +55,8 @@ public:
 
     const Gig* N;
 
-    WMap()                     :           N(NULL) {}
-    WMap(V nil)                : map(nil), N(NULL) {}
+    WMap()                     :           N((Gig*)NULL) {}
+    WMap(V nil)                : map(nil), N((Gig*)NULL) {}
     WMap(const Gig& N_)        :           N(&N_)  { map.reserve(N->size()); }
     WMap(const Gig& N_, V nil) : map(nil), N(&N_)  { map.reserve(N->size()); }
 
