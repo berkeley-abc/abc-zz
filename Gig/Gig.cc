@@ -324,7 +324,7 @@ void Gig::clearNumbering(GateType type)
 }
 
 
-void Gig::strash(uint64 strashed_gates)
+void Gig::strash()
 {
     Add_Gob(*this, Strash);
 }
