@@ -79,6 +79,14 @@ def build():
         CXXFLAGS.append("-pthread");
         LDFLAGS.append("-pthread");
         BUILD_DIR = BUILD_DIR + "_pthread"
+    if "i" in secs: 
+        CXXFLAGS.append("-fPIC");
+        LDFLAGS.append("-fPIC");
+        BUILD_DIR = BUILD_DIR + "_fpic"
+    if "m" in secs: 
+        CXXFLAGS.append("-m32");
+        LDFLAGS.append("-m32");
+        BUILD_DIR = BUILD_DIR + "_m32"
 
     # Lib file exists?
     public_target = z("LIB_DIR") + "/libminisat2.a"

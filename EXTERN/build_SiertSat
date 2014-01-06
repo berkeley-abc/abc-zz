@@ -85,6 +85,8 @@ def build():
     if "t" in secs: flags.append("-pthread")
     if "a" in secs: flags.append("-DNDEBUG")
     if "s" not in secs: flags.append("-ggdb")
+    if "i" in secs: flags.append("-fPIC")
+    if "m" in secs: flags.append("-m32")
 
     suffix = "_" + ''.join(sorted(set(pri))) + "_" + ''.join(sorted(set(secs)))
 

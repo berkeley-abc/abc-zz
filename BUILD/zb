@@ -55,6 +55,8 @@ SECONDARY-TYPE:
     s = no debug symbols
     a = no asserts
     y = toggle ymalloc (default: "on" for Release/Profile, off otherwise)
+    i = position independent code (-fPIC)
+    m = 32-bit mode (-m32)
 
 BUILD-OPTIONS:
     f = force build even though 'zb' is running
@@ -73,7 +75,7 @@ doc2 = """INTERNAL COMMANDS:
 valid_commands  = ["clean", "tclean", "realclean", "init", "reinit", "hh", "rehh", "globals"]
 valid_pri_types = "rdpq"
 pri_type_names  = ["release", "debug", "profile", "quick"]
-valid_sec_types = "btasy"
+valid_sec_types = "btasyim"
 valid_build_opt = "fjv+"
 
 default_build = "qr"    # -- must only contain PRIMART-TYPE letters
@@ -91,6 +93,7 @@ static_cxx   = None
 popcnt       = None
 qt_libpath   = None
 has_readline = None
+has_ccache   = None
 
 
 def get_build_path():
@@ -139,6 +142,10 @@ def get_available_libs():
     global has_readline
     has_readline = try_gcc("-lreadline")
 
+def get_ccache():
+    global has_ccache
+    has_ccache = (os.system("which ccache >/dev/null 2>&1") == 0)
+
 def probe():
     get_build_path()
     get_machine()
@@ -146,6 +153,7 @@ def probe():
     get_gcc_version()
     get_qt_libpath()
     get_available_libs()
+    get_ccache()
 
 
 ##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -378,7 +386,7 @@ def read_config_file(filename, valid_keys = None, subst = None):
     try:
         f = open(filename)
     except:
-        abort("Could not open config file: "+ filename +"'.")
+        abort("Could not open config file: "+ filename)
     else:
         with f:
             result = dict()
@@ -477,6 +485,8 @@ def setup_cflags(pri, secs, cxx_mode):
     if "a" in secs: flags.append("-DNDEBUG")
     if "s" not in secs: flags.append("-ggdb")
     if ("y" in secs) == (pri in "rp"): flags.append("-DZZ_NO_SMART_YMALLOC")
+    if "i" in secs: flags.append("-fPIC")
+    if "m" in secs: flags.append("-m32")
     if not cxx_mode:
         flags.append("-Wno-sign-compare")
 
@@ -495,6 +505,8 @@ def setup_lflags(pri, secs):
     if static_cxx:   flags.append("-static-libstdc++")
     if pri == "p":   flags.append("-pg")
     if "t" in secs:  flags.append("-pthread")
+    if "i" in secs: flags.append("-fPIC")
+    if "m" in secs: flags.append("-m32")
     return " ".join(flags)
 
 
@@ -621,6 +633,7 @@ def call_makefile(mod, params, deps, conf):
     cmd.append("CFLAGS='"  + setup_cflags(params.pri_type, params.sec_types, False) + "'")
     cmd.append("LFLAGS='"+ setup_lflags(params.pri_type, params.sec_types) + "'")
     if get_conf_bool(conf, "QT_MODULE"): cmd.append("QT_MODULE=1")
+    if has_ccache: cmd.append("USE_CCACHE=1")
     cmd.append("2>&1")      # -- get errors on stdout
 
     setup_pseudo_root()

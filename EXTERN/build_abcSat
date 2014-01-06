@@ -42,6 +42,8 @@ def build():       # -- assumes we are in directory 'ZZ/EXTERN/abcSat'
     if "t" in secs: flags.append("-pthread")
     if "a" in secs: flags.append("-DNDEBUG")
     if "s" not in secs: flags.append("-ggdb")
+    if "i" in secs: flags.append("-fPIC")
+    if "m" in secs: flags.append("-m32")
     opt_flags = " ".join(flags)
 
     # Lib file exists?
