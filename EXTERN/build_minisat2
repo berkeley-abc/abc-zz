@@ -95,7 +95,8 @@ def build():
 
     # Call makefile:
     os.chdir("minisat2")
-    flags = "CXXFLAGS=%s LDFLAGS=%s BUILD_DIR=%s %s %s" % (" ".join(CXXFLAGS), " ".join(LDFLAGS), BUILD_DIR, " ".join(OTHER), TARGET)
+    flags = "CXXFLAGS='%s' LDFLAGS='%s' BUILD_DIR='%s' %s %s" % (" ".join(CXXFLAGS), " ".join(LDFLAGS), BUILD_DIR, " ".join(OTHER), TARGET)
+    print "make -s -j%s %s" % (z("N_CORES"), flags)
     ret = os.system("make -s -j%s %s" % (z("N_CORES"), flags))
 
     # Copy results:
