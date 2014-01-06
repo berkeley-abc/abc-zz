@@ -198,6 +198,8 @@ int main(int argc, char** argv)
     try{
         if (hasExtension(input, "aig"))
             readAigerFile(input, N, true);
+        if (hasExtension(input, "gig"))
+            readGigFile(input, N);
         else{
             ShoutLn "ERROR! Unknown file extension: %_", input;
             exit(1);

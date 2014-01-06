@@ -55,6 +55,14 @@ BIN_OUT    = $(OUT)
 LINK = $(BUILD_PATH)/zz_gdep_link	
     # -- "g++" works fine under Linux, but this script handles MacOS as well
 
+ifdef USE_CCACHE
+  CXX = ccache g++
+  CC  = ccache gcc
+else
+  CXX = g++
+  CC  = gcc
+endif
+
 COMMA=,
 
 #$(warning $(BIN_OUT)  $(OUT)/Main_%.o  $(LIB_BIN)  $(LMOD))
@@ -75,7 +83,7 @@ ifdef QT_MODULE
 include $(BUILD_PATH)/qt_module.mak
 endif
 
-.PHONY: all lib bin libdep bindep clean
+.PHONY: all lib bin libdep bindep
 all : lib bin
 
 THIS_MAKEFILE = $(firstword $(MAKEFILE_LIST))
@@ -88,16 +96,16 @@ THIS_MAKEFILE = $(firstword $(MAKEFILE_LIST))
 INCL = $(addprefix -I,$(SYS_INCL))
 $(OUT)/%.dep : %.cc
 	mkdir -p $(dir $@)
-	g++ -M $(CXXFLAGS) $(INCL) $(CURDIR)/$< | $(BUILD_PATH)/filter_deps $(OUT) > $@
+	$(CXX) -M $(CXXFLAGS) $(INCL) $(CURDIR)/$< | $(BUILD_PATH)/filter_deps $(OUT) > $@
   # NOTE! Dependencies are generated with full absolute paths
 
 $(OUT)/%.dep : %.C
 	mkdir -p $(dir $@)
-	g++ -M $(CXXFLAGS) $(INCL) $(CURDIR)/$< | $(BUILD_PATH)/filter_deps $(OUT) > $@
+	$(CXX) -M $(CXXFLAGS) $(INCL) $(CURDIR)/$< | $(BUILD_PATH)/filter_deps $(OUT) > $@
 
 $(OUT)/%.dep : %.c 
 	mkdir -p $(dir $@)
-	gcc -M $(CFLAGS) $(INCL) $(CURDIR)/$< | $(BUILD_PATH)/filter_deps $(OUT) > $@
+	$(CC) -M $(CFLAGS) $(INCL) $(CURDIR)/$< | $(BUILD_PATH)/filter_deps $(OUT) > $@
 
 LIB_DEPS = $(foreach F, $(LIB_SRCS), $(OUT)/$(basename $(F)).dep)
 $(OUT)/LIB.deps: $(LIB_DEPS)
@@ -123,19 +131,19 @@ bindep : $(OUT)/BIN.deps
 $(OUT)/%.o : %.cc 
 	mkdir -p $(dir $@)
 	echo "\`\` Compiling:" $(LOCAL_PATH)/$<
-	g++ -c $(CXXFLAGS) $(INCL) $< -o $@
+	$(CXX) -c $(CXXFLAGS) $(INCL) $< -o $@
 	rm -f $(basename $@).dep      # (remove stale dependency file)
 
 $(OUT)/%.o : %.C
 	mkdir -p $(dir $@)
 	echo "\`\` Compiling:" $(LOCAL_PATH)/$<
-	g++ -c $(CXXFLAGS) $(INCL) $< -o $@
+	$(CXX) -c $(CXXFLAGS) $(INCL) $< -o $@
 	rm -f $(basename $@).dep      # (remove stale dependency file)
 
 $(OUT)/%.o : %.c
 	mkdir -p $(dir $@)
 	echo "\`\` Compiling:" $(LOCAL_PATH)/$<
-	gcc -c $(CFLAGS) $(INCL) $< -o $@
+	$(CC) -c $(CFLAGS) $(INCL) $< -o $@
 	rm -f $(basename $@).dep      # (remove stale dependency file)
 
 
@@ -145,7 +153,7 @@ $(LIB_BIN) : $(LIB_OBJS)
 	mkdir -p $(dir $@)
 	printf "\`\` Linking library: %s\n" "$(notdir $@)" #; printf "  - %s\n" $(notdir $^)
 	rm -f $@
-	echo "int __zb_dummy_var__;" > $(OUT)/__dummy__.cc; g++ -c $(OUT)/__dummy__.cc -o $(OUT)/__dummy__.o   # (needed for Mac who doesn't like empty libraries)
+	echo "int __zb_dummy_var__;" > $(OUT)/__dummy__.cc; $(CXX) -c $(OUT)/__dummy__.cc -o $(OUT)/__dummy__.o   # (needed for Mac who doesn't like empty libraries)
 	ar cqs $@ $^ $(OUT)/__dummy__.o 2>&1
 
 lib : $(LIB_BIN)

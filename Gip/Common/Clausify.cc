@@ -22,8 +22,6 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-// <<== rename to just 'clausify'; add support for reset logic (initial state) and perhaps
-// also unrolling (or use this as a primitive for that??)
 void clausify(const Gig& F, const Vec<GLit>& roots, MetaSat& S, WMapX<Lit>& f2s, bool init_ffs, Vec<GLit>* new_ffs)
 {
     Vec<GLit> Q(copy_, roots);

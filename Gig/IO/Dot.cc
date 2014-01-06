@@ -71,23 +71,11 @@ static
 void writeBox(Out& out, Gig& N, Wire w, Vec<char>& namebuf, Vec<String>* uif_names)
 {
     String shape = "box";
-  #if 0
-    String name1 = N.names().get(+w, namebuf);  // -- first line; must not be empty
-  #else
     String name1;
     FWrite(name1) "%w", +w.lit();
-  #endif
     String name2 = GateType_name[w.type()];     // -- second line; can be empty
     String color = "";
     String fill  = "";
-
-  #if 0
-    // Add a few more names, if present...
-    if (N.names().size(w) >= 2)
-        name1 = name1 + ", " + N.names().get(+w, namebuf, 1);
-    if (N.names().size(w) >= 3)
-        name1 = name1 + ", ...";
-  #endif
 
     // Set attribute and add extra info to name:
     if (w == gate_And){
@@ -98,6 +86,11 @@ void writeBox(Out& out, Gig& N, Wire w, Vec<char>& namebuf, Vec<String>* uif_nam
         shape = "plaintext";
         color = "#0000D8";
         FWrite(name2) " %_", w.num();
+
+    }else if (w == gate_Const){
+        shape = "plaintext";
+        color = "#0000D8";
+        FWrite(name2) " %_", w.lb();
 
     }else if (w == gate_FF){
         color = "#FFFFFF";

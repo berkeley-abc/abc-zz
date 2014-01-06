@@ -305,6 +305,12 @@ int main(int argc, char** argv)
     cli.add("keep"   , "string", ""          , "List of forcable gates (only for GNL input).");
     cli.add("blif"   , "string", ""          , "Save original input in BLIF format (for debugging only). Add '@' as last character to skip mapping.");
     cli.add("pnl"    , "string", ""          , "Save original input in PNL format (for debugging only). Add '@' as last character to skip mapping.");
+    cli.add("prot"   , "bool"  , "no"        , "Protect fanout-free gates by adding a PO to each one.");
+    cli.add("strash" , "bool"  , "no"        , "Apply structural hashing before mapping.");
+    cli.add("melt"   , "bool"  , "no"        , "Undo the 3-input LUT mapping of HDL-ICE.");
+    cli.add("comb"   , "bool"  , "no"        , "Remove white/black boxes and sequential elements (may change delay profile).");
+    cli.add("mux"    , "bool"  , "no"        , "Do MUX and XOR extraction first.");
+    cli.add("compact", "bool"  , "yes"       , "Compact netlist at end of pre-processing.");
     cli.add("cost"   , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
     cli.add("ftbs"   , "string", ""          , "Write all FTBs to a file (for analysis).");
     cli.add("N"      , "uint"  , "10"        , "Cuts to keep per node.");
@@ -313,9 +319,6 @@ int main(int argc, char** argv)
     cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
     cli.add("recycle", "bool"  , "yes"       , "Recycle cuts for faster iterations.");
     cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (default is area).");
-    cli.add("comb"   , "bool"  , "no"        , "Remove white/black boxes and sequential elements (may change delay profile).");
-    cli.add("mux"    , "bool"  , "yes"       , "Do MUX and XOR extraction first.");
-    cli.add("melt"   , "bool"  , "no"        , "Undo the 3-input LUT mapping of HDL-ICE.");
     cli.add("ela"    , "bool"  , "yes"       , "Use exact-local-area post-processing after each mapping phase.");
     cli.add("fmux"   , "bool"  , "no"        , "Use special F7MUX and F8MUX in Xilinx series 7.");
     cli.add("batch"  , "bool"  , "no"        , "Add last line summary for batch jobs.");
@@ -388,24 +391,25 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-#if 0   /*DEBUG -- <<== option protect logic without fanouts*/
-    {
-        Add_Gob(N, FanoutCount);
+
+    // Pre-process netlist:
+    N.is_frozen = false;
+    WriteLn "Info: %_", info(N);
+
+    if (cli.get("prot").bool_val){
+        Assure_Gob(N, FanoutCount);
         For_Gates(N, w)
             if (nFanouts(w) == 0 && w != gate_PO)
                 N.add(gate_PO).init(w);
     }
-#endif  /*END DEBUG*/
 
-    // Temporary preprocessing; rewrite this:
-    N.is_frozen = false;
-    WriteLn "Info: %_", info(N);
-    // <<== option: strash or no strash
-//    WriteLn "Strashing";
-//    N.strash();
-//    WriteLn "Info: %_", info(N);
-//    N.unstrash();
-    N.is_frozen = false;
+    if (cli.get("strash").bool_val){
+        WriteLn "Strashing";
+        N.strash();
+        WriteLn "Info: %_", info(N);
+        N.unstrash();
+        N.is_frozen = false;
+    }
 
     if (cli.get("melt").bool_val)
         expandLut3s(N);
@@ -416,7 +420,16 @@ int main(int argc, char** argv)
     if (cli.get("mux").bool_val)
         introduceMuxesAsLuts(N);
 
-    N.compact();
+    Vec<uint> protectors;
+    if (cli.get("compact").bool_val)
+        N.compact();
+    else{
+        // Cannot have fanout free gates in mapper; protect them, then remove protectors after mapping:
+        Assure_Gob(N, FanoutCount);
+        For_Gates(N, w)
+            if (nFanouts(w) == 0 && w != gate_PO)
+                protectors.push(N.add(gate_PO).init(w).num());
+    }
 
     double T1 = cpuTime();
     WriteLn "Parsing: %t", T1-T0;
@@ -427,6 +440,7 @@ int main(int argc, char** argv)
         Write "  #keeps=%_", keep_sz;
     NewLine;
 
+    // Optionally output parsed netlist:
     if (blif != ""){
         bool quit = false;
         if (blif.last() == '@'){
@@ -451,6 +465,7 @@ int main(int argc, char** argv)
         if (quit) return 0;
     }
 
+    // Techmap
 #if 1
     Vec<Params_LutMap> Ps(cli.get("rounds").int_val, P);
     lutMap(N, Ps);
@@ -571,6 +586,14 @@ int main(int argc, char** argv)
     double T2 = cpuTime();
     WriteLn "Mapping: %t", T2-T1;
 
+    // Remove protectors:
+    if (protectors.size() > 0){
+        for (uint i = 0; i < protectors.size(); i++)
+            remove(N(gate_PO, protectors[i]));
+        WriteLn "No protectors: %_", info(N);
+    }
+
+    // Optionally write mapped result to file:
     if (output != ""){
         if (hasExtension(output, "blif")){
             //N.setMode(gig_Lut6);

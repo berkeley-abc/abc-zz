@@ -3,7 +3,7 @@
 //| Name        : Gig.cc
 //| Author(s)   : Niklas Een
 //| Module      : IO
-//| Description :
+//| Description : Parser for .gig format used by the old Netlist.
 //|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
@@ -435,7 +435,7 @@ void readGig(In& in, /*out*/Gig& N)
             }
         }
 
-        // Translate names:  
+        // Translate names:
         Map<Str,GLit> old_syms;
         syms.moveTo(old_syms);
         For_Map(old_syms){
@@ -447,7 +447,9 @@ void readGig(In& in, /*out*/Gig& N)
         // GUARD SEQUENTIAL ELEMENTS:
 
         For_Gates(N, w){
-            if (isSeqElem(w)){
+            if (w == gate_FF)
+                w.set(0, N.add(gate_Seq).init(w[0]));   // -- second input of FF is "reset" and is combinational
+            else if (isSeqElem(w)){
                 For_Inputs(w, v){
                     w.set(Input_Pin(v), N.add(gate_Seq).init(v)); }
             }

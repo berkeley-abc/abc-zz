@@ -23,10 +23,10 @@ using namespace std;
 // Reader:
 
 
-const float delay_MemR = 15;
-const float delay_MemW = 13;
-const float delay_PadR = 4;
-const float delay_PadW = 4;
+const uint delay_MemR = 15;
+const uint delay_MemW = 13;
+const uint delay_PadR = 4;
+const uint delay_PadW = 4;
     // -- these don't have to be accurate, it is just for testing anyway
 
 

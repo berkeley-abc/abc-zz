@@ -831,8 +831,8 @@ void LutMap::updateFanoutEst(bool instantiate)
     if (!instantiate){
         if (!P.map_for_delay || round > 0){
             // Blend new values with old:
-            uint  r = round + 1.0f;
-            if (P.map_for_delay && round != 0) r -= 1.0;
+            uint  r = round + 1;
+            if (P.map_for_delay && round != 0) r -= 1;
             float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 2.0f);
             float beta  = 1.0f - alpha;
 
