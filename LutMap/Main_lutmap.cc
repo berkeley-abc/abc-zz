@@ -322,6 +322,9 @@ int main(int argc, char** argv)
     cli.add("ela"    , "bool"  , "yes"       , "Use exact-local-area post-processing after each mapping phase.");
     cli.add("fmux"   , "bool"  , "no"        , "Use special F7MUX and F8MUX in Xilinx series 7.");
     cli.add("batch"  , "bool"  , "no"        , "Add last line summary for batch jobs.");
+    cli.add("sig"    , "{off,full,pos}","off", "Map with signal tracking? (\"full\" includes negative literals).");
+    cli.add("remap"  , "string", ""          , "Write signal mapping to this file (requires 'sig' to be set).");
+    cli.add("verif"  , "bool"  , "no"        , "Signal tracking verification -- output files for equivalence checking.");
     cli.parseCmdLine(argc, argv);
 
     String input  = cli.get("input").string_val;
@@ -391,6 +394,14 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+    uint orig_netlist_size = N.size();
+    if (cli.get("remap").string_val != ""){
+        if (cli.get("strash").bool_val){ ShoutLn "ERROR! Must not use '-strash' with '-remap'."; exit(1); }
+        if (cli.get("melt")  .bool_val){ ShoutLn "ERROR! Must not use '-melt' with '-remap'."; exit(1); }
+        if (cli.get("comb")  .bool_val){ ShoutLn "ERROR! Must not use '-comb' with '-remap'."; exit(1); }
+        if (cli.get("mux")   .bool_val){ ShoutLn "ERROR! Must not use '-mux' with '-remap'."; exit(1); }
+        if (cli.get("sig").enum_val == 0){ ShoutLn "ERROR! Must use '-sig' with '-remap'."; exit(1); }
+    }
 
     // Pre-process netlist:
     N.is_frozen = false;
@@ -466,122 +477,124 @@ int main(int argc, char** argv)
     }
 
     // Techmap
-#if 1
     Vec<Params_LutMap> Ps(cli.get("rounds").int_val, P);
-    lutMap(N, Ps);
 
-#else
-    // With signal tracking (for debugging)
-    WMapX<GLit> remap;
-    Gig N_orig;
-    N.copyTo(N_orig);
+    if (cli.get("sig").enum_val == 0){
+        // No signal tracking:
+        lutMap(N, Ps);
 
-    Vec<Params_LutMap> Ps(cli.get("rounds").int_val, P);
-    lutMap(N, Ps, &remap);
+    }else{
+        // With signal tracking (for debugging)
+        WMapX<GLit> remap;
+        Gig N_orig;
+        N.copyTo(N_orig);
 
-  #if 1   /*DEBUG*/
-  {
-    double T0 = cpuTime();
-    uint n_luts = N.typeCount(gate_Lut6);
-    removeRemapSigns(N, remap);
-    removeInverters(N, &remap);
-    WriteLn "Inverter removal time: %t", cpuTime() - T0;
-    WriteLn "LUTs added: %_", N.typeCount(gate_Lut6) - n_luts;
+        lutMap(N, Ps, &remap);
 
-    For_Gates(N, w)
-        For_Inputs(w, v)
-            assert(!v.sign);
-  }
-  #endif  /*END DEBUG*/
+        if (cli.get("sig").enum_val == 2){      // -- 2 == 'pos' (no negative literals)
+            double T0 = cpuTime();
+            uint n_luts = N.typeCount(gate_Lut6);
+            removeRemapSigns(N, remap);
+            removeInverters(N, &remap);
+            WriteLn "Inverter removal time: %t", cpuTime() - T0;
+            WriteLn "LUTs added: %_", N.typeCount(gate_Lut6) - n_luts;
 
-  #if 1
-    For_Gatetype(N_orig, gate_PO, w)
-        remove(w);
-    For_Gatetype(N, gate_PO, w)
-        remove(w);
+            For_Gates(N, w)
+                For_Inputs(w, v)
+                    assert(!v.sign);
+        }
 
-    /**/WSeen vs, ns;
-    For_Gates(N_orig, w){
-        if (w == gate_PI || w == gate_PO) continue;
+        // Internal points verification -- turn combinational inputs into PIs and add POs to every internal point:
+        if (cli.get("verif").bool_val){
+            For_Gatetype(N_orig, gate_PO, w)
+                remove(w);
+            For_Gatetype(N, gate_PO, w)
+                remove(w);
 
-        if (isLogicGate(w)){
-            For_Inputs(w, v){
-                if (!isLogicGate(v) && v != gate_PI && v != gate_Const){
-                    Wire n = remap[v] + N; assert(+n); assert(n != gate_PI && n != gate_Const);
-                  #if 1
-                    /**/if (vs.has(v)) WriteLn "Duplicate in v: %_", v;
-                    /**/if (ns.has(n)) WriteLn "Duplicate in n: %_", n;
-                    /**/vs.add(v); ns.add(n);
-                    change(v, gate_PI);
-                    change(n, gate_PI);
-                    assert(v.num() == n.num());
-                  #endif
+            /**/WSeen vs, ns;
+            For_Gates(N_orig, w){
+                if (w == gate_PI || w == gate_PO) continue;
+
+                if (isLogicGate(w)){
+                    For_Inputs(w, v){
+                        if (!isLogicGate(v) && v != gate_PI && v != gate_Const){
+                            Wire n = remap[v] + N; assert(+n); assert(n != gate_PI && n != gate_Const);
+                          #if 1
+                            /**/if (vs.has(v)) WriteLn "Duplicate in v: %_", v;
+                            /**/if (ns.has(n)) WriteLn "Duplicate in n: %_", n;
+                            /**/vs.add(v); ns.add(n);
+                            change(v, gate_PI);
+                            change(n, gate_PI);
+                            assert(v.num() == n.num());
+                          #endif
+                        }
+                    }
+                }else{
+                    Wire m = remap[w] + N; assert(+m);
+                    assert(w.size() == m.size());
+                    for (uint i = 0; i < w.size(); i++){
+                        if (!w[i]){ assert(!m[i]); continue; }
+                        assert(m[i]);
+
+                        if (!isLogicGate(w[i])) continue;
+
+                        N_orig.add(gate_PO).init(w[i]);
+                        N     .add(gate_PO).init(m[i]);
+                    }
                 }
             }
-        }else{
-            Wire m = remap[w] + N; assert(+m);
-            assert(w.size() == m.size());
-            for (uint i = 0; i < w.size(); i++){
-                if (!w[i]){ assert(!m[i]); continue; }
-                assert(m[i]);
 
-                if (!isLogicGate(w[i])) continue;
+            For_UpOrder(N_orig, w)
+                if (!isLogicGate(w) && w != gate_PI && w != gate_PO)
+                    remove(w);
 
-                N_orig.add(gate_PO).init(w[i]);
-                N     .add(gate_PO).init(m[i]);
+            For_UpOrder(N, m)
+                if (!isLogicGate(m) && m != gate_PI && m != gate_PO)
+                    remove(m);
+
+            For_Gates(N_orig, w)
+                For_Inputs(w, v){
+                    /**/if (!(!v.isRemoved()))Dump(w);
+                    assert(!v.isRemoved());
+                }
+
+            For_Gates(N, w)
+                For_Inputs(w, v)
+                    assert(!v.isRemoved());
+
+            WriteLn "Signal tracking verificaton:";
+            WriteLn "  Transformed original: %_", info(N_orig);
+            WriteLn "  Transformed mapped  : %_", info(N);
+
+            uint count = 0;
+            Vec<GLit>& v = remap.base();
+            for (uint i = gid_FirstUser; i < v.size(); i++){
+                if (v[i] && isLogicGate(v[i] + N)){
+                    count++;
+                    N_orig.add(gate_PO).init(N_orig[i]);
+                    N.add(gate_PO).init(v[i]);
+                }
             }
+
+            WriteLn "  Signals retained: %_", count;
+
+            writeBlifFile("src.blif", N_orig);
+            WriteLn "Wrote: \a*src.blif\a*";
+
+            writeBlifFile("dst.blif", N);
+            WriteLn "Wrote: \a*dst.blif\a*";
+        }
+
+        // Write signal map to file:
+        String remap_file = cli.get("remap").string_val;
+        if (remap_file != ""){
+            OutFile out(remap_file);
+            for (uint i = 0; i < orig_netlist_size; i++)
+                if (remap[GLit(i)].id != 0)
+                    FWriteLn(out) "%_ %C%_", i, remap[GLit(i)].sign ? '~' : 0, remap[GLit(i)].id;
+            WriteLn "Wrote: \a*%s\a*", remap_file;
         }
     }
-
-    For_UpOrder(N_orig, w)
-        if (!isLogicGate(w) && w != gate_PI && w != gate_PO)
-            remove(w);
-
-    For_UpOrder(N, m)
-        if (!isLogicGate(m) && m != gate_PI && m != gate_PO)
-            remove(m);
-
-    For_Gates(N_orig, w)
-        For_Inputs(w, v){
-            /**/if (!(!v.isRemoved()))Dump(w);
-            assert(!v.isRemoved());
-        }
-
-    For_Gates(N, w)
-        For_Inputs(w, v)
-            assert(!v.isRemoved());
-
-    WriteLn "Transformed original: %_", info(N_orig);
-    WriteLn "Transformed mapped  : %_", info(N);
-  #endif
-
-  #if 1
-    uint count = 0;
-    Vec<GLit>& v = remap.base();
-    for (uint i = gid_FirstUser; i < v.size(); i++){
-        if (v[i] && isLogicGate(v[i] + N)){
-            count++;
-            N_orig.add(gate_PO).init(N_orig[i]);
-            N.add(gate_PO).init(v[i]);
-        }
-    }
-
-    WriteLn "Signals retained: %_", count;
-
-    //**/Write "Dumping PIs:";
-    //**/For_Gatetype(N_orig, gate_PI, w) Write " %_", w;
-    //**/NewLine;
-  #endif
-
-  #if 1
-    writeBlifFile("src.blif", N_orig);
-    WriteLn "Wrote: \a*src.blif\a*";
-
-    writeBlifFile("dst.blif", N);
-    WriteLn "Wrote: \a*dst.blif\a*";
-  #endif
-
-#endif
 
     double T2 = cpuTime();
     WriteLn "Mapping: %t", T2-T1;
@@ -692,3 +705,10 @@ int main(int argc, char** argv)
 
     return 0;
 }
+
+
+    //N.save(<gnlfile>);                                                                                                                              
+    // cuts_per_node=10 n_rounds=5    (one line per phase)                                                                                            
+    //cmd = <bin> -params=<filename> -sig=pos -remap=<remapfile> <gnlfile> <gnl-out>                                                                  
+    //int stat = system(cmd);                                                                                                                         
+    // read remap, read mapped netlist                                                                                                                
