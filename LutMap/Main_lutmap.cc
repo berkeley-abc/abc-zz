@@ -293,6 +293,126 @@ void writePnlFile(String filename, Gig& N)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// LutMap parameters:
+
+
+bool stringToBool(Str text)
+{
+    if (!text || text.size() == 0) return true;
+
+    if      (eq (text, "1"    )) return true;
+    else if (eq (text, "0"    )) return false;
+    else if (eqi(text, "true" )) return true;
+    else if (eqi(text, "false")) return false;
+    else if (eqi(text, "on"   )) return true;
+    else if (eqi(text, "off"  )) return false;
+    else if (eqi(text, "yes"  )) return true;
+    else if (eqi(text, "no"   )) return false;
+
+    throw 0;
+    return false;
+}
+
+
+void readParams(String filename, const Params_LutMap& P_default, /*out*/Vec<Params_LutMap>& Ps)
+{
+    InFile in(filename);
+    if (!in){
+        ShoutLn "ERROR! Could not open params file: %_", filename;
+        exit(1); }
+
+    Vec<char> buf;
+    Vec<Str>  fs, gs;
+    while (!in.eof()){
+        readLine(in, buf);
+        Str line = strip(buf.slice());
+        if (line.size() == 0)
+            continue;
+
+        Ps.push(P_default);
+        if (eq(line, "-")){
+            continue; }
+
+        Params_LutMap& P = Ps.last();
+
+        splitArray(line, " ", fs);
+        for (uint i = 0; i < fs.size(); i++){
+            Str s = fs[i];
+            if (s[0] == '-')
+                s = s.slice(1);
+
+            Str v = Str("");
+            uind j = search(s, '=');
+            if (j != UIND_MAX){
+                v = s.slice(j+1);
+                s = s.slice(0, j);
+            }
+
+            try{
+                if (eq(s, "cuts_per_node") || eq(s, "N")){
+                    P.cuts_per_node = stringToUInt64(v);
+                }else if (eq(s, "n_rounds") || eq(s, "iters")){
+                    P.n_rounds = stringToUInt64(v);
+                }else if (eq(s, "delay_factor") || eq(s, "df")){
+                    P.delay_factor = stringToDouble(v);
+                }else if (eq(s, "map_for_delay") || eq(s, "dopt")){
+                    P.map_for_delay = stringToBool(v);
+                }else if (eq(s, "recycle_cuts") || eq(s, "recycle")){
+                    P.recycle_cuts = stringToBool(v);
+                }else if (eq(s, "lut_costs")){
+                    splitArray(v, ",", gs);
+                    if (gs.size() != 7){
+                        ShoutLn "ERROR! Expected 7 values given to 'lut_costs'.";
+                        exit(1); }
+                    for (uint i = 0; i <= 6; i++)
+                        P.lut_cost[i] = stringToUInt64(gs[i]);
+                }else if (eq(s, "cost")){
+                    if (eq(v, "unit")){
+                        for (uint i = 0; i <= 6; i++)
+                            P.lut_cost[i] = 1;
+                        P.mux_cost = 0;
+                    }else if (eq(v, "wire")){
+                        for (uint i = 0; i <= 6; i++)
+                            P.lut_cost[i] = i;
+                        P.mux_cost = 1;
+                    }else{
+                        ShoutLn "ERROR! Invalid value given to parameter 'cost': %_", v;
+                        exit(1); }
+                }else if (eq(s, "mux_cost")){
+                    P.mux_cost = stringToUInt64(v);
+                }else if (eq(s, "use_ela") || eq(s, "ela")){
+                    P.use_ela = stringToBool(v);
+                }else if (eq(s, "use_fmux") || eq(s, "fmux")){
+                    P.use_fmux = stringToBool(v);
+                }else{
+                    throw 0;
+                }
+            }catch (...){
+                ShoutLn "ERROR! Invalid parameter: %_", fs[i];
+                exit(1);
+            }
+        }
+    }
+
+#if 0
+    WriteLn "Parameters:";
+    for (uint i = 0; i < Ps.size(); i++){
+        WriteLn "Iteration %_:", i;
+        WriteLn "  cuts_per_node: %_", Ps[i].cuts_per_node;
+        WriteLn "  n_rounds     : %_", Ps[i].n_rounds;
+        WriteLn "  delay_factor : %_", Ps[i].delay_factor;
+        WriteLn "  map_for_delay: %_", Ps[i].map_for_delay;
+        WriteLn "  recycle_cuts : %_", Ps[i].recycle_cuts;
+        WriteLn "  lut_cost     : %_", slice(Ps[i].lut_cost[0], Ps[i].lut_cost[7]);
+        WriteLn "  mux_cost     : %_", Ps[i].mux_cost;
+        WriteLn "  use_ela      : %_", Ps[i].use_ela;
+        WriteLn "  use_fmux     : %_", Ps[i].use_fmux;
+    }
+#endif
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Main:
 
 
@@ -311,16 +431,17 @@ int main(int argc, char** argv)
     cli.add("comb"   , "bool"  , "no"        , "Remove white/black boxes and sequential elements (may change delay profile).");
     cli.add("mux"    , "bool"  , "no"        , "Do MUX and XOR extraction first.");
     cli.add("compact", "bool"  , "yes"       , "Compact netlist at end of pre-processing.");
-    cli.add("cost"   , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
     cli.add("ftbs"   , "string", ""          , "Write all FTBs to a file (for analysis).");
+    cli.add("rounds" , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
     cli.add("N"      , "uint"  , "10"        , "Cuts to keep per node.");
     cli.add("iters"  , "uint"  , "4"         , "Phases in each mapping.");
-    cli.add("rounds" , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
     cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
-    cli.add("recycle", "bool"  , "yes"       , "Recycle cuts for faster iterations.");
     cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (default is area).");
+    cli.add("recycle", "bool"  , "yes"       , "Recycle cuts for faster iterations.");
     cli.add("ela"    , "bool"  , "yes"       , "Use exact-local-area post-processing after each mapping phase.");
     cli.add("fmux"   , "bool"  , "no"        , "Use special F7MUX and F8MUX in Xilinx series 7.");
+    cli.add("cost"   , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
+    cli.add("params" , "string", ""          , "A file containing options '-N' through '-cost'; one line per round (so number of lines sets '-rounds'). Omitted options will take values set by command line (use \"-\" for empty lines = all options are default)");
     cli.add("batch"  , "bool"  , "no"        , "Add last line summary for batch jobs.");
     cli.add("sig"    , "{off,full,pos}","off", "Map with signal tracking? (\"full\" includes negative literals).");
     cli.add("remap"  , "string", ""          , "Write signal mapping to this file (requires 'sig' to be set).");
@@ -477,7 +598,11 @@ int main(int argc, char** argv)
     }
 
     // Techmap
-    Vec<Params_LutMap> Ps(cli.get("rounds").int_val, P);
+    Vec<Params_LutMap> Ps;
+    if (cli.get("params").string_val != "")
+        readParams(cli.get("params").string_val, P, Ps);
+    else
+        Ps.growTo(cli.get("rounds").int_val, P);
 
     if (cli.get("sig").enum_val == 0){
         // No signal tracking:
@@ -707,8 +832,8 @@ int main(int argc, char** argv)
 }
 
 
-    //N.save(<gnlfile>);                                                                                                                              
-    // cuts_per_node=10 n_rounds=5    (one line per phase)                                                                                            
-    //cmd = <bin> -params=<filename> -sig=pos -remap=<remapfile> <gnlfile> <gnl-out>                                                                  
-    //int stat = system(cmd);                                                                                                                         
-    // read remap, read mapped netlist                                                                                                                
+    //N.save(<gnlfile>);
+    // cuts_per_node=10 n_rounds=5    (one line per phase)
+    //cmd = <bin> -params=<filename> -sig=pos -remap=<remapfile> <gnlfile> <gnl-out>
+    //int stat = system(cmd);
+    // read remap, read mapped netlist
