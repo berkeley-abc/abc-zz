@@ -18,6 +18,13 @@ namespace ZZ {
 using namespace std;
 
 
+#define Cut TeckMap_Cut
+#define Cut_NULL Cut()
+
+#define CutSet TechMap_CutSet
+#define CutSet_NULL CutSet()
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 /*
 
@@ -44,10 +51,10 @@ F7s, F8s
 
 */
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Cuts:
+// Cut class:
 
 
-/* 
+/*
 Cut layout:
 
 sig    : 1 uint
@@ -57,26 +64,28 @@ pad    : 0 or 1 uint (to get to 64-bit align)
 ftb    : '2^size / 64' uint64s, rounded up.
 */
 
-class TechMap_Cut {
+class Cut {
+public:
     typedef StackAlloc<uint64> Alloc;
 
+private:
     uint64* base;
 
-    TechMap_Cut& me() const { return *const_cast<TechMap_Cut*>(this); }
+    Cut& me() const { return *const_cast<Cut*>(this); }
 
     uint&   sig_()         { return ((uint*)&base[0])[0]; }
     uint&   size_()        { return ((uint*)&base[0])[1]; }
     uint&   input_(uint i) { return ((uint*)&base[1])[i]; }
     uint64& ftb_(uint i)   { return base[(size_() + 3) >> 1]; }
 
-    void init(Array<gate_id> inputs, Array<uint64> ftb, TechMap_Cut::Alloc& mem);
+    void init(Array<gate_id> inputs, Array<uint64> ftb, Cut::Alloc& mem);
 
 public:
-    TechMap_Cut() : base(NULL) {}
-    TechMap_Cut(Array<gate_id> inputs, Array<uint64> ftb, Alloc& mem) { init(inputs, ftb, mem); }
-    TechMap_Cut(Array<gate_id> inputs, uint64        ftb, Alloc& mem) { uint64* f = &ftb; init(inputs, slice(f[0], f[1]), mem); }
+    Cut() : base(NULL) {}
+    Cut(Array<gate_id> inputs, Array<uint64> ftb, Alloc& mem) { init(inputs, ftb, mem); }
+    Cut(Array<gate_id> inputs, uint64        ftb, Alloc& mem) { uint64* f = &ftb; init(inputs, slice(f[0], f[1]), mem); }
 
-    Null_Method(TechMap_Cut) { return base == NULL; }
+    Null_Method(Cut) { return base == NULL; }
     uint sig()                        const { return me().sig_(); }
     uint size()                       const { return me().size_(); }
     gate_id operator[](int input_num) const { return me().input_(input_num); }
@@ -84,7 +93,7 @@ public:
 };
 
 
-void TechMap_Cut::init(Array<gate_id> inputs, Array<uint64> ftb, TechMap_Cut::Alloc& mem)
+void Cut::init(Array<gate_id> inputs, Array<uint64> ftb, Cut::Alloc& mem)
 {
     base = mem.alloc(((inputs.size() + 3) >> 1) + ftb.size());
 
@@ -113,12 +122,12 @@ void TechMap_Cut::init(Array<gate_id> inputs, Array<uint64> ftb, TechMap_Cut::Al
 
 
 //=================================================================================================
-// -- helper functions:
+// -- Helpers:
 
 
-// Check if the support of 'c' is a subset of the support of 'd'. Does NOT assume cuts to be 
+// Check if the support of 'c' is a subset of the support of 'd'. Does NOT assume cuts to be
 // sorted. The FTB is not used.
-macro bool subsumes(const TechMap_Cut& c, const TechMap_Cut& d)
+macro bool subsumes(const Cut& c, const Cut& d)
 {
     assert_debug(c);
     assert_debug(d);
@@ -139,6 +148,46 @@ macro bool subsumes(const TechMap_Cut& c, const TechMap_Cut& d)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// CutSet class:
+
+
+struct CutSet {
+    Array<Cut> cuts;
+};
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// TechMap class:
+
+
+
+
+class TechMap {
+    // Input:
+    Gig&    N;
+
+    // State:
+    Cut::Alloc        mem;
+    WMap<CutSet>      cutmap;
+    WMap<Cut>         winner;
+    WMap<float>       area_est;
+    WMap<float>       fanout_est;
+    WMap<float>       arrival;
+    WMap<float>       depart;
+    WMap<uchar>       active;
+
+    uint              iter;
+    float             target_arrival;
+
+public:
+    TechMap(Gig& N);
+};
+
+
+//=================================================================================================
+// -- Main:
+
+
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -154,10 +203,10 @@ void test()
 
     StackAlloc<uint64> mem;
 
-    TechMap_Cut c(inputs.slice(), ftb.slice(), mem);
+    Cut c(inputs.slice(), ftb.slice(), mem);
     inputs.pop();
     inputs.push(3);
-    TechMap_Cut d(inputs.slice(), ftb.slice(), mem);
+    Cut d(inputs.slice(), ftb.slice(), mem);
 
     Dump(c.sig(), d.sig());
     WriteLn "%_", subsumes(c, d);
