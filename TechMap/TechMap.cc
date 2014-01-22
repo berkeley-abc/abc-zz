@@ -51,7 +51,7 @@ F7s, F8s
 
 */
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Cut class:
+// 'Cut' class:
 
 
 /*
@@ -82,13 +82,14 @@ private:
     uint64& ftb_(uint i)   { return base[offFtb_() + i]; }
     uchar&  sel_(uint i)   { return ((uchar*)&base[offSel_()])[i]; }
 
-    void init(uint64* base, Array<gate_id> inputs, uint64* ftb, uchar* sel);
+    void init(Array<gate_id> inputs, uint64* ftb, uchar* sel);
 
 public:
-    static uint allocSz(uint n_inputs);
-
     Cut() : base(NULL) {}
-    Cut(uint64* base, Array<gate_id> inputs, uint64* ftb, uchar* sel) { init(base, inputs, ftb, sel); }
+    Cut(uint64* base_) : base(base_) {}
+
+    static uint allocSz(uint n_inputs);
+    Cut(uint64* base_, Array<gate_id> inputs, uint64* ftb, uchar* sel) : base(base_) { init(inputs, ftb, sel); }
         // -- size of 'ftb' should be 'ceil(2^n / 64)' i.e. '(1 << inputs.size() + 63) >> 6'.
 
     Null_Method(Cut) { return base == NULL; }
@@ -99,6 +100,8 @@ public:
 
     uint64 ftb(uint word_num = 0)     const { return me().ftb_(word_num); }
     uchar  sel(uint byte_num)         const { return me().sel_(byte_num); }
+
+    uint ftbSz() const { return ((1ull << size()) + 63) >> 6; }
 };
 
 
@@ -112,7 +115,7 @@ inline uint Cut::allocSz(uint n_inputs)
 }
 
 
-inline void Cut::init(uint64* base, Array<gate_id> inputs, uint64* ftb, uchar* sel)
+inline void Cut::init(Array<gate_id> inputs, uint64* ftb, uchar* sel)
 {
     assert(inputs.size() <= 32);
     uint ftb_words = ((1ull << inputs.size()) + 63) >> 6;
@@ -138,7 +141,7 @@ inline void Cut::init(uint64* base, Array<gate_id> inputs, uint64* ftb, uchar* s
     for (uint i = 0; i < inputs.size(); i++)
         sel_(i) = sel[i];
 
-  #if 1
+  #if 0
     WriteLn "sig:    %_", (uint*)&sig_() - (uint*)base;
     WriteLn "size:   %_", (uint*)&size_() - (uint*)base;
     WriteLn "inputs: %_", (uint*)&input_(0) - (uint*)base;
@@ -151,11 +154,80 @@ inline void Cut::init(uint64* base, Array<gate_id> inputs, uint64* ftb, uchar* s
 }
 
 
-//=================================================================================================
-// -- Types:
+template<> fts_macro void write_(Out& out, const Cut& v)
+{
+    FWrite(out) "Cut{";
+    for (uint i = 0; i < v.size(); i++){
+        if (i != 0) FWrite(out) ", ";
+        FWrite(out) "w%_:%d", v[i], v.sel(i); }
+    FWrite(out) "}[";
+
+    for (uint i= 0; i < v.ftbSz(); i++){    // -- perhaps reverse order
+        if (i != 0) FWrite(out) ", ";
+        FWrite(out) "0x%.16X", v.ftb(i); }
+    FWrite(out) "]";
+}
 
 
-typedef Array<Cut> CutSet;
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Cut sets:
+
+
+class CutSet {
+    uint64* data;
+    uint off(uint i) const { return ((uint*)data)[i+1]; }
+
+    friend class DynCutSet;
+    CutSet(uint64* data_) : data(data_) {}
+
+public:
+    CutSet() : data(NULL) {}
+    Null_Method(CutSet) { return data == NULL; }
+
+    uint size() { return ((uint*)data)[0]; }
+    Cut operator[](uint i) const { return Cut(&data[off(i)]); }
+};
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+class DynCutSet {
+    Vec<uint64> mem;
+    Vec<uint>   off;
+
+    void clearCut() { inputs.clear(); ftb.clear(); sel.clear(); }
+
+    void storeCut() {
+        off.push((uint)mem.size());
+        mem.growTo(mem.size() + Cut::allocSz(inputs.size()));
+        Cut(&mem[off[LAST]], inputs.slice(), ftb.base(), sel.base());
+    }
+
+public:
+    Vec<gate_id> inputs;
+    Vec<uint64>  ftb;
+    Vec<uchar>   sel;
+
+    void begin() { mem.clear(); off.clear(); clearCut(); }
+    void next()  { storeCut(); clearCut(); }        // -- 'next()' must be called before the final 'done()'
+
+    template<class ALLOC>   // -- should allocate 'uint64's
+    CutSet done(ALLOC& allocator) {
+        /**/Dump(off);
+        uint off_adj = (off.size() + 2) >> 1;
+        /**/Dump(off_adj);
+        uint64* data = allocator.alloc(mem.size() + off_adj);
+        uint*   tab = (uint*)data;
+        tab[0] = off.size();
+        for (uint i = 0; i < off.size(); i++)
+            tab[i+1] = off[i] + off_adj;
+        for (uint i = 0; i < mem.size(); i++)
+            data[i + off_adj] = mem[i];
+        /**/WriteLn "data: %:x", slice(data[0], data[mem.size() + off_adj]);
+        return CutSet(data);
+    }
+};
 
 
 //=================================================================================================
@@ -373,29 +445,24 @@ void LutMap::generateCuts(Wire w)
 
 void test()
 {
-    Vec<gate_id> inputs;
-    inputs += 1, 2, 3, 35, 4, 5, 6;
+    DynCutSet cuts;
+    cuts.begin();
 
-    Vec<uint64> ftb;
-    ftb += 0xABBA;
-    ftb += 0x1234;
+    cuts.inputs += 100, 200, 300, 400, 500, 600, 700;
+    cuts.ftb += 0xABBADEAD00112233ull, 0x0123456789abcdefull;
+    cuts.sel += 7, 6, 5, 4, 3, 2, 1;
+    cuts.next();
 
-    Vec<uchar> sel;
-    sel += 40, 41, 42, 43, 44, 45, 46;
+    cuts.inputs += 111, 222;
+    cuts.ftb += 0xCC;
+    cuts.sel += 9, 8;
+    cuts.next();
 
     StackAlloc<uint64> mem;
+    CutSet final = cuts.done(mem);
 
-    uint64* c_mem = xmalloc<uint64>(Cut::allocSz(inputs.size()));
-    Cut c(c_mem, inputs.slice(), &ftb[0], &sel[0]);
-    inputs.pop();
-    inputs.push(3);
-
-    uint64* d_mem = xmalloc<uint64>(Cut::allocSz(inputs.size()));
-    Cut d(d_mem, inputs.slice(), &ftb[0], &sel[0]);
-
-    Dump(c.sig(), d.sig());
-    WriteLn "%_", subsumes(c, d);
-    WriteLn "%_", subsumes(d, c);
+    for (uint i = 0; i < final.size(); i++)
+        Dump(final[i]);
 }
 
 
