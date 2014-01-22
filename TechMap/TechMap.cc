@@ -220,8 +220,11 @@ public:
         uint64* data = allocator.alloc(mem.size() + off_adj);
         uint*   tab = (uint*)data;
         tab[0] = off.size();
+
+        if ((off.size() & 1) == 0) off.push(0);    // -- just to avoid uninitialized memory (valgrind)
         for (uint i = 0; i < off.size(); i++)
             tab[i+1] = off[i] + off_adj;
+
         for (uint i = 0; i < mem.size(); i++)
             data[i + off_adj] = mem[i];
         /**/WriteLn "data: %:x", slice(data[0], data[mem.size() + off_adj]);
