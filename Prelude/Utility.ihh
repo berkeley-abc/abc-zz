@@ -632,6 +632,14 @@ struct IsChar2 {
 
 macro void skipWS(In& in) { while (!in.eof() && isWS(*in)) in++; }
 
+macro void skipLine(In& in) {
+    for(;;){
+        if (in.eof()) return;
+        if (*in == '\n'){ in++; return; }
+        in++;
+    }
+}
+
 macro void skipEol(In& in) {
     for(;;){
         if (in.eof()) return;

@@ -221,7 +221,7 @@ public:
         uint*   tab = (uint*)data;
         tab[0] = off.size();
 
-        if ((off.size() & 1) == 0) off.push(0);    // -- just to avoid uninitialized memory (valgrind)
+/*hmm*/        if ((off.size() & 1) == 0) off.push(0);    // -- just to avoid uninitialized memory (valgrind)
         for (uint i = 0; i < off.size(); i++)
             tab[i+1] = off[i] + off_adj;
 
