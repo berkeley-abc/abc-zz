@@ -79,11 +79,11 @@ def build():
         CXXFLAGS.append("-pthread");
         LDFLAGS.append("-pthread");
         BUILD_DIR = BUILD_DIR + "_pthread"
-    if "i" in secs: 
+    if "i" in secs:
         CXXFLAGS.append("-fPIC");
         LDFLAGS.append("-fPIC");
         BUILD_DIR = BUILD_DIR + "_fpic"
-    if "m" in secs: 
+    if "m" in secs:
         CXXFLAGS.append("-m32");
         LDFLAGS.append("-m32");
         BUILD_DIR = BUILD_DIR + "_m32"
@@ -96,7 +96,7 @@ def build():
     # Call makefile:
     os.chdir("minisat2")
     flags = "CXXFLAGS='%s' LDFLAGS='%s' BUILD_DIR='%s' %s %s" % (" ".join(CXXFLAGS), " ".join(LDFLAGS), BUILD_DIR, " ".join(OTHER), TARGET)
-    print "make -s -j%s %s" % (z("N_CORES"), flags)
+    #print "make -s -j%s %s" % (z("N_CORES"), flags)
     ret = os.system("make -s -j%s %s" % (z("N_CORES"), flags))
 
     # Copy results:

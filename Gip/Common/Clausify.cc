@@ -183,8 +183,13 @@ void clausify(const Gig& F, const Vec<GLit>& roots, MetaSat& S, WMapX<Lit>& f2s,
                 }
                 Lit output = S.addLit();
 
+#if 1
                 for (uint i = 0; i < cnfIsop_size(cl); i++){
                     cnfIsop_clause(cl, i, inputs, output, tmp);
+#else
+                for (uint i = 0; i < cnfPrime_size(cl); i++){
+                    cnfPrime_clause(cl, i, inputs, output, tmp);
+#endif
                     S.addClause(tmp);
                 }
                 f2s(w) = output ^ bool(n.negs & 16);

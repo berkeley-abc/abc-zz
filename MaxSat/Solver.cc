@@ -108,20 +108,22 @@ void oddEvenSort(Gig& N, Vec<GLit>& fs)
 void naiveMaxSat(MaxSatProb& P)
 {
     // Insert clauses into SAT solver:
-    ZzSat S;
+    MiniSat2 S;
     Vec<Lit> act;
     Vec<Lit> tmp;
 
-    while (S.nVars() <= P.n_vars)
+    while (S.nVars() < P.n_vars + 2)
         S.addLit();
 
     for (uint i = 0; i < P.size(); i++){
+        tmp.clear();
+        for (uint j = 0; j < P[i].size(); j++)
+            tmp.push(Lit(P[i][j].id + 1, P[i][j].sign));    // -- here we assume first literal has index 2 (true for MiniSat's)
+
         if (P.weight[i] == UINT64_MAX){
-            vecCopy(P[i], tmp);
             S.addClause(tmp);
 
         }else if (P.weight[i] == 1){
-            vecCopy(P[i], tmp);
             act.push(S.addLit());
             tmp.push(~act[LAST]);
             S.addClause(tmp);
@@ -137,11 +139,8 @@ void naiveMaxSat(MaxSatProb& P)
     WMapX<Lit> n2s;
 
     Vec<GLit> act_pi;
-    for (uint i = 0; i < act.size(); i++){
-        Wire w = N.add(gate_PI);
-        act_pi.push(w);
-        n2s(w) = act[i];
-    }
+    for (uint i = 0; i < act.size(); i++)
+        act_pi.push(N.add(gate_PI));
     oddEvenSort(N, act_pi);
     for (uint i = 0; i < act_pi.size(); i++)
         N.add(gate_PO).init(act_pi[i]);
@@ -154,13 +153,16 @@ void naiveMaxSat(MaxSatProb& P)
     // + migrate n2s (or just init. n2s here instead)
 #endif
 
+    For_Gatetype(N, gate_PI, w)
+        n2s(w) = act[w.num()];
+
     WriteLn "N: %_", info(N);
 
     // Optimization loop:
     for (uint slack = 0; slack <= act.size(); slack++){
         lbool result;
         if (slack != act.size()){
-          #if 0
+          #if 1
             uint n = act.size() - 1 - slack;
             //uint n = slack;
             Lit p = clausify(N(gate_PO, n), S, n2s);
@@ -176,17 +178,18 @@ void naiveMaxSat(MaxSatProb& P)
 
         if (result == l_True){
             WriteLn "MODEL FOUND.  Relaxed clauses: %_.  Satisfied clauses: %_", slack, act.size() - slack;
-#if 1   /*DEBUG*/
+#if 0   /*DEBUG*/
             For_Gatetype(N, gate_PI, w)
                 WriteLn "pi[%_] = %_", w.num(), S.value(n2s[w]);
             NewLine;
             For_Gatetype(N, gate_PO, w)
                 WriteLn "po[%_] = %_", w.num(), S.value(n2s[w]);
 #endif  /*END DEBUG*/
+            WriteLn "CPU-time: %t", cpuTime();
 
             return;
         }else
-            WriteLn "%_ relaxed clasuses => UNSAT...", slack;
+            WriteLn "%_ relaxed clasuses => UNSAT...   [%t]", slack, cpuTime();
     }
 
     WriteLn "Hard clauses are UNSAT.";
