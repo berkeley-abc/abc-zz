@@ -5,4 +5,6 @@ if ! [ -e abc ]; then
 fi
 cd abc
 #hg update -r7d1e92a8b0b7
-hg update -r5fb7d1e975ea
+hg update -r5fb7d1e975ea -C
+
+patch -p1 <../abc_mainUtils.c.patch 
