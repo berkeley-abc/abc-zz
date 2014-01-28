@@ -14,6 +14,9 @@ int main(int argc, char** argv)
     ZZ_Init;
 
     cli.add("input", "string", arg_REQUIRED, "Input CNF.", 0);
+    cli.addCommand("core", "Core based solver.");
+    cli.addCommand("sort", "Sorter based solver.");
+    cli.addCommand("sort-down", "Sorter based solver, starting with SAT solution [still buggy!].");
     cli.parseCmdLine(argc, argv);
 
     MaxSatProb P;
@@ -27,10 +30,14 @@ int main(int argc, char** argv)
     WriteLn "#vars: %_", P.n_vars;
     WriteLn "#clauses: %_", P.size();
 
-    //for (uint i = 0; i < P.size(); i++)
-    //    WriteLn "%_ * %_", (P.weight[i] == UINT64_MAX) ? 0 : P.weight[i], P[i];
-
-    naiveMaxSat(P);
+    if (cli.cmd == "core")
+        coreMaxSat(P);
+    else if (cli.cmd == "sort")
+        sorterMaxSat(P, false);
+    else if (cli.cmd == "sort-down")
+        sorterMaxSat(P, true);
+    else
+        assert(false);
 
     return 0;
 }

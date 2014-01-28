@@ -3,12 +3,12 @@
 //| Name        : Solver.cc
 //| Author(s)   : Niklas Een
 //| Module      : MaxSat
-//| Description : 
-//| 
+//| Description :
+//|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -105,10 +105,11 @@ void oddEvenSort(Gig& N, Vec<GLit>& fs)
 // First attempt:
 
 
-void naiveMaxSat(MaxSatProb& P)
+void sorterMaxSat(MaxSatProb& P, bool down)
 {
     // Insert clauses into SAT solver:
-    MiniSat2 S;
+    MiniSat2s S;
+    //GlrSat S;
     Vec<Lit> act;
     Vec<Lit> tmp;
 
@@ -126,6 +127,7 @@ void naiveMaxSat(MaxSatProb& P)
         }else if (P.weight[i] == 1){
             act.push(S.addLit());
             tmp.push(~act[LAST]);
+            S.freeze(act[LAST].id);
             S.addClause(tmp);
 
         }else{
@@ -141,6 +143,9 @@ void naiveMaxSat(MaxSatProb& P)
     Vec<GLit> act_pi;
     for (uint i = 0; i < act.size(); i++)
         act_pi.push(N.add(gate_PI));
+    //**/uint64 seed = 42;
+    //**/shuffle(seed, act_pi);
+    /**/reverse(act_pi);
     oddEvenSort(N, act_pi);
     for (uint i = 0; i < act_pi.size(); i++)
         N.add(gate_PO).init(act_pi[i]);
@@ -158,11 +163,13 @@ void naiveMaxSat(MaxSatProb& P)
 
     WriteLn "N: %_", info(N);
 
-    // Optimization loop:
-    for (uint slack = 0; slack <= act.size(); slack++){
-        lbool result;
-        if (slack != act.size()){
-          #if 1
+    S.preprocess(true);
+
+    if (!down){
+        // Optimization loop:
+        for (uint slack = 0; slack <= act.size(); slack++){
+            lbool result;
+          #if 0
             uint n = act.size() - 1 - slack;
             //uint n = slack;
             Lit p = clausify(N(gate_PO, n), S, n2s);
@@ -173,26 +180,116 @@ void naiveMaxSat(MaxSatProb& P)
                 assumps.push(clausify(N(gate_PO, n), S, n2s));
             result = S.solve(assumps);
           #endif
-        }else
-            result = S.solve();
 
-        if (result == l_True){
-            WriteLn "MODEL FOUND.  Relaxed clauses: %_.  Satisfied clauses: %_", slack, act.size() - slack;
-#if 0   /*DEBUG*/
-            For_Gatetype(N, gate_PI, w)
-                WriteLn "pi[%_] = %_", w.num(), S.value(n2s[w]);
-            NewLine;
-            For_Gatetype(N, gate_PO, w)
-                WriteLn "po[%_] = %_", w.num(), S.value(n2s[w]);
-#endif  /*END DEBUG*/
-            WriteLn "CPU-time: %t", cpuTime();
+            if (result == l_True){
+                WriteLn "MODEL FOUND.  Relaxed clauses: %_.  Satisfied clauses: %_", slack, act.size() - slack;
+                WriteLn "CPU-time: %t", cpuTime();
 
-            return;
-        }else
-            WriteLn "%_ relaxed clasuses => UNSAT...   [%t]", slack, cpuTime();
+                return;
+            }else
+                WriteLn "%_ relaxed clasuses => UNSAT...   [%t]", slack, cpuTime();
+        }
+
+        WriteLn "Hard clauses are UNSAT.";
+
+    }else{
+        // Optimization loop:
+        for (int slack = act.size(); slack >= 0; slack--){
+            lbool result;
+            Vec<Lit> assumps;
+            for (uint n = 0; n < act.size() - slack; n++)
+                assumps.push(clausify(N(gate_PO, n), S, n2s));
+            result = S.solve(assumps);
+
+            if (result == l_False){
+                WriteLn "UNSAT.  Relaxed clauses: %_.  Satisfied clauses: %_", slack+1, act.size() - (slack-1);
+                WriteLn "CPU-time: %t", cpuTime();
+
+                return;
+            }else
+                WriteLn "%_ relaxed clasuses => SAT...   [%t]", slack, cpuTime();
+        }
+        WriteLn "All clauses are SAT. (relaxed claues: 0)";
+    }
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Second attempt:
+
+
+void coreMaxSat(MaxSatProb& P)
+{
+    // Insert clauses into SAT solver:
+    MiniSat2s S;
+    //GlrSat S;
+    Vec<Lit> act;
+    Vec<Lit> tmp;
+
+    while (S.nVars() < P.n_vars + 2)
+        S.addLit();
+
+    for (uint i = 0; i < P.size(); i++){
+        tmp.clear();
+        for (uint j = 0; j < P[i].size(); j++)
+            tmp.push(Lit(P[i][j].id + 1, P[i][j].sign));    // -- here we assume first literal has index 2 (true for MiniSat's)
+
+        if (P.weight[i] == UINT64_MAX){
+            S.addClause(tmp);
+
+        }else if (P.weight[i] == 1){
+            act.push(S.addLit());
+            tmp.push(~act[LAST]);
+            S.freeze(act[LAST].id);
+            S.addClause(tmp);
+
+        }else{
+            WriteLn "Weighted MaxSat not supported yet.";
+            exit(1);
+        }
     }
 
-    WriteLn "Hard clauses are UNSAT.";
+    Vec<Lit> orig_act(copy_, act);
+
+    uint slack = 0;
+    for(;;){
+        WriteLn "Solving for %_ relaxed subsets.", slack;
+
+        lbool result = S.solve(act);
+        if (result == l_True){
+            uint n_unsat = 0;
+            for (uint i = 0; i < orig_act.size(); i++)
+                if (S.value(orig_act[i]) == l_False)
+                    n_unsat++;
+
+            WriteLn "Optimal solution found. Unsat clauses: %_", n_unsat;
+            WriteLn "CPU-time: %t", cpuTime();
+            break;
+        }
+
+        slack++;
+
+        // Relax one element from the core:
+        Vec<Lit> confl;
+        Vec<Lit> ps;        // -- will participate in cardinality constraint
+        S.getConflict(confl);
+        /**/WriteLn "  -- core size: %_", confl.size();
+        for (uint i = 0; i < confl.size(); i++){
+            Lit p = S.addLit();
+            Lit a = S.addLit();     // -- new activation literal
+            Lit b = confl[i];       // -- old activation literal
+            uind pos = find(act, b);
+            S.addClause(p, ~a, b);
+            act[pos] = a;
+
+            ps.push(p);
+        }
+
+        // Cardinality constraint:
+        for (uint i = 0; i < ps.size(); i++)
+            for (uint j = i+1; j < ps.size(); j++)
+                S.addClause(~ps[i], ~ps[j]);
+    }
 }
 
 
