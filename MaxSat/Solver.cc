@@ -17,6 +17,7 @@
 #include "ZZ_Gig.hh"
 #include "ZZ_Gip.CnfMap.hh"
 #include "ZZ_Gip.Common.hh"
+#include "Sorters.hh"
 
 namespace ZZ {
 using namespace std;
@@ -101,9 +102,61 @@ void oddEvenSort(Gig& N, Vec<GLit>& fs)
 }
 
 
+//=================================================================================================
+
+
+struct CmpGig {
+    Gig& N;
+    Vec<GLit>& result; // -- initialized to input signals; will contain output signals
+
+    CmpGig(Gig& N_, Vec<GLit>& result_) : N(N_), result(result_) {}
+
+    void operator()(uint i, uint j) {
+        l_tuple(result[i], result[j]) = tuple(mkOr (result[i] + N, result[j] + N),
+                                              mkAnd(result[i] + N, result[j] + N));
+    }
+};
+
+
+void oddEvenSort2(Gig& N, Vec<GLit>& fs)
+{
+    uint orig_sz = fs.size();
+    uint sz;
+    for (sz = 1; sz < fs.size(); sz *= 2);
+    fs.growTo(sz, ~GLit_True);
+
+    CmpGig cmp(N, fs);
+    oeSort(fs.size(), cmp);
+
+    fs.shrinkTo(orig_sz);
+}
+
+
+void pairWiseSort(Gig& N, Vec<GLit>& fs)
+{
+    uint orig_sz = fs.size();
+    uint sz;
+    for (sz = 1; sz < fs.size(); sz *= 2);
+    fs.growTo(sz, ~GLit_True);
+
+    CmpGig cmp(N, fs);
+    pwSort(fs.size(), cmp);
+
+    fs.shrinkTo(orig_sz);
+}
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // First attempt:
 
+
+//up/down card req
+//single/multi assumption
+//invert act
+
+#define SINGLE_ASSUMP
+#define INVERT_ACT
+//#define REVERSE_ORDER
 
 void sorterMaxSat(MaxSatProb& P, bool down)
 {
@@ -142,11 +195,20 @@ void sorterMaxSat(MaxSatProb& P, bool down)
 
     Vec<GLit> act_pi;
     for (uint i = 0; i < act.size(); i++)
+      #if !defined(INVERT_ACT)
         act_pi.push(N.add(gate_PI));
+      #else
+        act_pi.push(~N.add(gate_PI));
+      #endif
+
     //**/uint64 seed = 42;
     //**/shuffle(seed, act_pi);
-    /**/reverse(act_pi);
-    oddEvenSort(N, act_pi);
+      #if defined(REVERSE_ORDER)
+        reverse(act_pi);
+      #endif
+    //oddEvenSort(N, act_pi);
+    //oddEvenSort2(N, act_pi);
+    pairWiseSort(N, act_pi);
     for (uint i = 0; i < act_pi.size(); i++)
         N.add(gate_PO).init(act_pi[i]);
 
@@ -164,22 +226,33 @@ void sorterMaxSat(MaxSatProb& P, bool down)
     WriteLn "N: %_", info(N);
 
     S.preprocess(true);
+    uint orig_clauses = S.nClauses();
 
     if (!down){
         // Optimization loop:
         for (uint slack = 0; slack <= act.size(); slack++){
             lbool result;
-          #if 0
+        #if defined(SINGLE_ASSUMP)
+          #if !defined(INVERT_ACT)
             uint n = act.size() - 1 - slack;
-            //uint n = slack;
             Lit p = clausify(N(gate_PO, n), S, n2s);
-            result = S.solve(p);
           #else
+            uint n = slack;
+            Lit p = ~clausify(N(gate_PO, n), S, n2s);
+          #endif
+            result = S.solve(p);
+
+        #else
             Vec<Lit> assumps;
+          #if !defined(INVERT_ACT)
             for (uint n = 0; n < act.size() - slack; n++)
                 assumps.push(clausify(N(gate_PO, n), S, n2s));
-            result = S.solve(assumps);
+          #else
+            for (uint n = slack; n < act.size(); n++)
+                assumps.push(~clausify(N(gate_PO, n), S, n2s));
           #endif
+            result = S.solve(assumps);
+         #endif
 
             if (result == l_True){
                 WriteLn "MODEL FOUND.  Relaxed clauses: %_.  Satisfied clauses: %_", slack, act.size() - slack;
@@ -187,7 +260,7 @@ void sorterMaxSat(MaxSatProb& P, bool down)
 
                 return;
             }else
-                WriteLn "%_ relaxed clasuses => UNSAT...   [%t]", slack, cpuTime();
+                WriteLn "%_ relaxed clasuses => UNSAT...   [%t]  (%_ clauses)", slack, cpuTime(), S.nClauses() - orig_clauses;
         }
 
         WriteLn "Hard clauses are UNSAT.";
@@ -197,9 +270,26 @@ void sorterMaxSat(MaxSatProb& P, bool down)
         for (int slack = act.size(); slack >= 0; slack--){
             lbool result;
             Vec<Lit> assumps;
+        #if defined(SINGLE_ASSUMP)      // -- doesn't really make sense for sort-down
+          #if !defined(INVERT_ACT)
+            uint n = act.size() - 1 - slack;
+            Lit p = (n < N.enumSize(gate_PO)) ? clausify(N(gate_PO, n), S, n2s) : S.True();
+          #else
+            uint n = slack;
+            Lit p = (n < N.enumSize(gate_PO)) ? ~clausify(N(gate_PO, n), S, n2s) : S.True();
+          #endif
+            result = S.solve(p);
+
+        #else
+          #if !defined(INVERT_ACT)
             for (uint n = 0; n < act.size() - slack; n++)
                 assumps.push(clausify(N(gate_PO, n), S, n2s));
+          #else
+            for (uint n = slack; n < act.size(); n++)
+                assumps.push(~clausify(N(gate_PO, n), S, n2s));
+          #endif
             result = S.solve(assumps);
+        #endif
 
             if (result == l_False){
                 WriteLn "UNSAT.  Relaxed clauses: %_.  Satisfied clauses: %_", slack+1, act.size() - (slack-1);
@@ -207,7 +297,7 @@ void sorterMaxSat(MaxSatProb& P, bool down)
 
                 return;
             }else
-                WriteLn "%_ relaxed clasuses => SAT...   [%t]", slack, cpuTime();
+                WriteLn "%_ relaxed clasuses => SAT...   [%t]  (%_ clauses)", slack, cpuTime(), S.nClauses() - orig_clauses;
         }
         WriteLn "All clauses are SAT. (relaxed claues: 0)";
     }
