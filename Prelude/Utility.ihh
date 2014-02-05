@@ -438,7 +438,7 @@ template<class V>
 void shuffle(uint64& seed, V& v)
 {
     for (uind i = 0; i < v.size(); i++){
-        uind j = irand(seed, v.size() - i) + i;
+        uind j = (uind)irandl(seed, v.size() - i) + i;
         swp(v[i], v[j]);
     }
 }

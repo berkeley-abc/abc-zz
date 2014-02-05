@@ -313,8 +313,9 @@ void coreMaxSat(MaxSatProb& P)
     // Insert clauses into SAT solver:
     MiniSat2s S;
     //GlrSat S;
-    Vec<Lit> act;
-    Vec<Lit> tmp;
+    Vec<Lit>    act;
+    Vec<double> score;     // -- activity of activation literal (indexed by literal ID)
+    Vec<Lit>    tmp;
 
     while (S.nVars() < P.n_vars + 2)
         S.addLit();
@@ -341,11 +342,34 @@ void coreMaxSat(MaxSatProb& P)
 
     Vec<Lit> orig_act(copy_, act);
 
+    double act_inc = 1.0;
+    uint card_clauses = 0;
     uint slack = 0;
     for(;;){
-        WriteLn "Solving for %_ relaxed subsets.", slack;
+        WriteLn "Solving for %_ relaxed subsets.  [%t]  (%_ card.cl.)", slack, cpuTime(), card_clauses;
 
+        //**/static uint64 seed = 1;
+        //**/shuffle(seed, act);
+      #if 1
         lbool result = S.solve(act);
+      #else
+        lbool result;
+        Vec<Lit> sub;
+        for(;;){
+            result = S.solve(sub);
+            if (result == l_True){
+                uint sub_sz = sub.size();
+                for (uint i = 0; i < act.size(); i++){
+                    if (S.value(act[i]) == l_False)
+                        sub.push(act[i]);
+                }
+                if (sub_sz == sub.size())
+                    break;
+            }else
+                break;
+        }
+      #endif
+
         if (result == l_True){
             uint n_unsat = 0;
             for (uint i = 0; i < orig_act.size(); i++)
@@ -361,8 +385,9 @@ void coreMaxSat(MaxSatProb& P)
 
         // Relax one element from the core:
         Vec<Lit> confl;
-        Vec<Lit> ps;        // -- will participate in cardinality constraint
         S.getConflict(confl);
+
+        Vec<Lit> ps;        // -- will participate in cardinality constraint
         /**/WriteLn "  -- core size: %_", confl.size();
         for (uint i = 0; i < confl.size(); i++){
             Lit p = S.addLit();
@@ -371,17 +396,56 @@ void coreMaxSat(MaxSatProb& P)
             uind pos = find(act, b);
             S.addClause(p, ~a, b);
             act[pos] = a;
+            score(a.id, 0.0) = score(b.id, 0.0) + act_inc;      // -- update activity score:
+
+            S.freeze(a.id);
+            S.thaw(b.id);
 
             ps.push(p);
         }
+        act_inc *= 1.05;
+        assert(act_inc < 1e100);
 
         // Cardinality constraint:
-        for (uint i = 0; i < ps.size(); i++)
-            for (uint j = i+1; j < ps.size(); j++)
-                S.addClause(~ps[i], ~ps[j]);
+        uint n_clauses = S.nClauses();
+        if (ps.size() <= 5){
+            for (uint i = 0; i < ps.size(); i++)
+                for (uint j = i+1; j < ps.size(); j++)
+                    S.addClause(~ps[i], ~ps[j]);
+
+        }else{
+            Gig N;
+            WMapX<Lit> n2s;
+
+            Vec<GLit> act_pi;
+            for (uint i = 0; i < ps.size(); i++)
+                act_pi.push(N.add(gate_PI));
+
+            For_Gatetype(N, gate_PI, w)
+                n2s(w) = ps[w.num()];
+
+            pairWiseSort(N, act_pi);
+            for (uint i = 0; i < act_pi.size(); i++)
+                N.add(gate_PO).init(act_pi[i]);
+
+            Lit p = clausify(N(gate_PO, 1), S, n2s);
+            S.addClause(~p);
+        }
+        card_clauses += S.nClauses() - n_clauses;
+
+        // Sort 'act' on score:
+        Vec<Pair<double, Lit> > as;
+        for (uint i = 0; i < act.size(); i++)
+            as.push(tuple(-score(act[i].id, 0.0), act[i]));
+        sort(as);
+        for (uint i = 0; i < as.size(); i++)
+            act[i] = as[i].snd;
     }
 }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
+
+
+// Prova assumption med assumption-aktivitet

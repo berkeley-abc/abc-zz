@@ -286,6 +286,7 @@ protected:
     // Static helpers:
     //
 
+public:
     // Returns a random float 0 <= x < 1. Seed must never be 0.
     static inline double drand(double& seed) {
         seed *= 1389796;

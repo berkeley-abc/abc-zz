@@ -832,6 +832,28 @@ static double luby(double y, int x){
     return pow(y, seq);
 }
 
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// EXPERIMENTAL:
+
+
+template <class T>
+void swp(T& x, T& y) {        // -- 'swap' and 'move' suffer from name clashes...
+    T tmp; tmp = x; x = y; y = tmp; }
+
+
+template<class V>
+void shuffle(double& seed, V& v)
+{
+    for (int i = 0; i < v.size(); i++){
+        int j = Solver::irand(seed, v.size() - i) + i;
+        swp(v[i], v[j]);
+    }
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+
+
 // NOTE: assumptions passed in member-variable 'assumptions'.
 lbool Solver::solve_()
 {
@@ -856,6 +878,21 @@ lbool Solver::solve_()
     // Search:
     int curr_restarts = 0;
     while (status == l_Undef){
+      #if 0
+        //**/shuffle(random_seed, assumptions); //printf(".. shuffling assumptions ..\n");
+      #else
+        //**/if (luby(restart_inc, curr_restarts) > luby(restart_inc, curr_restarts + 1)){
+        //**/    for (int i = 0; i < assumptions.size() - 1; i++){   // -- quadratic!
+        //**/        int best_j = i;
+        //**/        for (int j = i+1; j < assumptions.size(); j++){
+        //**/            if (activity[var(assumptions[j])] > activity[var(assumptions[best_j])])
+        //**/                best_j = j;
+        //**/        }
+        //**/        swp(assumptions[i], assumptions[best_j]);
+        //**/    }
+        //**/}
+      #endif
+
         double rest_base = luby_restart ? luby(restart_inc, curr_restarts) : pow(restart_inc, curr_restarts);
         status = search(rest_base * restart_first);
         if (!withinBudget()) break;
