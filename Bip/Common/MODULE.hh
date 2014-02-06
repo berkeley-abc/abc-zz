@@ -7,6 +7,9 @@
 #ifndef ZZ__Bip__Common_hh
 #include "ZZ/Bip/Common/Common.hh"
 #endif
+#ifndef ZZ__Bip__Common__Ltl_hh
+#include "ZZ/Bip/Common/Ltl.hh"
+#endif
 #ifndef ZZ__Bip__ExportDot_hh
 #include "ZZ/Bip/Common/ExportDot.hh"
 #endif
@@ -15,7 +18,4 @@
 #endif
 #ifndef ZZ__Bip__Cube_hh
 #include "ZZ/Bip/Common/Cube.hh"
-#endif
-#ifndef ZZ__Bip__Common__Ltl_hh
-#include "ZZ/Bip/Common/Ltl.hh"
 #endif

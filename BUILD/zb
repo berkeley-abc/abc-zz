@@ -13,6 +13,7 @@ import tempfile
 import multiprocessing
 import atexit
 import time
+import filecmp
 
 
 ##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -431,7 +432,7 @@ def get_conf_bool(conf, field):
 ## Config file:
 
 
-valid_conf_vars = set(["MOD_DEPS", "SYS_LIBS", "SYS_PATH", "SYS_INCL", "DEFAULT_MODE", "PUBLISH_BIN", "QT_MODULE"])
+valid_conf_vars = set(["MOD_DEPS", "SYS_LIBS", "SYS_PATH", "SYS_INCL", "DEFAULT_MODE", "PUBLISH_BIN", "QT_MODULE", "AUTO_HEADER"])
 
 
 def subst_conf_symbols(text):
@@ -619,6 +620,19 @@ def clean_external_module(mod):
 
 def call_makefile(mod, params, deps, conf):
     go_to_module(mod)
+
+    if get_conf_bool(conf, "AUTO_HEADER"):
+        if os.path.exists(module_header):
+            old_header = module_header + ".old"
+            times = os.stat(module_header)
+            shutil.move(module_header, old_header)
+            create_MODULE_hh(mod)
+            if filecmp.cmp(module_header, old_header):
+                os.utime(module_header, (times.st_atime, times.st_mtime))
+            os.remove(old_header)
+
+        else:
+            create_MODULE_hh(mod)
 
     qual = make_qualifier(params.pri_type, params.sec_types)
     cmd = []
