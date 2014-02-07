@@ -122,9 +122,10 @@ inline void Cut::init(Array<gate_id> inputs, uint64* ftb, uchar* sel)
     uint sel_words = (inputs.size() + 7) >> 3;
     uint alloc_sz = ((inputs.size() + 3) >> 1) + ftb_words + sel_words;
 
-    size_()   = inputs.size();
-    offFtb_() = (inputs.size() + 3) >> 1;
-    offSel_() = offFtb_() + ftb_words;
+    size_()     = inputs.size();
+    offFtb_()   = (inputs.size() + 3) >> 1;
+    offSel_()   = offFtb_() + ftb_words;
+    reserved_() = 0;
     assert(offSel_() + sel_words == alloc_sz);
 
     uint sig_mask = 0;
@@ -134,23 +135,17 @@ inline void Cut::init(Array<gate_id> inputs, uint64* ftb, uchar* sel)
 
     for (uint i = 0; i < inputs.size(); i++)
         input_(i) = inputs[i];
+    if ((inputs.size() & 1) == 1)
+        input_(inputs.size()) = 0;   // -- avoid uninitialized memory
+
 
     for (uint i = 0; i < ftb_words; i++)
         ftb_(i) = ftb[i];
 
+    for (uint i = 0; i < (inputs.size() + 7) >> 3; i++)
+        base[offSel_() + i] = 0;     // -- avoid uninitialized memory
     for (uint i = 0; i < inputs.size(); i++)
         sel_(i) = sel[i];
-
-  #if 0
-    WriteLn "sig:    %_", (uint*)&sig_() - (uint*)base;
-    WriteLn "size:   %_", (uint*)&size_() - (uint*)base;
-    WriteLn "inputs: %_", (uint*)&input_(0) - (uint*)base;
-    WriteLn "ftb:    %_", (uint*)&ftb_(0) - (uint*)base;
-    WriteLn "sel:    %_", (uint*)&sel_(0) - (uint*)base;
-
-    NewLine;
-    WriteLn "alloc:  %_", alloc_sz;
-  #endif
 }
 
 
@@ -172,6 +167,15 @@ template<> fts_macro void write_(Out& out, const Cut& v)
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Cut sets:
 
+
+/*
+Cutset layout:
+
+n_cuts  : 1 uint
+offsets : 'n_cuts' uints
+pad     : 0 or 1 uint (to get to 64-bit align)
+cuts    : several uint64s
+*/
 
 class CutSet {
     uint64* data;
@@ -212,22 +216,19 @@ public:
     void begin() { mem.clear(); off.clear(); clearCut(); }
     void next()  { storeCut(); clearCut(); }        // -- 'next()' must be called before the final 'done()'
 
-    template<class ALLOC>   // -- should allocate 'uint64's
+    template<class ALLOC>   // -- NOTE! Should allocate 'uint64's
     CutSet done(ALLOC& allocator) {
-        /**/Dump(off);
         uint off_adj = (off.size() + 2) >> 1;
-        /**/Dump(off_adj);
         uint64* data = allocator.alloc(mem.size() + off_adj);
         uint*   tab = (uint*)data;
         tab[0] = off.size();
 
-/*hmm*/        if ((off.size() & 1) == 0) off.push(0);    // -- just to avoid uninitialized memory (valgrind)
         for (uint i = 0; i < off.size(); i++)
             tab[i+1] = off[i] + off_adj;
+        if ((off.size() & 1) == 0) tab[off.size() + 1] = 0;    // -- avoid uninitialized memory 
 
         for (uint i = 0; i < mem.size(); i++)
             data[i + off_adj] = mem[i];
-        /**/WriteLn "data: %:x", slice(data[0], data[mem.size() + off_adj]);
         return CutSet(data);
     }
 };
