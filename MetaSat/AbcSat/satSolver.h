@@ -182,11 +182,14 @@ static inline clause * clause_read( sat_solver * s, cla h )
 
 int sat_solver_var_value( sat_solver* s, int v );
 
+static int sat_solver_var_literal( sat_solver* s, int v ) ___unused;
 static int sat_solver_var_literal( sat_solver* s, int v )
 {
     assert( v >= 0 && v < s->size );
     return toLitCond( v, s->model[v] != l_True );
 }
+
+static void sat_solver_act_var_clear(sat_solver* s) ___unused;
 static void sat_solver_act_var_clear(sat_solver* s)
 {
     int i;
@@ -199,6 +202,7 @@ void sat_solver_compress(sat_solver* s);
 int sat_solver_final(sat_solver* s, int ** ppArray);
 
 
+static clock_t sat_solver_set_runtime_limit(sat_solver* s, clock_t Limit) ___unused;
 static clock_t sat_solver_set_runtime_limit(sat_solver* s, clock_t Limit)
 {
     clock_t nRuntimeLimit = s->nRuntimeLimit;
@@ -206,6 +210,7 @@ static clock_t sat_solver_set_runtime_limit(sat_solver* s, clock_t Limit)
     return nRuntimeLimit;
 }
 
+static int sat_solver_set_random(sat_solver* s, int fNotUseRandom) ___unused;
 static int sat_solver_set_random(sat_solver* s, int fNotUseRandom)
 {
     int fNotUseRandomOld = s->fNotUseRandom;

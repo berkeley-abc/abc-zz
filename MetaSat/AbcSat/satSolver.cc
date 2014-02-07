@@ -45,6 +45,7 @@ namespace abc_sat {
 // Just like 'assert()' but expression will be evaluated in the release version as well.
 static inline void check(int expr) { assert(expr); }
 
+static void printlits(lit* begin, lit* end) ___unused;
 static void printlits(lit* begin, lit* end)
 {
     int i;
@@ -79,7 +80,7 @@ static const int varX  = 3;
 
 struct varinfo_t
 {
-    unsigned val    :  2;  // variable value 
+    unsigned val    :  2;  // variable value
     unsigned pol    :  1;  // last polarity
     unsigned tag    :  1;  // conflict analysis tag
     unsigned lev    : 28;  // variable level

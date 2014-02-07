@@ -1,6 +1,6 @@
 //_________________________________________________________________________________________________
 //|                                                                                      -- INFO --
-//| Name        : abcSat.hh
+//| Name        : MODULE.hh (for AbcSat)
 //| Author(s)   : Niklas Een
 //| Module      : ABC SAT
 //| Description : ABC's version of MiniSat pulled out as a separate library.
@@ -17,8 +17,6 @@
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
-
-$MAKEFILE_DEFINES
 
 namespace abc_sat {
 

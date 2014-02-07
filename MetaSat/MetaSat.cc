@@ -14,9 +14,9 @@
 #include "Prelude.hh"
 #include "MetaSat.hh"
 #include "minisat2.hh"
-#include "abcSat.hh"
 #include "SiertSat.hh"
 #include "ZZ_MiniSat.hh"
+#include "ZZ_MetaSat.AbcSat.hh"
 #include "ZZ/Generics/Sort.hh"
 
 namespace MS = ::Minisat;
