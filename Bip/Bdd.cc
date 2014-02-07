@@ -12,11 +12,16 @@
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
-#include "abc.hh"
 #include "ZZ_Netlist.hh"
 #include "ZZ_Bip.Common.hh"
 #include "ZZ/Generics/Sort.hh"
 #include "Bdd.hh"
+
+extern "C" {
+#include "ZZ/Abc/abc.h"
+#include "ZZ/Abc/mainInt.h"
+#include "ZZ/Abc/main.h"
+}
 
 namespace ZZ {
 using namespace std;

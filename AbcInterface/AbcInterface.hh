@@ -14,9 +14,11 @@
 #ifndef ZZ__AbcInterface__AbcInterface_hh
 #define ZZ__AbcInterface__AbcInterface_hh
 
-#include "abc.hh"
 #include "ZZ_Netlist.hh"
 #include "ZZ_Bip.Common.hh"     // -- get type declaration for 'Cex' 
+
+struct Gia_Man_t_;
+typedef struct Gia_Man_t_ Gia_Man_t;
 
 namespace ZZ {
 using namespace std;

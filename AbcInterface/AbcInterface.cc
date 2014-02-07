@@ -14,6 +14,12 @@
 #include "Prelude.hh"
 #include "AbcInterface.hh"
 
+extern "C" {
+#include "ZZ/Abc/abc.h"
+#include "ZZ/Abc/mainInt.h"
+#include "ZZ/Abc/main.h"
+}
+
 namespace ZZ {
 using namespace std;
 
