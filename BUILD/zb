@@ -432,7 +432,7 @@ def get_conf_bool(conf, field):
 ## Config file:
 
 
-valid_conf_vars = set(["MOD_DEPS", "SYS_LIBS", "SYS_PATH", "SYS_INCL", "DEFAULT_MODE", "PUBLISH_BIN", "QT_MODULE", "AUTO_HEADER"])
+valid_conf_vars = set(["MOD_DEPS", "SYS_LIBS", "SYS_PATH", "SYS_INCL", "DEFAULT_MODE", "PUBLISH_BIN", "QT_MODULE", "AUTO_HEADER", "NO_WARN"])
 
 
 def subst_conf_symbols(text):
@@ -464,11 +464,12 @@ def parse_conf(mod):
 
 
 # Inputs: primary type, secondary types
-def setup_cflags(pri, secs, cxx_mode):
+def setup_cflags(pri, secs, cxx_mode, no_warn):
     flags = []
 
     # General:
-    flags.append("-Wall -ffloat-store -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS -msse2")
+    if not no_warn: flags.append("-Wall")
+    flags.append("-ffloat-store -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS -msse2")
     flags.append("-DZZ_CONSTANTS_AS_MACROS")
     if popcnt: flags.append("-mpopcnt")
     if has_readline: flags.append("-DZZ_HAS_READLINE")
@@ -640,6 +641,8 @@ def call_makefile(mod, params, deps, conf):
     if not "j" in params.build_opt: cmd.append("-j" + str(n_cores))
     if "v" in params.build_opt:     cmd.append("VERBOSE=1")
 
+    no_warn = get_conf_bool(conf, "NO_WARN")
+
     cmd.append("BUILD_PATH=" + build_path)
     cmd.append("ROOT_PATH=" + root_path)
     cmd.append("OUTPUT_SUBDIR=" + output_subdir)
@@ -649,8 +652,8 @@ def call_makefile(mod, params, deps, conf):
     cmd.append("SYS_LIBS='"+ " ".join(deps.sys_libs) +"'")
     cmd.append("SYS_PATH='"+ " ".join(deps.sys_path) +"'")
     cmd.append("SYS_INCL='"+ " ".join(deps.sys_incl) +"'")
-    cmd.append("CXXFLAGS='"+ setup_cflags(params.pri_type, params.sec_types, True) + "'")
-    cmd.append("CFLAGS='"  + setup_cflags(params.pri_type, params.sec_types, False) + "'")
+    cmd.append("CXXFLAGS='"+ setup_cflags(params.pri_type, params.sec_types, True , no_warn) + "'")
+    cmd.append("CFLAGS='"  + setup_cflags(params.pri_type, params.sec_types, False, no_warn) + "'")
     cmd.append("LFLAGS='"+ setup_lflags(params.pri_type, params.sec_types) + "'")
     if get_conf_bool(conf, "QT_MODULE"): cmd.append("QT_MODULE=1")
     if has_ccache: cmd.append("USE_CCACHE=1")
