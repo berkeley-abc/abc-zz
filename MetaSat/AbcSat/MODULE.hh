@@ -26,6 +26,28 @@ struct sat_solver_t;
 typedef struct sat_solver_t sat_solver;
 typedef int lit;
 
+
+typedef int    lit;
+typedef int    cla;
+
+typedef char               lbool;
+
+static const int   var_Undef = -1;
+static const lit   lit_Undef = -2;
+
+static const lbool l_Undef   =  0;
+static const lbool l_True    =  1;
+static const lbool l_False   = -1;
+
+static inline lit  toLit    (int v)        { return v + v; }
+static inline lit  toLitCond(int v, int c) { return v + v + (c != 0); }
+static inline lit  lit_neg  (lit l)        { return l ^ 1; }
+static inline int  lit_var  (lit l)        { return l >> 1; }
+static inline int  lit_sign (lit l)        { return l & 1; }
+static inline int  lit_print(lit l)        { return lit_sign(l)? -lit_var(l)-1 : lit_var(l)+1; }
+static inline lit  lit_read (int s)        { return s > 0 ? toLit(s-1) : lit_neg(toLit(-s-1)); }
+static inline int  lit_check(lit l, int n) { return l >= 0 && lit_var(l) < n;                  }
+
 sat_solver* sat_solver_new           ();
 void        sat_solver_delete        (sat_solver* s);
 void        sat_solver_rollback      (sat_solver* s);   // -- clear method

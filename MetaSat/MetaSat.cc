@@ -13,10 +13,10 @@
 
 #include "Prelude.hh"
 #include "MetaSat.hh"
-#include "minisat2.hh"
 #include "SiertSat.hh"
 #include "ZZ_MiniSat.hh"
 #include "ZZ_MetaSat.AbcSat.hh"
+#include "ZZ_MetaSat.MiniSat2.hh"
 #include "ZZ/Generics/Sort.hh"
 
 namespace MS = ::Minisat;
@@ -563,11 +563,6 @@ bool MiniSat2s::exportCnf(const String& filename)
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // ABC SAT wrapper:
-
-
-}
-#include "ZZ/EXTERN/abcSat/satVec.h"
-namespace ZZ {
 
 
 typedef Vec<abc_sat::lit> AS_litvec;
