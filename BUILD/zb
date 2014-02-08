@@ -853,7 +853,7 @@ def create_MODULE_hh(mod):
     go_to_module(mod)
     if os.path.exists(module_header): abort("'%s' already exists." % module_header)
 
-    mod_path = os.getcwd()[len(root_path)-len(root_tag):]
+    mod_path = pseudo_root + os.getcwd()[len(root_path):]
 
     with open(module_header, "w") as out:
         for f in files_in_dir("."):
