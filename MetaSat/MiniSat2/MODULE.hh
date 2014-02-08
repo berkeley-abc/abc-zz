@@ -7,7 +7,6 @@
 #include "ZZ/MetaSat/MiniSat2/mtl/Alg.hh"
 #include "ZZ/MetaSat/MiniSat2/ParseUtils.hh"
 #include "ZZ/MetaSat/MiniSat2/Options.hh"
-#include "ZZ/MetaSat/MiniSat2/Map.hh"
 #include "ZZ/MetaSat/MiniSat2/Alloc.hh"
 #include "ZZ/MetaSat/MiniSat2/SolverTypes.hh"
 #include "ZZ/MetaSat/MiniSat2/Solver.hh"
