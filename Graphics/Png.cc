@@ -57,7 +57,9 @@ bool readPng(String filename, Bitmap& bm)
 
 
     // Create bitmap:
-    bm.init(info_ptr->width, info_ptr->height, xmalloc<Color>(info_ptr->width * info_ptr->height), true);
+    uint width  = png_get_image_width (png_ptr, info_ptr);
+    uint height = png_get_image_height(png_ptr, info_ptr);
+    bm.init(width, height, xmalloc<Color>(width * height), true);
 
     // Normalize image:
     png_set_expand(png_ptr);
@@ -75,7 +77,7 @@ bool readPng(String filename, Bitmap& bm)
 
     png_bytep* row_pointers = xmalloc<png_bytep>(bm.height);
     for (uint y = 0; y < bm.height; y++){
-        row_pointers[y] = xmalloc<png_byte>(info_ptr->rowbytes); }
+        row_pointers[y] = xmalloc<png_byte>(png_get_rowbytes(png_ptr, info_ptr)); }
     png_read_image(png_ptr, row_pointers);
 
     fclose(in);
@@ -108,7 +110,8 @@ bool readPng(String filename, Bitmap& bm)
 #endif
 
     bool ret = true;
-    if (info_ptr->color_type == PNG_COLOR_TYPE_RGB){
+    uchar color_type = png_get_color_type(png_ptr, info_ptr);
+    if (color_type == PNG_COLOR_TYPE_RGB){
         for (uint y = 0; y < bm.height; y++){
             png_byte* row = row_pointers[y];
             for (uint x = 0; x < bm.width; x++){
@@ -117,7 +120,7 @@ bool readPng(String filename, Bitmap& bm)
             }
         }
 
-    }else if (info_ptr->color_type == PNG_COLOR_TYPE_RGBA){
+    }else if (color_type == PNG_COLOR_TYPE_RGBA){
         for (uint y = 0; y < bm.height; y++){
             png_byte* row = row_pointers[y];
             for (uint x = 0; x < bm.width; x++){
@@ -126,7 +129,7 @@ bool readPng(String filename, Bitmap& bm)
             }
         }
 
-    }else if (info_ptr->color_type == PNG_COLOR_TYPE_GRAY){
+    }else if (color_type == PNG_COLOR_TYPE_GRAY){
         for (uint y = 0; y < bm.height; y++){
             png_byte* row = row_pointers[y];
             for (uint x = 0; x < bm.width; x++){
@@ -135,7 +138,7 @@ bool readPng(String filename, Bitmap& bm)
             }
         }
 
-    }else if (info_ptr->color_type == PNG_COLOR_TYPE_GA){
+    }else if (color_type == PNG_COLOR_TYPE_GA){
         for (uint y = 0; y < bm.height; y++){
             png_byte* row = row_pointers[y];
             for (uint x = 0; x < bm.width; x++){
