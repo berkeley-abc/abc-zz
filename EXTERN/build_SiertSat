@@ -225,11 +225,7 @@ def clean_up():
 
 
 def main():
-    try:
-        os.chdir(module_name)
-    except:
-        os.system("./checkout_SiertSat")
-        os.chdir(module_name)
+    os.chdir(module_name)
 
     if   z("CMD") == "build" : build()
     elif z("CMD") == "header": create_header()

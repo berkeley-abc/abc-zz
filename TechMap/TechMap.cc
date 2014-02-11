@@ -3,16 +3,18 @@
 //| Name        : TechMap.cc
 //| Author(s)   : Niklas Een
 //| Module      : TechMap
-//| Description :
+//| Description : Second generation technology mapper.
 //|
-//| (C) Copyright 2013, The Regents of the University of California
+//| (C) Copyright 2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//|
+//| Currently targeted at FPGA mapping.
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
 #include "ZZ_Gig.hh"
+#include "ZZ_BFunc.hh"
+#include "ZZ_Npn4.hh"
 
 namespace ZZ {
 using namespace std;
@@ -48,6 +50,13 @@ CutMap
 struct CutSet
 F7s, F8s
 
+Example circuit:
+  #Seq=834,781
+  #Lut4=2,340,883 
+  #Delay=455 
+  #Box=374,355
+  #Sel=21,965  
+
 
 */
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -69,7 +78,7 @@ public:
 private:
     uint64* base;
 
-    Cut& me() const { return *const_cast<Cut*>(this); }
+    Cut&    me() const     { return *const_cast<Cut*>(this); }
 
     uint&   sig_()         { return ((uint*)&base[0])[0]; }
 
@@ -165,7 +174,7 @@ template<> fts_macro void write_(Out& out, const Cut& v)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Cut sets:
+// Static cut-set:
 
 
 /*
@@ -193,9 +202,12 @@ public:
 };
 
 
-//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Dynamic cut-set:
 
 
+// Usage: call 'begin()', define cut by modifying public variables, call 'next()', repeat this 
+// step, finally call 'dont()' to get a static 'CutSet'. The dynamic cut set can then be reused.
 class DynCutSet {
     Vec<uint64> mem;
     Vec<uint>   off;
@@ -205,19 +217,37 @@ class DynCutSet {
     void storeCut() {
         off.push((uint)mem.size());
         mem.growTo(mem.size() + Cut::allocSz(inputs.size()));
+        if (sel.size() == 0) sel.growTo(inputs.size(), 0);
         Cut(&mem[off[LAST]], inputs.slice(), ftb.base(), sel.base());
     }
 
 public:
-    Vec<gate_id> inputs;
-    Vec<uint64>  ftb;
-    Vec<uchar>   sel;
+  //________________________________________
+  //  Add a cut:
 
-    void begin() { mem.clear(); off.clear(); clearCut(); }
-    void next()  { storeCut(); clearCut(); }        // -- 'next()' must be called before the final 'done()'
+    Vec<gate_id> inputs;    // }- these fields must be populated before calling 'next()'
+    Vec<uint64>  ftb;       // }
+    Vec<uchar>   sel;       // -- this field can be left empty ('next()' will pad with zeros)
 
-    template<class ALLOC>   // -- NOTE! Should allocate 'uint64's
+    void begin()  { mem.clear(); off.clear(); clearCut(); }
+    void next ()  { storeCut(); clearCut(); }       // -- 'next()' must be called before the final 'done()'
+
+  //________________________________________
+  //  Manipulate cut set:
+
+    uint size() const      { return off.size(); }         // -- returns the number of cuts stored by 'next()' calls 
+    Cut operator[](uint i) { return Cut(&mem[off[i]]); }  // -- cut is invalidated if cutset is changed (by calling 'next()')
+
+    void swap    (uint i, uint j) { swp(off[i], off[j]); }
+    void pop     ()               { assert(off.size() > 0); off.pop(); }
+    void shrinkTo(uint new_size)  { assert(new_size <= off.size()); off.shrinkTo(new_size); }
+
+  //________________________________________
+  //  Finalize:
+
+    template<class ALLOC>   // -- NOTE! 'ALLOC' should allocate 'uint64's
     CutSet done(ALLOC& allocator) {
+        // <<== NEEDS TO BE REDONE IN PRESENCE OF 'swap()' and' 'shrinkTo()'
         uint off_adj = (off.size() + 2) >> 1;
         uint64* data = allocator.alloc(mem.size() + off_adj);
         uint*   tab = (uint*)data;
@@ -225,10 +255,11 @@ public:
 
         for (uint i = 0; i < off.size(); i++)
             tab[i+1] = off[i] + off_adj;
-        if ((off.size() & 1) == 0) tab[off.size() + 1] = 0;    // -- avoid uninitialized memory 
+        if ((off.size() & 1) == 0) tab[off.size() + 1] = 0;    // -- avoid uninitialized memory
 
         for (uint i = 0; i < mem.size(); i++)
             data[i + off_adj] = mem[i];
+
         return CutSet(data);
     }
 };
@@ -264,31 +295,145 @@ macro bool subsumes(const Cut& c, const Cut& d)
 // TechMap class:
 
 
+struct Params_TechMap {
+    uint  cut_size;             // -- maximum cut size
+    float delay_fraction;       // -- delays in 'gate_Delay' are multiplied by this value
+
+    Params_TechMap() :
+        cut_size      (6),
+        delay_fraction(1.0)
+    {}
+};
+
+
 class TechMap {
     // Input:
-    Gig&    N;
+    Gig&                  N;
+    const Params_TechMap& P;
 
     // State:
-    StackAlloc<uint64> mem;
-    WMap<CutSet>      cutmap;
-    WMap<Cut>         winner;
-    WMap<float>       area_est;
-    WMap<float>       fanout_est;
-    WMap<float>       arrival;
-    WMap<float>       depart;
-    WMap<uchar>       active;
+    StackAlloc<uint64>  mem;
+    WMap<CutSet>        cutmap;
+    WMap<Cut>           winner;
+    WMap<float>         area_est;
+    WMap<float>         fanout_est;
+    WMap<float>         arrival;
+    WMap<float>         depart;
+    WMap<uchar>         active;
 
-    uint              iter;
-    float             target_arrival;
+    uint                iter;
+    float               target_arrival;
 
+    // Temporaries:     
+    DynCutSet           dcuts;
+
+    // Statistics:
+    uint64              cuts_enumerated;
+
+    // Internal methods:
     void run();
 
     void generateCuts(Wire w);
-
+    void generateCuts_LogicGate(Wire w, DynCutSet& out_dcuts);
+    void prioritizeCuts(Wire w, DynCutSet& dcuts);
 
 public:
-    TechMap(Gig& N_) : N(N_) { run(); }
+    TechMap(Gig& N_, const Params_TechMap& P_ = Params_TechMap()) : N(N_), P(P_) { run(); }
 };
+
+
+//=================================================================================================
+// -- Cut generation:
+
+
+#include "TechMap_CutGen.icc"
+
+
+void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
+{
+
+}
+
+
+void TechMap::generateCuts(Wire w)
+{
+    assert(!w.sign);
+
+    dcuts.begin();
+    bool skip = false;
+
+    switch (w.type()){
+    case gate_Const:
+    case gate_Reset:    // -- not used, but is part of each netlist
+    case gate_Box:      // -- treat sequential boxes like a global source
+    case gate_PI:
+    case gate_FF:
+        // Global sources have only the implicit trivial cut:
+        area_est(w) = 0;
+        arrival(w) = 0;
+        break;
+
+    case gate_Bar:
+    case gate_Sel:
+        // Treat barriers and pin selectors as PIs except for delay:
+        area_est(w) = 0;
+        arrival(w) = arrival[w[0]];
+        break;
+
+    case gate_Delay:{
+        // Treat delay gates as PIs except for delay:
+        area_est(w) = 0;
+        float arr = 0;
+        For_Inputs(w, v)
+            newMax(arr, arrival[v]);
+        arrival(w) = arr + w.arg() * P.delay_fraction;
+        break;}
+
+    case gate_And:
+    case gate_Lut4:
+        // Logic:
+  //      if (!cutmap[w]){    // -- else reuse cuts from previous iteration
+
+          #if 0     // <<== LATER
+            if (!winner[w].null())
+                cuts.push(winner[w]);     // <<==FT cannot push last winner if mux_depth gets too big
+          #endif
+
+            generateCuts_LogicGate(w, dcuts);
+            cuts_enumerated += dcuts.size();    // -- for statistics
+            prioritizeCuts(w, dcuts);
+
+            //if (!probeRound()){
+            //    cuts.shrinkTo(P.cuts_per_node);
+            //}else{
+            //    for (uint i = 1; i < cuts.size(); i++){
+            //        if (delay(cuts[i], arrival, N) > delay(cuts[0], arrival, N))
+            //            cuts.shrinkTo(i);
+            //    }
+            //    cuts.shrinkTo(2 * P.cuts_per_node);
+            //}
+
+//        }else
+//            prioritizeCuts(w, cutmap[w]);   // <<== need to be able to update a static cut-set!
+        break;
+
+    case gate_PO:
+    case gate_Seq:
+        // Don't sture trivial cuts for sinks (saves a little memory):
+        skip = true;
+        break;
+
+    default:
+        ShoutLn "INTERNAL ERROR! Unhandled gate type: %_", w.type();
+        assert(false);
+    }
+
+    if (!skip){
+        cutmap(w) = dcuts.done(mem);
+        /**/WriteLn "cutmap[%_]:", w;
+        /**/for (uint i = 0; i < cutmap[w].size(); i++) WriteLn "  %_", cutmap[w][i];
+    }
+}
 
 
 //=================================================================================================
@@ -332,14 +477,15 @@ void TechMap::run()
         }
     }
 
+    cuts_enumerated = 0;
+
     // Map:     <<== use Iter_Params here.... (how to score cuts, how to update target delay, whether to recycle cuts...)
     for (iter = 0; iter < 1; iter++){
         // Generate cuts:
-        double T0 = cpuTime();
+        double T0 ___unused = cpuTime();
         For_All_Gates(N, w)
             generateCuts(w);
-        double T1 = cpuTime();
-        /**/Dump(T1 - T0);
+        double T1 ___unused = cpuTime();
 
         // Finalize mapping:
 
@@ -355,100 +501,12 @@ void TechMap::run()
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Cut generation:
-
-
-void TechMap::generateCuts(Wire w)
-{ }
-#if 0
-void LutMap::generateCuts(Wire w)
-{
-    assert(!w.sign);
-
-    uint64 ftb;
-    uchar  sel;
-
-    switch (w.type()){
-    case gate_Const:
-        ftb = (w == GLit_True) ? 0xFFFFFFFFFFFFFFFFull : 0;
-         Cut(mem, Array<gate_id>(empty_), &ftb, NULL);
-
-    Cut(Alloc& mem, Array<gate_id> inputs, uint64* ftb, uchar* sel);
-        ...
-    case gate_Reset:    // -- not used, but is part of each netlist
-    case gate_Box:      // -- treat sequential boxes like a global source
-    case gate_PI:
-    case gate_FF:
-        // Base case -- Global sources:
-        cutmap(w) = Array<Cut>(empty_);     // -- only the trivial cut
-        area_est(w) = 0;
-        arrival(w) = 0;
-        break;
-
-    case gate_Bar:
-    case gate_Sel:
-        // Treat barriers and pin selectors as PIs except for delay:
-        cutmap(w) = Array<Cut>(empty_);
-        area_est(w) = 0;
-        arrival(w) = arrival[w[0]];
-        break;
-
-    case gate_Delay:{
-        // Treat delay gates as PIs except for delay:
-        cutmap(w) = Array<Cut>(empty_);
-        area_est(w) = 0;
-        float arr = 0;
-        For_Inputs(w, v)
-            newMax(arr, arrival[v]);
-        arrival(w) = arr + w.arg() / DELAY_FRACTION;
-        break;}
-
-    case gate_And:
-    case gate_Lut4:
-        // Inductive case:
-        if (!cutmap[w]){
-            Vec<Cut>& cuts = tmp_cuts;
-            cuts.clear();   // -- keep last winner
-            if (!winner[w].null())
-                cuts.push(winner[w]);     // <<==FT cannot push last winner if mux_depth gets too big
-            generateCuts_LogicGate(w, cuts);
-
-            cuts_enumerated += cuts.size();
-            prioritizeCuts(w, cuts.slice());
-
-            if (!probeRound()){
-                cuts.shrinkTo(P.cuts_per_node);
-            }else{
-                for (uint i = 1; i < cuts.size(); i++){
-                    if (delay(cuts[i], arrival, N) > delay(cuts[0], arrival, N))
-                        cuts.shrinkTo(i);
-                }
-                cuts.shrinkTo(2 * P.cuts_per_node);
-            }
-            cutmap(w) = Array_copy(cuts, mem);
-        }else
-            prioritizeCuts(w, cutmap[w]);
-        break;
-
-    case gate_PO:
-    case gate_Seq:
-        // Nothing to do.
-        break;
-
-    default:
-        ShoutLn "INTERNAL ERROR! Unhandled gate type: %_", w.type();
-        assert(false);
-    }
-}
-#endif
-
-
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Testing:
 
 
 void test()
 {
+#if 0
     DynCutSet cuts;
     cuts.begin();
 
@@ -467,6 +525,19 @@ void test()
 
     for (uint i = 0; i < final.size(); i++)
         Dump(final[i]);
+#endif
+
+    Gig N;
+
+    Wire x = N.add(gate_PI);
+    Wire y = N.add(gate_PI);
+    Wire z = N.add(gate_PI);
+    Wire f = N.add(gate_And).init(x, y);
+    Wire g = N.add(gate_And).init(~x, z);
+    Wire h = N.add(gate_And).init(~f, ~g);
+    Wire t ___unused = N.add(gate_PO).init(~h);
+
+    TechMap map(N);
 }
 
 

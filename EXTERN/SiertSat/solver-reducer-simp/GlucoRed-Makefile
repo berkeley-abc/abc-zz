@@ -1,0 +1,9 @@
+EXEC   = glucored-simp
+BASE   = glucose
+MROOT  = ..
+DEPDIR = $(BASE)/mtl $(BASE)/utils $(BASE)/core solver-reducer
+LFLAGS = -pthread
+CFLAGS = -I$(MROOT)/$(BASE) -DGLUCORED
+OBJEXT = og
+
+include $(MROOT)/solver-reducer/template.mk

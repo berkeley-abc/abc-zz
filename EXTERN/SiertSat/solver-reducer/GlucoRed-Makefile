@@ -1,0 +1,9 @@
+EXEC   = glucored
+BASE   = glucose
+MROOT  = ..
+DEPDIR = $(BASE)/mtl $(BASE)/utils $(BASE)/core
+LFLAGS = -pthread
+CFLAGS = -I$(MROOT)/$(BASE) -DGLUCORED
+OBJEXT = og
+
+include $(MROOT)/solver-reducer/template.mk

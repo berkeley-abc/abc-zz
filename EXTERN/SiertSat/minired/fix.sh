@@ -1,0 +1,12 @@
+echo '#include "../solver-reducer/ExtSolver.cc"' > ExtSolver.cc
+echo '#include "../solver-reducer/ExtSolver.h"' > ExtSolver.h
+echo '#include "../solver-reducer/GlucoRed-Search.cc"' > GlucoRed-Search.cc
+echo '#include "../solver-reducer/Main.cc"' > Main.cc
+echo '#include "../solver-reducer/MiniRed-Search.cc"' > MiniRed-Search.cc
+echo '#include "../solver-reducer/Reducer.cc"' > Reducer.cc
+echo '#include "../solver-reducer/Reducer.h"' > Reducer.h
+echo '#include "../solver-reducer/SolRed.cc"' > SolRed.cc
+echo '#include "../solver-reducer/SolRed.h"' > SolRed.h
+echo '#include "../solver-reducer/Version.h"' > Version.h
+echo '#include "../solver-reducer/Work.cc"' > Work.cc
+echo '#include "../solver-reducer/Work.h"' > Work.h
