@@ -5,7 +5,7 @@
 //| Module      : Graphics
 //| Description : Simple 8-bit color abstraction (with alpha channel).
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

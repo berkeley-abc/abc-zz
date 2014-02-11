@@ -5,7 +5,7 @@
 //| Module      : EqCheck
 //| Description : Combinational equivalence checking of two design through ABC.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

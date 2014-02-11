@@ -5,7 +5,7 @@
 //| Module      : Bip
 //| Description : Localization using counterexample- and proof-based abstraction.
 //|
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| This is an old module. Some coding conventions has changed since its conception.

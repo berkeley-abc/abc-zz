@@ -5,7 +5,7 @@
 //| Module      : Generics
 //| Description : Map from an integer-like type to some arbitrary type 'T'.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

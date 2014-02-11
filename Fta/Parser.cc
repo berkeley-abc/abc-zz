@@ -5,7 +5,7 @@
 //| Module      : Fta
 //| Description : Parsers for fault-tree formats.
 //| 
-//| (C) Copyright 2013, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

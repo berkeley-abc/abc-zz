@@ -5,7 +5,7 @@
 //| Module      : TechMap
 //| Description : Stand alone binary for calling technology mapper.
 //| 
-//| (C) Copyright 2014, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

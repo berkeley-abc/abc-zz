@@ -164,11 +164,11 @@ def create_header():
              "glucose/core/BoundedQueue.h",
              "glucose/core/Solver.h",
              "glucose/utils/System.h",
-             "glucored/Work.h",
-             "glucored/Version.h",
-             "glucored/ExtSolver.h",
-             "glucored/Reducer.h",
-             "glucored/SolRed.h",
+             "solver-reducer-g/Work.h",
+             "solver-reducer-g/Version.h",
+             "solver-reducer-g/ExtSolver.h",
+             "solver-reducer-g/Reducer.h",
+             "solver-reducer-g/SolRed.h",
              "minisat/mtl/XAlloc.h",
              "minisat/mtl/Alloc.h",
              "minisat/mtl/Vec.h",
@@ -183,11 +183,11 @@ def create_header():
              "minisat/core/SolverTypes.h",
              "minisat/core/Solver.h",
              "minisat/utils/System.h",
-             "minired/Work.h",
-             "minired/Version.h",
-             "minired/ExtSolver.h",
-             "minired/Reducer.h",
-             "minired/SolRed.h"
+             "solver-reducer-r/Work.h",
+             "solver-reducer-r/Version.h",
+             "solver-reducer-r/ExtSolver.h",
+             "solver-reducer-r/Reducer.h",
+             "solver-reducer-r/SolRed.h"
             ]
 
     out_filename = z("INCLUDE_DIR") + "/"+ module_name + ".hh"
@@ -196,8 +196,8 @@ def create_header():
 
     for filename in order:
         remove_protected = (filename.endswith("Solver.h"))
-        if filename.startswith("glucored"): out.write("#define GLUCORED\n")
-        if filename.startswith("minired"):  out.write("#define MINIRED\n")
+        if filename.startswith("solver-reducer-g"): out.write("#define GLUCORED\n"); filename = "solver-reducer" + filename[16:]
+        if filename.startswith("solver-reducer-r"):  out.write("#define MINIRED\n"); filename = "solver-reducer" + filename[16:]
         with open(filename) as f:
             for line in f:
                 if not skip_line(line, remove_protected):

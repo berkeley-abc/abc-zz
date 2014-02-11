@@ -5,7 +5,7 @@
 //| Module      : Npn4
 //| Description : Tables for LUT4->CNF conversion.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| "isop" contains a minimal CNF encoding (irredundant sum-of-product)

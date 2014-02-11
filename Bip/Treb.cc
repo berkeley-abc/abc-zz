@@ -5,7 +5,7 @@
 //| Module      : Bip
 //| Description : Second go at the PDR algorithm, with several generalizations.
 //|
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 'Treb' is short for Trebuchet. A slightly longer name would have been:

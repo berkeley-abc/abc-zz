@@ -5,7 +5,7 @@
 //| Module      : Generics
 //| Description : Parses expressions with infix, postfix and prefix operators and parenthesis.
 //| 
-//| (C) Copyright 2013, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

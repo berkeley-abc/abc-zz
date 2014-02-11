@@ -5,7 +5,7 @@
 //| Module      : DelayOpt
 //| Description : Organize standard cells into groups of the same function, sorted on size.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

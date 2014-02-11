@@ -5,7 +5,7 @@
 //| Module      : Gig
 //| Description : Contains the more advanced functionality of the netlist.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

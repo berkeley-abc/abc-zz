@@ -5,7 +5,7 @@
 //| Module      : Liberty
 //| Description : Convert Liberty files to .genlib files (losing most information).
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

@@ -5,7 +5,7 @@
 //| Module      : Netlist
 //| Description : Declares and registers some standard netlist objects used through-out ZZ.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

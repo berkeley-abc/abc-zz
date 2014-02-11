@@ -5,7 +5,7 @@
 //| Module      : Bip
 //| Description : LTL checking based on circuit monitor synthesis.
 //| 
-//| (C) Copyright 2013, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

@@ -5,7 +5,7 @@
 //| Module      : Netlist
 //| Description : Defines some basic types of the 'Netlist' ADT.
 //|
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //|

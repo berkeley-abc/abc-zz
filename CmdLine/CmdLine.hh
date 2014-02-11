@@ -5,7 +5,7 @@
 //| Module      : CmdLine
 //| Description : Command line parsing.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| Full documentation can be found in CmdLine_README.txt

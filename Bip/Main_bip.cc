@@ -5,7 +5,7 @@
 //| Module      : Bip
 //| Description : Commandline interface for the Bip engine.
 //|
-//| (C) Copyright 2010-2013, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //|

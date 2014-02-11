@@ -5,7 +5,7 @@
 //| Module      : Bip
 //| Description : SAT based interpolant minimization. 
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| WORK IN PROGRESS! Don't used for any real application!

@@ -5,7 +5,7 @@
 //| Module      : TechMap
 //| Description : Second generation technology mapper.
 //|
-//| (C) Copyright 2014, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| Currently targeted at FPGA mapping.

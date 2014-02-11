@@ -1,3 +1,16 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : ConstrExtr.hh
+//| Author(s)   : Niklas Een
+//| Module      : Bip
+//| Description : Constraint extraction for verification.
+//| 
+//| (C) Copyright 2010-2014, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//|________________________________________________________________________________________________
+
 #ifndef ZZ__Bip__ConstrExtr_hh
 #define ZZ__Bip__ConstrExtr_hh
 

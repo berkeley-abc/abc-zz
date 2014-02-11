@@ -5,7 +5,7 @@
 //| Module      : Bip
 //| Description : Export a netlist to a GraphViz DOT file.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

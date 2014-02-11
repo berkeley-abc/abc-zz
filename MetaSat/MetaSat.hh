@@ -5,7 +5,7 @@
 //| Module      : MetaSat
 //| Description : Wrapper for non-proof-logging SAT solvers supporting the assumption interface.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

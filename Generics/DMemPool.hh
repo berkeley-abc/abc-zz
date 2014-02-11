@@ -5,7 +5,7 @@
 //| Module      : Generics
 //| Description : Dynamic memory pool for objects of size 2^k words.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

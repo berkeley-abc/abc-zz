@@ -5,7 +5,7 @@
 //| Module      : Bip
 //| Description : Second attempt at a sifting algorithm for inductive invariant finding.
 //| 
-//| (C) Copyright 2013, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

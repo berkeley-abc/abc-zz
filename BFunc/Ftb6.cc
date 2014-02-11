@@ -5,7 +5,7 @@
 //| Module      : Ftb6
 //| Description : 6-input function table manipulation.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

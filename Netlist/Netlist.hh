@@ -5,7 +5,7 @@
 //| Module      : Netlist
 //| Description : A netlist is a graph of multi-input, single output gates ("gate-inverter-graph").
 //|
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //|

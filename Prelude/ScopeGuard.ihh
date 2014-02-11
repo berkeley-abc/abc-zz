@@ -5,7 +5,7 @@
 //| Module      : Prelude
 //| Description : Library for convenient RIAA without custom classes.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| Heavily based on 'ScopeGuard.h' by Andrei Alexandrescu and Petru Marginean. 

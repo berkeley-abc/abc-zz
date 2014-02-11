@@ -5,7 +5,7 @@
 //| Module      : Generics
 //| Description : Provides a mechanism for allocating and returning IDs (integers 0, 1, 2...).
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

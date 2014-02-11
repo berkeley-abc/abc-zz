@@ -5,7 +5,7 @@
 //| Module      : Cluster
 //| Description : Daemon running on client machines (drones). 
 //| 
-//| (C) Copyright 2013, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

@@ -5,7 +5,7 @@
 //| Module      : DelayOpt
 //| Description : Initial buffering and sizing using non-incremental sweeping algorithm.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 

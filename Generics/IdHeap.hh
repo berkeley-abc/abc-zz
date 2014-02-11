@@ -5,7 +5,7 @@
 //| Module      : Generics
 //| Description : A heap with supports for increase/decrease of the key (priority) of its elements.
 //| 
-//| (C) Copyright 2010-2012, The Regents of the University of California
+//| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
 //| 
