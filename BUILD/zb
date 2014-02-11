@@ -476,7 +476,7 @@ def setup_cflags(pri, secs, cxx_mode, no_warn):
     if pseudo_root == "NNN": flags.append("-Wno-strict-aliasing")    # -- not pretty, but this is old code and these warnings are getting annoying
 
     # ABC flags:
-    if machine.endswith("i686"):
+    if machine.endswith("i686") or "m" in secs:
         flags.append("-DLIN -DSIZEOF_VOID_P=4 -DSIZEOF_LONG=4 -DSIZEOF_INT=4")
     else:
         flags.append("-DLIN64 -DSIZEOF_VOID_P=8 -DSIZEOF_LONG=8 -DSIZEOF_INT=4")

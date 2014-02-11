@@ -17,7 +17,7 @@
   Revision    [$Id: utilTruth.h,v 1.00 2012/10/28 00:00:00 alanmi Exp $]
 
 ***********************************************************************/
- 
+
 #ifndef ABC__misc__util__utilTruth_h
 #define ABC__misc__util__utilTruth_h
 
@@ -303,45 +303,45 @@ static inline void Abc_TtCofactor0p( word * pOut, word * pIn, int nWords, int iV
 {
     if ( nWords == 1 )
         pOut[0] = ((pIn[0] & s_Truths6Neg[iVar]) << (1 << iVar)) | (pIn[0] & s_Truths6Neg[iVar]);
-	else if ( iVar <= 5 )
-	{
-		int w, shift = (1 << iVar);
-		for ( w = 0; w < nWords; w++ )
+    else if ( iVar <= 5 )
+    {
+        int w, shift = (1 << iVar);
+        for ( w = 0; w < nWords; w++ )
             pOut[w] = ((pIn[w] & s_Truths6Neg[iVar]) << shift) | (pIn[w] & s_Truths6Neg[iVar]);
-	}
-	else // if ( iVar > 5 )
-	{
+    }
+    else // if ( iVar > 5 )
+    {
         word * pLimit = pIn + nWords;
-		int i, iStep = Abc_TtWordNum(iVar);
-		for ( ; pIn < pLimit; pIn += 2*iStep, pOut += 2*iStep )
-			for ( i = 0; i < iStep; i++ )
+        int i, iStep = Abc_TtWordNum(iVar);
+        for ( ; pIn < pLimit; pIn += 2*iStep, pOut += 2*iStep )
+            for ( i = 0; i < iStep; i++ )
             {
                 pOut[i]         = pIn[i];
                 pOut[i + iStep] = pIn[i];
             }
-	}	
+    }   
 }
 static inline void Abc_TtCofactor1p( word * pOut, word * pIn, int nWords, int iVar )
 {
     if ( nWords == 1 )
         pOut[0] = (pIn[0] & s_Truths6[iVar]) | ((pIn[0] & s_Truths6[iVar]) >> (1 << iVar));
-	else if ( iVar <= 5 )
-	{
-		int w, shift = (1 << iVar);
-		for ( w = 0; w < nWords; w++ )
+    else if ( iVar <= 5 )
+    {
+        int w, shift = (1 << iVar);
+        for ( w = 0; w < nWords; w++ )
             pOut[w] = (pIn[w] & s_Truths6[iVar]) | ((pIn[w] & s_Truths6[iVar]) >> shift);
-	}
-	else // if ( iVar > 5 )
-	{
+    }
+    else // if ( iVar > 5 )
+    {
         word * pLimit = pIn + nWords;
-		int i, iStep = Abc_TtWordNum(iVar);
-		for ( ; pIn < pLimit; pIn += 2*iStep, pOut += 2*iStep )
-			for ( i = 0; i < iStep; i++ )
+        int i, iStep = Abc_TtWordNum(iVar);
+        for ( ; pIn < pLimit; pIn += 2*iStep, pOut += 2*iStep )
+            for ( i = 0; i < iStep; i++ )
             {
                 pOut[i]         = pIn[i + iStep];
                 pOut[i + iStep] = pIn[i + iStep];
             }
-	}	
+    }   
 }
 static inline void Abc_TtCofactor0( word * pTruth, int nWords, int iVar )
 {
@@ -404,44 +404,44 @@ static inline int Abc_TtCheckEqualCofs( word * pTruth, int nWords, int iVar, int
         int shift2 = (Num2 >> 1) * (1 << jVar) + (Num2 & 1) * (1 << iVar);
         return ((pTruth[0] >> shift1) & Mask) == ((pTruth[0] >> shift2) & Mask);
     }
-	if ( jVar <= 5 )
-	{
+    if ( jVar <= 5 )
+    {
         word Mask = s_Truths6Neg[jVar] & s_Truths6Neg[iVar];
         int shift1 = (Num1 >> 1) * (1 << jVar) + (Num1 & 1) * (1 << iVar);
         int shift2 = (Num2 >> 1) * (1 << jVar) + (Num2 & 1) * (1 << iVar);
-		int w;
-		for ( w = 0; w < nWords; w++ )
+        int w;
+        for ( w = 0; w < nWords; w++ )
             if ( ((pTruth[w] >> shift1) & Mask) != ((pTruth[w] >> shift2) & Mask) )
                 return 0;
         return 1;
-	}
-	if ( iVar <= 5 && jVar > 5 )
-	{
+    }
+    if ( iVar <= 5 && jVar > 5 )
+    {
         word * pLimit = pTruth + nWords;
         int j, jStep = Abc_TtWordNum(jVar);
-		int shift1 = (Num1 & 1) * (1 << iVar);
-		int shift2 = (Num2 & 1) * (1 << iVar);
+        int shift1 = (Num1 & 1) * (1 << iVar);
+        int shift2 = (Num2 & 1) * (1 << iVar);
         int Offset1 = (Num1 >> 1) * jStep;
         int Offset2 = (Num2 >> 1) * jStep;
-		for ( ; pTruth < pLimit; pTruth += 2*jStep )
-			for ( j = 0; j < jStep; j++ )
+        for ( ; pTruth < pLimit; pTruth += 2*jStep )
+            for ( j = 0; j < jStep; j++ )
                 if ( ((pTruth[j + Offset1] >> shift1) & s_Truths6Neg[iVar]) != ((pTruth[j + Offset2] >> shift2) & s_Truths6Neg[iVar]) )
                     return 0;
         return 1;
-	}
-	{
+    }
+    {
         word * pLimit = pTruth + nWords;
-		int j, jStep = Abc_TtWordNum(jVar);
-		int i, iStep = Abc_TtWordNum(iVar);
+        int j, jStep = Abc_TtWordNum(jVar);
+        int i, iStep = Abc_TtWordNum(iVar);
         int Offset1 = (Num1 >> 1) * jStep + (Num1 & 1) * iStep;
         int Offset2 = (Num2 >> 1) * jStep + (Num2 & 1) * iStep;
-		for ( ; pTruth < pLimit; pTruth += 2*jStep )
-			for ( i = 0; i < jStep; i += 2*iStep )
-				for ( j = 0; j < iStep; j++ )
+        for ( ; pTruth < pLimit; pTruth += 2*jStep )
+            for ( i = 0; i < jStep; i += 2*iStep )
+                for ( j = 0; j < iStep; j++ )
                     if ( pTruth[Offset1 + i + j] != pTruth[Offset2 + i + j] )
                         return 0;
         return 1;
-	}	
+    }   
 }
 
 
@@ -923,20 +923,20 @@ static inline void Abc_TtFlip( word * pTruth, int nWords, int iVar )
 {
     if ( nWords == 1 )
         pTruth[0] = ((pTruth[0] << (1 << iVar)) & s_Truths6[iVar]) | ((pTruth[0] & s_Truths6[iVar]) >> (1 << iVar));
-	else if ( iVar <= 5 )
-	{
-		int w, shift = (1 << iVar);
-		for ( w = 0; w < nWords; w++ )
+    else if ( iVar <= 5 )
+    {
+        int w, shift = (1 << iVar);
+        for ( w = 0; w < nWords; w++ )
             pTruth[w] = ((pTruth[w] << shift) & s_Truths6[iVar]) | ((pTruth[w] & s_Truths6[iVar]) >> shift);
-	}
-	else // if ( iVar > 5 )
-	{
+    }
+    else // if ( iVar > 5 )
+    {
         word * pLimit = pTruth + nWords;
-		int i, iStep = Abc_TtWordNum(iVar);
-		for ( ; pTruth < pLimit; pTruth += 2*iStep )
-			for ( i = 0; i < iStep; i++ )
+        int i, iStep = Abc_TtWordNum(iVar);
+        for ( ; pTruth < pLimit; pTruth += 2*iStep )
+            for ( i = 0; i < iStep; i++ )
                 ABC_SWAP( word, pTruth[i], pTruth[i + iStep] );
-	}	
+    }   
 }
 
 /**Function*************************************************************
@@ -973,22 +973,22 @@ static inline void Abc_TtSwapAdjacent( word * pTruth, int nWords, int iVar )
     {
         unsigned * pTruthU = (unsigned *)pTruth;
         unsigned * pLimitU = (unsigned *)(pTruth + nWords);
-		for ( ; pTruthU < pLimitU; pTruthU += 4 )
+        for ( ; pTruthU < pLimitU; pTruthU += 4 )
             ABC_SWAP( unsigned, pTruthU[1], pTruthU[2] );
     }
     else // if ( iVar > 5 )
     {
         word * pLimit = pTruth + nWords;
-		int i, iStep = Abc_TtWordNum(iVar);
-		for ( ; pTruth < pLimit; pTruth += 4*iStep )
-			for ( i = 0; i < iStep; i++ )
+        int i, iStep = Abc_TtWordNum(iVar);
+        for ( ; pTruth < pLimit; pTruth += 4*iStep )
+            for ( i = 0; i < iStep; i++ )
                 ABC_SWAP( word, pTruth[i + iStep], pTruth[i + 2*iStep] );
     }
 }
 static inline void Abc_TtSwapVars( word * pTruth, int nVars, int iVar, int jVar )
 {
-	static word Ps_PMasks[5][6][3] = {
-		{ 
+    static word Ps_PMasks[5][6][3] = {
+        { 
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 0 0  
             { ABC_CONST(0x9999999999999999), ABC_CONST(0x2222222222222222), ABC_CONST(0x4444444444444444) }, // 0 1  
             { ABC_CONST(0xA5A5A5A5A5A5A5A5), ABC_CONST(0x0A0A0A0A0A0A0A0A), ABC_CONST(0x5050505050505050) }, // 0 2 
@@ -996,7 +996,7 @@ static inline void Abc_TtSwapVars( word * pTruth, int nVars, int iVar, int jVar 
             { ABC_CONST(0xAAAA5555AAAA5555), ABC_CONST(0x0000AAAA0000AAAA), ABC_CONST(0x5555000055550000) }, // 0 4 
             { ABC_CONST(0xAAAAAAAA55555555), ABC_CONST(0x00000000AAAAAAAA), ABC_CONST(0x5555555500000000) }  // 0 5 
         },
-		{ 
+        { 
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 1 0  
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 1 1  
             { ABC_CONST(0xC3C3C3C3C3C3C3C3), ABC_CONST(0x0C0C0C0C0C0C0C0C), ABC_CONST(0x3030303030303030) }, // 1 2 
@@ -1004,7 +1004,7 @@ static inline void Abc_TtSwapVars( word * pTruth, int nVars, int iVar, int jVar 
             { ABC_CONST(0xCCCC3333CCCC3333), ABC_CONST(0x0000CCCC0000CCCC), ABC_CONST(0x3333000033330000) }, // 1 4 
             { ABC_CONST(0xCCCCCCCC33333333), ABC_CONST(0x00000000CCCCCCCC), ABC_CONST(0x3333333300000000) }  // 1 5 
         },
-		{ 
+        { 
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 2 0  
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 2 1  
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 2 2 
@@ -1012,7 +1012,7 @@ static inline void Abc_TtSwapVars( word * pTruth, int nVars, int iVar, int jVar 
             { ABC_CONST(0xF0F00F0FF0F00F0F), ABC_CONST(0x0000F0F00000F0F0), ABC_CONST(0x0F0F00000F0F0000) }, // 2 4 
             { ABC_CONST(0xF0F0F0F00F0F0F0F), ABC_CONST(0x00000000F0F0F0F0), ABC_CONST(0x0F0F0F0F00000000) }  // 2 5 
         },
-		{ 
+        { 
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 3 0  
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 3 1  
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 3 2 
@@ -1020,7 +1020,7 @@ static inline void Abc_TtSwapVars( word * pTruth, int nVars, int iVar, int jVar 
             { ABC_CONST(0xFF0000FFFF0000FF), ABC_CONST(0x0000FF000000FF00), ABC_CONST(0x00FF000000FF0000) }, // 3 4 
             { ABC_CONST(0xFF00FF0000FF00FF), ABC_CONST(0x00000000FF00FF00), ABC_CONST(0x00FF00FF00000000) }  // 3 5 
         },
-		{ 
+        { 
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 4 0  
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 4 1  
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 4 2 
@@ -1028,10 +1028,10 @@ static inline void Abc_TtSwapVars( word * pTruth, int nVars, int iVar, int jVar 
             { ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000), ABC_CONST(0x0000000000000000) }, // 4 4 
             { ABC_CONST(0xFFFF00000000FFFF), ABC_CONST(0x00000000FFFF0000), ABC_CONST(0x0000FFFF00000000) }  // 4 5 
         }
-	};
-	if ( iVar == jVar )
-		return;
-	if ( jVar < iVar )
+    };
+    if ( iVar == jVar )
+        return;
+    if ( jVar < iVar )
         ABC_SWAP( int, iVar, jVar );
     assert( iVar < jVar && jVar < nVars );
     if ( nVars <= 6 )
@@ -1041,41 +1041,41 @@ static inline void Abc_TtSwapVars( word * pTruth, int nVars, int iVar, int jVar 
         pTruth[0] = (pTruth[0] & s_PMasks[0]) | ((pTruth[0] & s_PMasks[1]) << shift) | ((pTruth[0] & s_PMasks[2]) >> shift);
         return;
     }
-	if ( jVar <= 5 )
-	{
+    if ( jVar <= 5 )
+    {
         word * s_PMasks = Ps_PMasks[iVar][jVar];
-	    int nWords = Abc_TtWordNum(nVars);
-		int w, shift = (1 << jVar) - (1 << iVar);
-		for ( w = 0; w < nWords; w++ )
+        int nWords = Abc_TtWordNum(nVars);
+        int w, shift = (1 << jVar) - (1 << iVar);
+        for ( w = 0; w < nWords; w++ )
             pTruth[w] = (pTruth[w] & s_PMasks[0]) | ((pTruth[w] & s_PMasks[1]) << shift) | ((pTruth[w] & s_PMasks[2]) >> shift);
         return;
-	}
-	if ( iVar <= 5 && jVar > 5 )
-	{
-	    word low2High, high2Low;
+    }
+    if ( iVar <= 5 && jVar > 5 )
+    {
+        word low2High, high2Low;
         word * pLimit = pTruth + Abc_TtWordNum(nVars);
         int j, jStep = Abc_TtWordNum(jVar);
-		int shift = 1 << iVar;
-		for ( ; pTruth < pLimit; pTruth += 2*jStep )
-			for ( j = 0; j < jStep; j++ )
-			{
+        int shift = 1 << iVar;
+        for ( ; pTruth < pLimit; pTruth += 2*jStep )
+            for ( j = 0; j < jStep; j++ )
+            {
                 low2High = (pTruth[j] & s_Truths6[iVar]) >> shift;
                 high2Low = (pTruth[j+jStep] << shift) & s_Truths6[iVar];
                 pTruth[j] = (pTruth[j] & ~s_Truths6[iVar]) | high2Low;
                 pTruth[j+jStep] = (pTruth[j+jStep] & s_Truths6[iVar]) | low2High;
-			}
+            }
         return;
-	}
-	{
+    }
+    {
         word * pLimit = pTruth + Abc_TtWordNum(nVars);
-		int i, iStep = Abc_TtWordNum(iVar);
-		int j, jStep = Abc_TtWordNum(jVar);
-		for ( ; pTruth < pLimit; pTruth += 2*jStep )
-			for ( i = 0; i < jStep; i += 2*iStep )
-				for ( j = 0; j < iStep; j++ )
+        int i, iStep = Abc_TtWordNum(iVar);
+        int j, jStep = Abc_TtWordNum(jVar);
+        for ( ; pTruth < pLimit; pTruth += 2*jStep )
+            for ( i = 0; i < jStep; i += 2*iStep )
+                for ( j = 0; j < iStep; j++ )
                     ABC_SWAP( word, pTruth[iStep + i + j], pTruth[jStep + i + j] );
         return;
-	}	
+    }   
 }
 // moves one var (v) to the given position (p)
 static inline void Abc_TtMoveVar( word * pF, int nVars, int * V2P, int * P2V, int v, int p )
@@ -1261,24 +1261,24 @@ static inline int Abc_Tt6FirstBit( word t )
 {
     int n = 0;
     if ( t == 0 ) return -1;
-    if ( (t & 0x00000000FFFFFFFF) == 0 ) { n += 32; t >>= 32; }
-    if ( (t & 0x000000000000FFFF) == 0 ) { n += 16; t >>= 16; }
-    if ( (t & 0x00000000000000FF) == 0 ) { n +=  8; t >>=  8; }
-    if ( (t & 0x000000000000000F) == 0 ) { n +=  4; t >>=  4; }
-    if ( (t & 0x0000000000000003) == 0 ) { n +=  2; t >>=  2; }
-    if ( (t & 0x0000000000000001) == 0 ) { n++; }
+    if ( (t & ABC_CONST(0x00000000FFFFFFFF)) == 0 ) { n += 32; t >>= 32; }
+    if ( (t & ABC_CONST(0x000000000000FFFF)) == 0 ) { n += 16; t >>= 16; }
+    if ( (t & ABC_CONST(0x00000000000000FF)) == 0 ) { n +=  8; t >>=  8; }
+    if ( (t & ABC_CONST(0x000000000000000F)) == 0 ) { n +=  4; t >>=  4; }
+    if ( (t & ABC_CONST(0x0000000000000003)) == 0 ) { n +=  2; t >>=  2; }
+    if ( (t & ABC_CONST(0x0000000000000001)) == 0 ) { n++; }
     return n;
 }
 static inline int Abc_Tt6LastBit( word t )
 {
     int n = 0;
     if ( t == 0 ) return -1;
-    if ( (t & 0xFFFFFFFF00000000) == 0 ) { n += 32; t <<= 32; }
-    if ( (t & 0xFFFF000000000000) == 0 ) { n += 16; t <<= 16; }
-    if ( (t & 0xFF00000000000000) == 0 ) { n +=  8; t <<=  8; }
-    if ( (t & 0xF000000000000000) == 0 ) { n +=  4; t <<=  4; }
-    if ( (t & 0xC000000000000000) == 0 ) { n +=  2; t <<=  2; }
-    if ( (t & 0x8000000000000000) == 0 ) { n++; }
+    if ( (t & ABC_CONST(0xFFFFFFFF00000000)) == 0 ) { n += 32; t <<= 32; }
+    if ( (t & ABC_CONST(0xFFFF000000000000)) == 0 ) { n += 16; t <<= 16; }
+    if ( (t & ABC_CONST(0xFF00000000000000)) == 0 ) { n +=  8; t <<=  8; }
+    if ( (t & ABC_CONST(0xF000000000000000)) == 0 ) { n +=  4; t <<=  4; }
+    if ( (t & ABC_CONST(0xC000000000000000)) == 0 ) { n +=  2; t <<=  2; }
+    if ( (t & ABC_CONST(0x8000000000000000)) == 0 ) { n++; }
     return 63-n;
 }
 static inline int Abc_TtFindFirstBit( word * pIn, int nVars )
