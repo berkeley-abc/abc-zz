@@ -13,8 +13,10 @@
 
 #include "Prelude.hh"
 #include "ZZ_Gig.hh"
+#include "ZZ_Gig.IO.hh"
 #include "ZZ_BFunc.hh"
 #include "ZZ_Npn4.hh"
+#include "ZZ/Generics/Sort.hh"
 
 namespace ZZ {
 using namespace std;
@@ -59,6 +61,14 @@ Example circuit:
 
 
 */
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Helpers:
+
+
+macro bool isLogic(Wire w) {
+    return w == gate_And || w == gate_Lut4; }
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // 'Cut' class:
 
@@ -207,7 +217,7 @@ public:
 
 
 // Usage: call 'begin()', define cut by modifying public variables, call 'next()', repeat this 
-// step, finally call 'dont()' to get a static 'CutSet'. The dynamic cut set can then be reused.
+// step, finally call 'done()' to get a static 'CutSet'. The dynamic cut set can then be reused.
 class DynCutSet {
     Vec<uint64> mem;
     Vec<uint>   off;
@@ -235,34 +245,69 @@ public:
   //________________________________________
   //  Manipulate cut set:
 
-    uint size() const      { return off.size(); }         // -- returns the number of cuts stored by 'next()' calls 
+    uint size() const      { return off.size(); }         // -- returns the number of cuts stored by 'next()' calls
     Cut operator[](uint i) { return Cut(&mem[off[i]]); }  // -- cut is invalidated if cutset is changed (by calling 'next()')
 
     void swap    (uint i, uint j) { swp(off[i], off[j]); }
     void pop     ()               { assert(off.size() > 0); off.pop(); }
-    void shrinkTo(uint new_size)  { assert(new_size <= off.size()); off.shrinkTo(new_size); }
+    void shrinkTo(uint new_size)  { if (new_size <= off.size()) off.shrinkTo(new_size); }
 
   //________________________________________
   //  Finalize:
 
     template<class ALLOC>   // -- NOTE! 'ALLOC' should allocate 'uint64's
-    CutSet done(ALLOC& allocator) {
-        // <<== NEEDS TO BE REDONE IN PRESENCE OF 'swap()' and' 'shrinkTo()'
-        uint off_adj = (off.size() + 2) >> 1;
-        uint64* data = allocator.alloc(mem.size() + off_adj);
-        uint*   tab = (uint*)data;
-        tab[0] = off.size();
-
-        for (uint i = 0; i < off.size(); i++)
-            tab[i+1] = off[i] + off_adj;
-        if ((off.size() & 1) == 0) tab[off.size() + 1] = 0;    // -- avoid uninitialized memory
-
-        for (uint i = 0; i < mem.size(); i++)
-            data[i + off_adj] = mem[i];
-
-        return CutSet(data);
-    }
+    CutSet done(ALLOC& allocator);
 };
+
+
+template<class ALLOC>
+CutSet DynCutSet::done(ALLOC& allocator)
+{
+#if 1
+    uint mem_needed = 0;
+    for (uint i = 0; i < off.size(); i++)
+        mem_needed += Cut::allocSz(Cut(&mem[off[i]]).size());
+
+    uint off_adj = (off.size() + 2) >> 1;
+    mem_needed += off_adj;
+    uint64* data = allocator.alloc(mem_needed);
+    uint*   tab = (uint*)data;
+    tab[0] = off.size();
+
+    for (uint i = 0; i < off.size(); i++){
+        tab[i+1] = off_adj;
+
+        uint sz = Cut::allocSz(Cut(&mem[off[i]]).size());
+        memcpy(&data[off_adj], &mem[off[i]], sz * sizeof(uint64));
+        off_adj += sz;
+    }
+    assert(off_adj == mem_needed);
+    if ((off.size() & 1) == 0) tab[off.size() + 1] = 0;    // -- avoid uninitialized memory
+
+    //**/WriteLn "====================";
+    //**/for (uint i = 0; i < mem_needed; i++)
+    //**/    WriteLn "%>2%d: %.16x", i, data[i];
+#else
+    // <<== NEEDS TO BE REDONE IN PRESENCE OF 'swap()' and' 'shrinkTo()'
+    uint off_adj = (off.size() + 2) >> 1;
+    uint64* data = allocator.alloc(mem.size() + off_adj);
+    uint*   tab = (uint*)data;
+    tab[0] = off.size();
+
+    for (uint i = 0; i < off.size(); i++)
+        tab[i+1] = off[i] + off_adj;
+    if ((off.size() & 1) == 0) tab[off.size() + 1] = 0;    // -- avoid uninitialized memory
+
+    for (uint i = 0; i < mem.size(); i++)
+        data[i + off_adj] = mem[i];
+
+    //**/WriteLn "--------------------";
+    //**/for (uint i = 0; i < mem.size() + off_adj; i++)
+    //**/    WriteLn "%>2%d: %.16x", i, data[i];
+#endif
+
+    return CutSet(data);
+}
 
 
 //=================================================================================================
@@ -306,7 +351,16 @@ struct Params_TechMap {
 };
 
 
+struct LutMap_Cost {
+    uint    idx;
+    float   delay;
+    float   area;
+};
+
+
 class TechMap {
+    typedef LutMap_Cost Cost;
+
     // Input:
     Gig&                  N;
     const Params_TechMap& P;
@@ -324,8 +378,11 @@ class TechMap {
     uint                iter;
     float               target_arrival;
 
-    // Temporaries:     
+    // Temporaries:
     DynCutSet           dcuts;
+    Vec<Cost>           tmp_costs;
+    Vec<uint>           tmp_where;
+    Vec<uint>           tmp_list;
 
     // Statistics:
     uint64              cuts_enumerated;
@@ -336,6 +393,7 @@ class TechMap {
     void generateCuts(Wire w);
     void generateCuts_LogicGate(Wire w, DynCutSet& out_dcuts);
     void prioritizeCuts(Wire w, DynCutSet& dcuts);
+    void updateEstimates();
 
 public:
     TechMap(Gig& N_, const Params_TechMap& P_ = Params_TechMap()) : N(N_), P(P_) { run(); }
@@ -349,9 +407,59 @@ public:
 #include "TechMap_CutGen.icc"
 
 
+struct Area_lt {
+    bool operator()(const LutMap_Cost& x, const LutMap_Cost& y) const {
+        if (x.area < y.area) return true;
+        if (x.area > y.area) return false;
+        if (x.delay < y.delay) return true;
+        if (x.delay > y.delay) return false;
+        return false;
+    }
+};
+
+
 void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
 {
+    // Compute costs:
+    Vec<Cost>& costs = tmp_costs;
+    costs.setSize(dcuts.size());
 
+    for (uint i = 0; i < dcuts.size(); i++){
+        costs[i].idx = i;
+        costs[i].delay = 0.0f;
+        costs[i].area  = 0.0f;
+
+        for (uint j = 0; j < dcuts[i].size(); j++){
+            Wire w = dcuts[i][j] + N;
+            newMax(costs[i].delay, arrival[w]);
+            costs[i].area += area_est[w];
+        }
+        costs[i].area += dcuts[i].size();       // <<==  P.lut_cost[cuts[i].size()];
+        costs[i].delay += 1.0f;
+    }
+
+    // Compute order:
+    sobSort(sob(costs, Area_lt()));
+
+    // Implement order:
+    Vec<uint>& where = tmp_where;
+    Vec<uint>& list  = tmp_list;
+    where.setSize(dcuts.size());
+    list .setSize(dcuts.size());
+    for (uint i = 0; i < dcuts.size(); i++)
+        where[i] = list[i] = i;
+
+    for (uint i = 0; i < dcuts.size(); i++){
+        uint w = where[costs[i].idx];
+        where[list[i]] = w;
+        swp(list[i], list[w]);
+        dcuts.swap(i, w);
+    }
+
+    //
+    area_est(w) = costs[0].area / fanout_est[w];
+    arrival(w)  = costs[0].delay;
+    dcuts.shrinkTo(8);
 }
 
 
@@ -419,7 +527,7 @@ void TechMap::generateCuts(Wire w)
 
     case gate_PO:
     case gate_Seq:
-        // Don't sture trivial cuts for sinks (saves a little memory):
+        // Don't store trivial cuts for sinks (saves a little memory):
         skip = true;
         break;
 
@@ -430,9 +538,80 @@ void TechMap::generateCuts(Wire w)
 
     if (!skip){
         cutmap(w) = dcuts.done(mem);
-        /**/WriteLn "cutmap[%_]:", w;
-        /**/for (uint i = 0; i < cutmap[w].size(); i++) WriteLn "  %_", cutmap[w][i];
+        //**/WriteLn "cutmap[%_]:  arrival=%_  area_est=%_", w, arrival[w], area_est[w];
+        //**/for (uint i = 0; i < cutmap[w].size(); i++) WriteLn "  %_", cutmap[w][i];
     }
+}
+
+
+//=================================================================================================
+// -- Update estimates:
+
+
+void TechMap::updateEstimates()
+{
+    active.clear();
+
+    For_Gates(N, w){
+        if (isCO(w))
+            active(w) = true;
+    }
+
+    For_DownOrder(N, w){
+        if (!active[w]) continue;
+
+        if (isLogic(w)){
+            //<<== reprioritizeCuts(w, cutmap[w]);
+            const Cut& cut = cutmap[w][0];
+            for (uint i = 0; i < cut.size(); i++)
+                active(cut[i] + N) = true;
+
+        }else if (!isCI(w)){
+            For_Inputs(w, v)
+                active(v) = true;
+        }
+    }
+
+    WMap<uint> fanouts(N, 0);
+    fanouts.reserve(N.size());
+    depart.clear();
+    For_All_Gates_Rev(N, w){
+        if (isLogic(w)){
+            if (active[w]){
+                const Cut& cut = cutmap[w][0];
+                for (uint i = 0; i < cut.size(); i++){
+                    Wire v = cut[i] + N;
+                    fanouts(v)++;
+                    newMax(depart(v), depart[w] + 1.0f);    // <<== something different here for MUX7?
+                }
+            }else
+                depart(w) = FLT_MAX;    // <<== for now, give a well defined value to inactive nodes
+
+        }else if (!isCI(w)){
+            float delay = (w != gate_Delay) ? 0.0f : w.arg() * P.delay_fraction;
+            For_Inputs(w, v){
+                fanouts(v)++;
+                newMax(depart(v), depart[w] + delay);
+            }
+        }
+    }
+
+    float mapped_delay = 0.0f;
+    For_Gates(N, w)
+        if (isCI(w))
+            newMax(mapped_delay, depart[w]);
+    /**/WriteLn "Delay: %_", mapped_delay;
+
+    double total_area = 0;
+    double total_luts = 0;
+    For_Gates(N, w){
+        if (active[w] && isLogic(w)){
+            total_area += cutmap[w][0].size();
+            total_luts += 1;
+        }
+    }
+
+    /**/Dump(total_area, total_luts);
 }
 
 
@@ -488,15 +667,17 @@ void TechMap::run()
         double T1 ___unused = cpuTime();
 
         // Finalize mapping:
-
         //<<== set target delay (at least if iter 0)
         //<<== if not recycling cuts, set 'winner'
 
         // Computer estimations:
+        updateEstimates();
     }
 
 
     // Cleanup:
+
+    /**/mem.report();
 }
 
 
@@ -527,8 +708,12 @@ void test()
         Dump(final[i]);
 #endif
 
+  #if 1
     Gig N;
+    readAigerFile("/home/een/ZZ/LutMap/comb/nm.aig", N, false);
 
+  #else
+    Gig N;
     Wire x = N.add(gate_PI);
     Wire y = N.add(gate_PI);
     Wire z = N.add(gate_PI);
@@ -536,6 +721,7 @@ void test()
     Wire g = N.add(gate_And).init(~x, z);
     Wire h = N.add(gate_And).init(~f, ~g);
     Wire t ___unused = N.add(gate_PO).init(~h);
+  #endif
 
     TechMap map(N);
 }
