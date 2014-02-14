@@ -232,7 +232,7 @@ int Pdr_ManPushClauses( Pdr_Man_t * p )
   Synopsis    [Returns 1 if the clause is contained in higher clauses.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -256,7 +256,7 @@ int Pdr_ManCheckContainment( Pdr_Man_t * p, int k, Pdr_Set_t * pSet )
   Synopsis    [Sorts literals by priority.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -295,7 +295,7 @@ int * Pdr_ManSortByPriority( Pdr_Man_t * p, Pdr_Set_t * pCube )
   Synopsis    [Returns 1 if the state could be blocked.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -417,7 +417,7 @@ int Pdr_ManGeneralize( Pdr_Man_t * p, int k, Pdr_Set_t * pCube, Pdr_Set_t ** ppP
   Synopsis    [Returns 1 if the state could be blocked.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -578,6 +578,17 @@ int Pdr_ManSolveInt( Pdr_Man_t * p )
     abctime clkStart = Abc_Clock(), clkOne = 0;
     p->timeToStop = p->pPars->nTimeOut ? p->pPars->nTimeOut * CLOCKS_PER_SEC + Abc_Clock(): 0;
     assert( Vec_PtrSize(p->vSolvers) == 0 );
+    // in the multi-output mode, mark trivial POs (those fed by const0) as solved 
+    if ( p->pPars->fSolveAll ){
+        Saig_ManForEachPo( p->pAig, pObj, k )
+            if ( Aig_ObjChild0(pObj) == Aig_ManConst0(p->pAig) )
+            {
+                Vec_IntWriteEntry( p->pPars->vOutMap, k, 1 ); // unsat
+                p->pPars->nProveOuts++;
+                if ( p->pPars->fUseBridge )
+                    Gia_ManToBridgeResult( stdout, 1, NULL, k );
+            }
+    }
     // create the first timeframe
     p->pPars->timeLastSolved = Abc_Clock();
     Pdr_ManCreateSolver( p, (k = 0) );
@@ -747,9 +758,9 @@ int Pdr_ManSolveInt( Pdr_Man_t * p )
                 if ( p->pTime4Outs[p->iOutCur] == 0 && Vec_PtrEntry(p->vCexes, p->iOutCur) == NULL ) // undecided
                 {
                     p->pPars->nDropOuts++;
-                    if ( p->pPars->vOutMap ) 
+                    if ( p->pPars->vOutMap )
                         Vec_IntWriteEntry( p->pPars->vOutMap, p->iOutCur, -1 );
-                    if ( !p->pPars->fNotVerbose ) 
+                    if ( !p->pPars->fNotVerbose )
                         Abc_Print( 1, "Timing out on output %*d.\n", nOutDigits, p->iOutCur );
                 }
                 p->timeToStopOne = 0;
@@ -866,7 +877,7 @@ int Pdr_ManSolveInt( Pdr_Man_t * p )
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
