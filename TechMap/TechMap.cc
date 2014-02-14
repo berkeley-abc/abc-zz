@@ -388,15 +388,14 @@ class TechMap {
     uint64              cuts_enumerated;
 
     // Internal methods:
-    void run();
-
     void generateCuts(Wire w);
     void generateCuts_LogicGate(Wire w, DynCutSet& out_dcuts);
     void prioritizeCuts(Wire w, DynCutSet& dcuts);
     void updateEstimates();
 
 public:
-    TechMap(Gig& N_, const Params_TechMap& P_ = Params_TechMap()) : N(N_), P(P_) { run(); }
+    TechMap(Gig& N_, const Params_TechMap& P_ = Params_TechMap()) : N(N_), P(P_) {}
+    void run();
 };
 
 
@@ -538,8 +537,8 @@ void TechMap::generateCuts(Wire w)
 
     if (!skip){
         cutmap(w) = dcuts.done(mem);
-        //**/WriteLn "cutmap[%_]:  arrival=%_  area_est=%_", w, arrival[w], area_est[w];
-        //**/for (uint i = 0; i < cutmap[w].size(); i++) WriteLn "  %_", cutmap[w][i];
+        /**/WriteLn "cutmap[%_]:  arrival=%_  area_est=%_", w, arrival[w], area_est[w];
+        /**/for (uint i = 0; i < cutmap[w].size(); i++) WriteLn "  %_", cutmap[w][i];
     }
 }
 
@@ -633,6 +632,8 @@ void TechMap::run()
     }
 
     normalizeLut4s(N);
+    /**/writeDot("N.dot", N); WriteLn "Wrote: N.dot";
+
 
     // Prepare for mapping:
     target_arrival = 0;
@@ -685,32 +686,46 @@ void TechMap::run()
 // Testing:
 
 
-void test()
+}
+#include "ZZ_CmdLine.hh"
+#include "ZZ_Gig.IO.hh"
+#include "GigReader.hh"
+namespace ZZ {
+
+
+void test(int argc, char** argv)
 {
 #if 0
-    DynCutSet cuts;
-    cuts.begin();
+    uint64 ftb = 0x8888888888888888ull;
+    WriteLn "ftb: %.16x", ftb;
+    ftb = ftb6_swap(ftb, 1, 0);
+    WriteLn "ftb: %.16x", ftb;
+    ftb = ftb6_swap(ftb, 2, 1);
+    WriteLn "ftb: %.16x", ftb;
 
-    cuts.inputs += 100, 200, 300, 400, 500, 600, 700;
-    cuts.ftb += 0xABBADEAD00112233ull, 0x0123456789abcdefull;
-    cuts.sel += 7, 6, 5, 4, 3, 2, 1;
-    cuts.next();
-
-    cuts.inputs += 111, 222;
-    cuts.ftb += 0xCC;
-    cuts.sel += 9, 8;
-    cuts.next();
-
-    StackAlloc<uint64> mem;
-    CutSet final = cuts.done(mem);
-
-    for (uint i = 0; i < final.size(); i++)
-        Dump(final[i]);
-#endif
+#else
 
   #if 1
+    cli.add("input", "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
+    cli.parseCmdLine(argc, argv);
+    String input = cli.get("input").string_val;
+
     Gig N;
-    readAigerFile("/home/een/ZZ/LutMap/comb/nm.aig", N, false);
+    try{
+        if (hasExtension(input, "aig"))
+            readAigerFile(input, N, false);
+        else if (hasExtension(input, "gnl"))
+            N.load(input);
+        else if (hasExtension(input, "gig"))
+            readGigForTechmap(input, N);
+        else{
+            ShoutLn "ERROR! Unknown file extension: %_", input;
+            exit(1);
+        }
+    }catch (const Excp_Msg& err){
+        ShoutLn "PARSE ERROR! %_", err.msg;
+        exit(1);
+    }
 
   #else
     Gig N;
@@ -724,6 +739,8 @@ void test()
   #endif
 
     TechMap map(N);
+    map.run();
+#endif
 }
 
 

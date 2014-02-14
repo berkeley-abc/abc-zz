@@ -20,7 +20,7 @@ using namespace ZZ;
 
 
 namespace ZZ {
-void test();
+void test(int argc, char** argv);
 }
 
 
@@ -28,7 +28,7 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
-    test();
+    test(argc, argv);
 
     return 0;
 }
