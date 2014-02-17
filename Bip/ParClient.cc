@@ -246,6 +246,7 @@ Msg pollMsg(int fd)
 }
 
 
+#if 1
 void sendMsg(uint type, Array<const uchar> data, int fd)
 {
     char buf[HEADER_Length + 1];
@@ -272,6 +273,40 @@ void sendMsg(uint type, Array<const uchar> data, int fd)
         }
     }
 }
+
+#else
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Introduce bugs in protocol to test PAR stability:
+void sendMsg(uint type, Array<const uchar> data, int fd)
+{
+    char buf[HEADER_Length + 1];
+    sprintf(buf, "%.*u %.*u ", HEADER_TypeBytes, type, HEADER_SizeBytes, data.size());
+    //**/fprintf(stderr, "##  Sending message with header [%s]\n", buf);
+
+    if (rand() % 5 == 0 && data.size() > 0){ data.pop(); }
+
+    ssize_t n = write(fd, buf, HEADER_Length);
+    if (n != (ssize_t)HEADER_Length){
+        fprintf(stderr, "ParClient: Pipe closed prematurely?\n"); fflush(stderr);
+        fprintf(stderr, "pid: %u\n", (uint)getpid()); fflush(stderr);
+        _exit(255);
+    }
+    assert(n == (ssize_t)HEADER_Length);
+
+    if (data.size() > 0){
+        uind bytes_written = 0;
+        while (bytes_written < data.size()){
+            n = write(fd, &data[bytes_written], data.size() - bytes_written);
+            if (n < 0){
+                fprintf(stderr, "ParClient: Not all data was sent (%u bytes out of %u)\nPipe closed prematurely?\n", (uint)n, (uint)data.size()); fflush(stderr);
+                _exit(255);
+            }
+            bytes_written += n;
+        }
+    }
+}
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#endif
 
 
 void sendMsg(Msg msg, int fd)
@@ -443,7 +478,7 @@ void streamOut_Netlist(Vec<uchar>& data, NetlistRef N)
     if (has_fairness || Has_Pob(N, constraints)){
         putu(data, 1);  // -- version
 
-        // Save fairness properties: 
+        // Save fairness properties:
         {
             if (!has_fairness)
                 putu(data, 0);
@@ -475,7 +510,7 @@ void streamOut_Netlist(Vec<uchar>& data, NetlistRef N)
             }
         }
 
-        // Save constraints: 
+        // Save constraints:
         {
             if (!Has_Pob(N, constraints))
                 putu(data, 0);

@@ -77,7 +77,7 @@ macro bool isLogic(Wire w) {
 Cut layout:
 
 sig    : 1 uint
-sizes  : 4 uchars: #inputs, offset-ftb, offset-selection, unused
+sizes  : 4 uchars: #inputs, offset-ftb, unused, unused
 inputs : 'size' uints
 pad    : 0 or 1 uint (to get to 64-bit align)
 ftb    : '2^size / 64' uint64s, rounded up.
@@ -94,21 +94,20 @@ private:
 
     uchar&  size_()        { return ((uchar*)&base[0])[4]; }    // -- 'size == n_inputs'
     uchar&  offFtb_()      { return ((uchar*)&base[0])[5]; }
-    uchar&  offSel_()      { return ((uchar*)&base[0])[6]; }
-    uchar&  reserved_()    { return ((uchar*)&base[0])[7]; }
+    uchar&  reserved0_()   { return ((uchar*)&base[0])[6]; }
+    uchar&  reserved1_()   { return ((uchar*)&base[0])[7]; }
 
     uint&   input_(uint i) { return ((uint*)&base[1])[i]; }
     uint64& ftb_(uint i)   { return base[offFtb_() + i]; }
-    uchar&  sel_(uint i)   { return ((uchar*)&base[offSel_()])[i]; }
 
-    void init(Array<gate_id> inputs, uint64* ftb, uchar* sel);
+    void init(Array<gate_id> inputs, uint64* ftb);
 
 public:
     Cut() : base(NULL) {}
     Cut(uint64* base_) : base(base_) {}
 
     static uint allocSz(uint n_inputs);
-    Cut(uint64* base_, Array<gate_id> inputs, uint64* ftb, uchar* sel) : base(base_) { init(inputs, ftb, sel); }
+    Cut(uint64* base_, Array<gate_id> inputs, uint64* ftb) : base(base_) { init(inputs, ftb); }
         // -- size of 'ftb' should be 'ceil(2^n / 64)' i.e. '(1 << inputs.size() + 63) >> 6'.
 
     Null_Method(Cut) { return base == NULL; }
@@ -118,7 +117,6 @@ public:
     gate_id operator[](int input_num) const { return me().input_(input_num); }
 
     uint64 ftb(uint word_num = 0)     const { return me().ftb_(word_num); }
-    uchar  sel(uint byte_num)         const { return me().sel_(byte_num); }
 
     uint ftbSz() const { return ((1ull << size()) + 63) >> 6; }
 };
@@ -128,24 +126,22 @@ public:
 inline uint Cut::allocSz(uint n_inputs)
 {
     uint ftb_words = ((1ull << n_inputs) + 63) >> 6;
-    uint sel_words = (n_inputs + 7) >> 3;
-    uint alloc_sz = ((n_inputs + 3) >> 1) + ftb_words + sel_words;
+    uint alloc_sz = ((n_inputs + 3) >> 1) + ftb_words;
     return alloc_sz;
 }
 
 
-inline void Cut::init(Array<gate_id> inputs, uint64* ftb, uchar* sel)
+inline void Cut::init(Array<gate_id> inputs, uint64* ftb)
 {
     assert(inputs.size() <= 32);
     uint ftb_words = ((1ull << inputs.size()) + 63) >> 6;
-    uint sel_words = (inputs.size() + 7) >> 3;
-    uint alloc_sz = ((inputs.size() + 3) >> 1) + ftb_words + sel_words;
+    uint alloc_sz = ((inputs.size() + 3) >> 1) + ftb_words;
 
-    size_()     = inputs.size();
-    offFtb_()   = (inputs.size() + 3) >> 1;
-    offSel_()   = offFtb_() + ftb_words;
-    reserved_() = 0;
-    assert(offSel_() + sel_words == alloc_sz);
+    size_()      = inputs.size();
+    offFtb_()    = (inputs.size() + 3) >> 1;
+    reserved0_() = 0;
+    reserved1_() = 0;
+    assert(offFtb_() + ftb_words == alloc_sz);
 
     uint sig_mask = 0;
     for (uint i = 0; i < inputs.size(); i++)
@@ -157,14 +153,8 @@ inline void Cut::init(Array<gate_id> inputs, uint64* ftb, uchar* sel)
     if ((inputs.size() & 1) == 1)
         input_(inputs.size()) = 0;   // -- avoid uninitialized memory
 
-
     for (uint i = 0; i < ftb_words; i++)
         ftb_(i) = ftb[i];
-
-    for (uint i = 0; i < (inputs.size() + 7) >> 3; i++)
-        base[offSel_() + i] = 0;     // -- avoid uninitialized memory
-    for (uint i = 0; i < inputs.size(); i++)
-        sel_(i) = sel[i];
 }
 
 
@@ -173,7 +163,7 @@ template<> fts_macro void write_(Out& out, const Cut& v)
     FWrite(out) "Cut{";
     for (uint i = 0; i < v.size(); i++){
         if (i != 0) FWrite(out) ", ";
-        FWrite(out) "w%_:%d", v[i], v.sel(i); }
+        FWrite(out) "w%_", v[i]; }
     FWrite(out) "}[";
 
     for (uint i= 0; i < v.ftbSz(); i++){    // -- perhaps reverse order
@@ -198,7 +188,9 @@ cuts    : several uint64s
 
 class CutSet {
     uint64* data;
-    uint off(uint i) const { return ((uint*)data)[i+1]; }
+
+    uint  off (uint i) const { return ((uint*)data)[i+1]; }
+    uint& off_(uint i)       { return ((uint*)data)[i+1]; }
 
     friend class DynCutSet;
     CutSet(uint64* data_) : data(data_) {}
@@ -207,8 +199,10 @@ public:
     CutSet() : data(NULL) {}
     Null_Method(CutSet) { return data == NULL; }
 
-    uint size() { return ((uint*)data)[0]; }
+    uint size() const { return ((uint*)data)[0]; }
     Cut operator[](uint i) const { return Cut(&data[off(i)]); }
+
+    void swap(uint i, uint j) { swp(off_(i), off_(j)); }
 };
 
 
@@ -222,13 +216,12 @@ class DynCutSet {
     Vec<uint64> mem;
     Vec<uint>   off;
 
-    void clearCut() { inputs.clear(); ftb.clear(); sel.clear(); }
+    void clearCut() { inputs.clear(); ftb.clear(); }
 
     void storeCut() {
         off.push((uint)mem.size());
         mem.growTo(mem.size() + Cut::allocSz(inputs.size()));
-        if (sel.size() == 0) sel.growTo(inputs.size(), 0);
-        Cut(&mem[off[LAST]], inputs.slice(), ftb.base(), sel.base());
+        Cut(&mem[off[LAST]], inputs.slice(), ftb.base());
     }
 
 public:
@@ -237,7 +230,6 @@ public:
 
     Vec<gate_id> inputs;    // }- these fields must be populated before calling 'next()'
     Vec<uint64>  ftb;       // }
-    Vec<uchar>   sel;       // -- this field can be left empty ('next()' will pad with zeros)
 
     void begin()  { mem.clear(); off.clear(); clearCut(); }
     void next ()  { storeCut(); clearCut(); }       // -- 'next()' must be called before the final 'done()'
@@ -263,7 +255,6 @@ public:
 template<class ALLOC>
 CutSet DynCutSet::done(ALLOC& allocator)
 {
-#if 1
     uint mem_needed = 0;
     for (uint i = 0; i < off.size(); i++)
         mem_needed += Cut::allocSz(Cut(&mem[off[i]]).size());
@@ -284,28 +275,6 @@ CutSet DynCutSet::done(ALLOC& allocator)
     assert(off_adj == mem_needed);
     if ((off.size() & 1) == 0) tab[off.size() + 1] = 0;    // -- avoid uninitialized memory
 
-    //**/WriteLn "====================";
-    //**/for (uint i = 0; i < mem_needed; i++)
-    //**/    WriteLn "%>2%d: %.16x", i, data[i];
-#else
-    // <<== NEEDS TO BE REDONE IN PRESENCE OF 'swap()' and' 'shrinkTo()'
-    uint off_adj = (off.size() + 2) >> 1;
-    uint64* data = allocator.alloc(mem.size() + off_adj);
-    uint*   tab = (uint*)data;
-    tab[0] = off.size();
-
-    for (uint i = 0; i < off.size(); i++)
-        tab[i+1] = off[i] + off_adj;
-    if ((off.size() & 1) == 0) tab[off.size() + 1] = 0;    // -- avoid uninitialized memory
-
-    for (uint i = 0; i < mem.size(); i++)
-        data[i + off_adj] = mem[i];
-
-    //**/WriteLn "--------------------";
-    //**/for (uint i = 0; i < mem.size() + off_adj; i++)
-    //**/    WriteLn "%>2%d: %.16x", i, data[i];
-#endif
-
     return CutSet(data);
 }
 
@@ -315,7 +284,7 @@ CutSet DynCutSet::done(ALLOC& allocator)
 
 
 // Check if the support of 'c' is a subset of the support of 'd'. Does NOT assume cuts to be
-// sorted. The FTB and cut selection ('sel') is not used.
+// sorted. The FTB is not used.
 macro bool subsumes(const Cut& c, const Cut& d)
 {
     assert_debug(c);
@@ -342,7 +311,7 @@ macro bool subsumes(const Cut& c, const Cut& d)
 
 struct Params_TechMap {
     uint  cut_size;             // -- maximum cut size
-    float delay_fraction;       // -- delays in 'gate_Delay' are multiplied by this value
+    float delay_fraction;       // -- delay value in 'gate_Delay' are multiplied by this value
 
     Params_TechMap() :
         cut_size      (6),
@@ -351,15 +320,25 @@ struct Params_TechMap {
 };
 
 
-struct LutMap_Cost {
+struct TechMap_Cost {
     uint    idx;
     float   delay;
     float   area;
 };
 
 
+struct TechMap_CutImpl {
+    uchar   idx;
+    uchar   sel[6];         // -- currently only cuts up to size 6 supported (may change)
+    uchar   reserved_;
+    float   arrival;
+    float   area_est;
+};
+
+
 class TechMap {
-    typedef LutMap_Cost Cost;
+    typedef TechMap_Cost    Cost;
+    typedef TechMap_CutImpl CutImpl;
 
     // Input:
     Gig&                  N;
@@ -368,12 +347,12 @@ class TechMap {
     // State:
     StackAlloc<uint64>  mem;
     WMap<CutSet>        cutmap;
-    WMap<Cut>           winner;
-    WMap<float>         area_est;
+//    WMap<Cut>           winner;
+    Vec<WMap<CutImpl> > impl;
+
     WMap<float>         fanout_est;
-    WMap<float>         arrival;
     WMap<float>         depart;
-    WMap<uchar>         active;
+    WMap<uchar>         active; // <<== change to 'current choice' or 'sel'_
 
     uint                iter;
     float               target_arrival;
@@ -400,14 +379,45 @@ public:
 
 
 //=================================================================================================
-// -- Cut generation:
+// == Cut prioritization:
 
 
-#include "TechMap_CutGen.icc"
+#if 0
+
+    [internal] arrival     <<== make internal?
+    [internal] area_est    <<== make internal?
+
+fanout_est
+
+iter_no
+target_arrival
+depart
+active
+
+lut_cost (mux_cost)
+
+temporaries...
+
+
+CutImpl {
+    current choice (
+    k scored cuts
+    n-k more cuts for enumeration purposes
+
+
+categories: lut6, mux7, mux8
+spread (delay heavy, area heavy,
+
+for each cut:
+  selectors     (0 = trivial cut? or -1?
+  area_est
+  arrival
+#endif
+
 
 
 struct Area_lt {
-    bool operator()(const LutMap_Cost& x, const LutMap_Cost& y) const {
+    bool operator()(const TechMap_Cost& x, const TechMap_Cost& y) const {
         if (x.area < y.area) return true;
         if (x.area > y.area) return false;
         if (x.delay < y.delay) return true;
@@ -417,8 +427,20 @@ struct Area_lt {
 };
 
 
+/*
+0 1 2 3 4 5 6 7
+
+A A A A A D D M
+*/
+
+
 void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
 {
+    if (iter == 0){
+        assert(impl.size() == 1);
+    }
+
+
     // Compute costs:
     Vec<Cost>& costs = tmp_costs;
     costs.setSize(dcuts.size());
@@ -430,8 +452,8 @@ void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
 
         for (uint j = 0; j < dcuts[i].size(); j++){
             Wire w = dcuts[i][j] + N;
-            newMax(costs[i].delay, arrival[w]);
-            costs[i].area += area_est[w];
+            newMax(costs[i].delay, impl[0][w].arrival);
+            costs[i].area += impl[0][w].area_est;
         }
         costs[i].area += dcuts[i].size();       // <<==  P.lut_cost[cuts[i].size()];
         costs[i].delay += 1.0f;
@@ -456,10 +478,18 @@ void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
     }
 
     //
-    area_est(w) = costs[0].area / fanout_est[w];
-    arrival(w)  = costs[0].delay;
+    impl[0](w).area_est = costs[0].area / fanout_est[w];
+    impl[0](w).arrival  = costs[0].delay;
     dcuts.shrinkTo(8);
 }
+
+
+
+//=================================================================================================
+// -- Cut generation:
+
+
+#include "TechMap_CutGen.icc"
 
 
 void TechMap::generateCuts(Wire w)
@@ -476,24 +506,24 @@ void TechMap::generateCuts(Wire w)
     case gate_PI:
     case gate_FF:
         // Global sources have only the implicit trivial cut:
-        area_est(w) = 0;
-        arrival(w) = 0;
+        impl[0](w).area_est = 0;
+        impl[0](w).arrival = 0;     // <<== method in CutImpl?
         break;
 
     case gate_Bar:
     case gate_Sel:
         // Treat barriers and pin selectors as PIs except for delay:
-        area_est(w) = 0;
-        arrival(w) = arrival[w[0]];
+        impl[0](w).area_est = 0;
+        impl[0](w).arrival = impl[0][w[0]].arrival;
         break;
 
     case gate_Delay:{
         // Treat delay gates as PIs except for delay:
-        area_est(w) = 0;
+        impl[0](w).area_est = 0;
         float arr = 0;
         For_Inputs(w, v)
-            newMax(arr, arrival[v]);
-        arrival(w) = arr + w.arg() * P.delay_fraction;
+            newMax(arr, impl[0][v].arrival);
+        impl[0](w).arrival = arr + w.arg() * P.delay_fraction;
         break;}
 
     case gate_And:
@@ -537,8 +567,8 @@ void TechMap::generateCuts(Wire w)
 
     if (!skip){
         cutmap(w) = dcuts.done(mem);
-        /**/WriteLn "cutmap[%_]:  arrival=%_  area_est=%_", w, arrival[w], area_est[w];
-        /**/for (uint i = 0; i < cutmap[w].size(); i++) WriteLn "  %_", cutmap[w][i];
+        //**/WriteLn "cutmap[%_]:  arrival=%_  area_est=%_", w, arrival[w], area_est[w];
+        //**/for (uint i = 0; i < cutmap[w].size(); i++) WriteLn "  %_", cutmap[w][i];
     }
 }
 
@@ -632,26 +662,27 @@ void TechMap::run()
     }
 
     normalizeLut4s(N);
-    /**/writeDot("N.dot", N); WriteLn "Wrote: N.dot";
+    //**/writeDot("N.dot", N); WriteLn "Wrote: N.dot";
 
 
     // Prepare for mapping:
     target_arrival = 0;
 
     cutmap    .reserve(N.size());
-    winner    .reserve(N.size());
-    area_est  .reserve(N.size());
+    //winner    .reserve(N.size());     // <<==
     fanout_est.reserve(N.size());
-    arrival   .reserve(N.size());
     depart    .reserve(N.size());
     active    .reserve(N.size());
+
+    impl.push();
+    impl[0].reserve(N.size());
 
     {
         Auto_Gob(N, FanoutCount);
         For_Gates(N, w){
-            area_est  (w) = 0;
+            impl[0](w).arrival  = FLT_MAX;  // <<==
+            impl[0](w).area_est = 0;        // <<==
             fanout_est(w) = nFanouts(w);
-            arrival   (w) = FLT_MAX;
             depart    (w) = FLT_MAX;
             active    (w) = true;
         }
