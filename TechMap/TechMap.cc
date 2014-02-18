@@ -28,6 +28,12 @@ using namespace std;
 #define CutSet TechMap_CutSet
 #define CutSet_NULL CutSet()
 
+#define CutImpl TechMap_CutImpl
+#define CutImpl_NULL CutImpl()
+
+#define Cost TechMap_Cost
+#define Cost_NULL TechMap_Cost()
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 /*
@@ -210,7 +216,7 @@ public:
 // Dynamic cut-set:
 
 
-// Usage: call 'begin()', define cut by modifying public variables, call 'next()', repeat this 
+// Usage: call 'begin()', define cut by modifying public variables, call 'next()', repeat this
 // step, finally call 'done()' to get a static 'CutSet'. The dynamic cut set can then be reused.
 class DynCutSet {
     Vec<uint64> mem;
@@ -306,40 +312,138 @@ macro bool subsumes(const Cut& c, const Cut& d)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// TechMap class:
+// Cut implementation:
 
 
-struct Params_TechMap {
-    uint  cut_size;             // -- maximum cut size
-    float delay_fraction;       // -- delay value in 'gate_Delay' are multiplied by this value
+// NOTE! Through out the code, 'impl' is indexed 'impl[sel][wire]' where 
+//   'sel == 0' is delay optimal
+//   'sel == 1' is area optimal
+//   'sel == 2..' are trade-off choices ("balanced" cuts)
 
-    Params_TechMap() :
-        cut_size      (6),
-        delay_fraction(1.0)
-    {}
+
+struct CutImpl {
+    enum { TRIV_CUT = -1, NO_CUT = -2 };    // -- used with 'idx'
+    int     idx;
+    float   arrival;
+    float   area_est;
+
+    CutImpl() : idx(NO_CUT), arrival(0.0f), area_est(0.0f) {}
 };
 
 
-struct TechMap_Cost {
+// Returns '(arrival, area_est)'; arrival and area for an area optimal selection UNDER
+// the assumption that 'arrival_lim' is not exceeded. If no such cut exists, 
+// '(FLT_MAX, FLT_MAX') is returned.  If 'sel' is non-null, cut selection is recorded there.
+template<class CUT>
+inline Pair<float,float> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& impl, float arrival_lim, uchar* sel = NULL)
+{
+    // Find best arrival:
+    float arrival = 0;
+    for (uint i = 0; i < cut.size(); i++)
+        newMax(arrival, impl[0][GLit(cut[i])].arrival);     // -- impl[0] is delay optimal
+
+    if (arrival_lim == -FLT_MAX)            // -- special value => return delay optimal selection
+        arrival_lim = arrival;
+    else if (arrival > arrival_lim)
+        return tuple(FLT_MAX, FLT_MAX);     // -- no solution
+
+    // Pick best area meeting that arrival:
+    float total_area_est = 0;
+    for (uint i = 0; i < cut.size(); i++){
+        GLit p = GLit(cut[i]);
+        float area_est = impl[0][p].area_est;
+        uint best_j = 0;
+        for (uint j = 1; j < impl.size(); j++){
+            if (impl[j][p].idx == CutImpl::NO_CUT) break;
+            if (impl[j][p].arrival <= arrival_lim){
+                if (newMin(area_est, impl[j][p].area_est))
+                    best_j = j;
+            }
+        }
+
+        newMax(arrival, impl[best_j][p].arrival);
+        total_area_est += area_est;
+
+        if (sel)
+            sel[i] = best_j;
+    }
+
+    return tuple(arrival, total_area_est);
+}
+
+
+// Returns '(arrival, area_est)'; arrival and area of a delay optimal selection for 'cut'. 
+// If 'sel' is non-null, cut selection is recorded there.
+template<class CUT>
+inline Pair<float,float> cutImpl_bestDelay(CUT cut, const Vec<WMap<CutImpl> >& impl, uchar* sel = NULL)
+{
+    return cutImpl_bestArea(cut, impl, -FLT_MAX, sel);
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Costs for sorting cuts:
+
+
+struct Cost {
     uint    idx;
     float   delay;
     float   area;
 };
 
 
-struct TechMap_CutImpl {
-    uchar   idx;
-    uchar   sel[6];         // -- currently only cuts up to size 6 supported (may change)
-    uchar   reserved_;
-    float   arrival;
-    float   area_est;
+template<> fts_macro void write_(Out& out, const Cost& v)
+{
+    FWrite(out) "Cost{idx=%_; delay=%_; area=%_}", v.idx, v.delay, v.area;
+}
+
+
+struct Area_lt {
+    bool operator()(const Cost& x, const Cost& y) const {
+        if (x.area < y.area) return true;
+        if (x.area > y.area) return false;
+        if (x.delay < y.delay) return true;
+        if (x.delay > y.delay) return false;
+        return false;
+    }
+};
+
+
+struct Delay_lt {
+    bool operator()(const Cost& x, const Cost& y) const {
+        if (x.delay < y.delay) return true;
+        if (x.delay > y.delay) return false;
+        if (x.area < y.area) return true;
+        if (x.area > y.area) return false;
+        return false;
+    }
+};
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// TechMap class:
+
+
+struct Params_TechMap {
+    uint        cut_size;             // -- maximum cut size
+    float       delay_fraction;       // -- delay value in 'gate_Delay' are multiplied by this value
+    uint        balanced_cuts;        // -- #cuts to compute between "best area" and "best delay"
+    float       delta_delay;          // -- minimum delay improvement to consider when computing balanced cuts.
+    Vec<float>  lut_cost;
+
+    Params_TechMap() :
+        cut_size      (6),
+        delay_fraction(1.0),
+        balanced_cuts (2),
+        delta_delay   (0.1)
+    {
+        for (uint i = 0; i <= cut_size; i++)        // -- default LUT cost is "number of inputs" 
+            lut_cost.push(i);
+    }
 };
 
 
 class TechMap {
-    typedef TechMap_Cost    Cost;
-    typedef TechMap_CutImpl CutImpl;
-
     // Input:
     Gig&                  N;
     const Params_TechMap& P;
@@ -366,14 +470,16 @@ class TechMap {
     // Statistics:
     uint64              cuts_enumerated;
 
-    // Internal methods:
+    // Helper methods:
+
+    // Major internal methods:
     void generateCuts(Wire w);
     void generateCuts_LogicGate(Wire w, DynCutSet& out_dcuts);
     void prioritizeCuts(Wire w, DynCutSet& dcuts);
     void updateEstimates();
 
 public:
-    TechMap(Gig& N_, const Params_TechMap& P_ = Params_TechMap()) : N(N_), P(P_) {}
+    TechMap(Gig& N_, const Params_TechMap& P_) : N(N_), P(P_) {}
     void run();
 };
 
@@ -416,17 +522,6 @@ for each cut:
 
 
 
-struct Area_lt {
-    bool operator()(const TechMap_Cost& x, const TechMap_Cost& y) const {
-        if (x.area < y.area) return true;
-        if (x.area > y.area) return false;
-        if (x.delay < y.delay) return true;
-        if (x.delay > y.delay) return false;
-        return false;
-    }
-};
-
-
 /*
 0 1 2 3 4 5 6 7
 
@@ -436,31 +531,51 @@ A A A A A D D M
 
 void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
 {
-    if (iter == 0){
-        assert(impl.size() == 1);
-    }
+//    uchar* sel = (uchar*)alloca(P.cut_size);
 
-
-    // Compute costs:
     Vec<Cost>& costs = tmp_costs;
     costs.setSize(dcuts.size());
 
+    // Compute optimal delay:
+    float best_delay = FLT_MAX;
     for (uint i = 0; i < dcuts.size(); i++){
         costs[i].idx = i;
-        costs[i].delay = 0.0f;
-        costs[i].area  = 0.0f;
+        l_tuple(costs[i].delay, costs[i].area) = cutImpl_bestDelay(dcuts[i], impl);
 
-        for (uint j = 0; j < dcuts[i].size(); j++){
-            Wire w = dcuts[i][j] + N;
-            newMax(costs[i].delay, impl[0][w].arrival);
-            costs[i].area += impl[0][w].area_est;
-        }
-        costs[i].area += dcuts[i].size();       // <<==  P.lut_cost[cuts[i].size()];
+        newMin(best_delay, costs[i].delay);
+
+        costs[i].area += P.lut_cost[dcuts[i].size()];
         costs[i].delay += 1.0f;
     }
 
-    // Compute order:
-    sobSort(sob(costs, Area_lt()));
+    // Iteration specific cut sorting and cut implementations:
+    if (iter == 0){
+        assert(impl.size() == 1);
+        sobSort(sob(costs, Delay_lt()));
+//        sobSort(sob(costs, Area_lt()));
+
+    }else{
+        float req_time = active[w] ? target_arrival - depart[w] - 1.0f : best_delay;
+        /**/req_time += 2;
+        for (uint i = 0; i < dcuts.size(); i++){
+            costs[i].idx = i;
+#if 1
+            l_tuple(costs[i].delay, costs[i].area) = cutImpl_bestArea(dcuts[i], impl, req_time);
+#else
+            l_tuple(costs[i].delay, costs[i].area) = cutImpl_bestDelay(dcuts[i], impl);
+            if (costs[i].delay > req_time)
+                costs[i].delay = costs[i].area = FLT_MAX;
+#endif
+            // <<== if FLT_MAX, then don't store this cut?
+            assert(costs[i].delay >= best_delay);
+
+            costs[i].area += P.lut_cost[dcuts[i].size()];
+            costs[i].delay += 1.0f;
+        }
+
+        sobSort(sob(costs, Area_lt()));
+//        assert(costs[0].delay <= req_time + 1.0f);  // <<== assumes we keep winner from prev. iter. (or subsuming cut)
+    }
 
     // Implement order:
     Vec<uint>& where = tmp_where;
@@ -480,9 +595,9 @@ void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
     //
     impl[0](w).area_est = costs[0].area / fanout_est[w];
     impl[0](w).arrival  = costs[0].delay;
+
     dcuts.shrinkTo(8);
 }
-
 
 
 //=================================================================================================
@@ -504,26 +619,64 @@ void TechMap::generateCuts(Wire w)
     case gate_Reset:    // -- not used, but is part of each netlist
     case gate_Box:      // -- treat sequential boxes like a global source
     case gate_PI:
-    case gate_FF:
+    case gate_FF:{
         // Global sources have only the implicit trivial cut:
-        impl[0](w).area_est = 0;
-        impl[0](w).arrival = 0;     // <<== method in CutImpl?
-        break;
+        CutImpl& m = impl[0](w);
+        m.idx = CutImpl::TRIV_CUT;
+        m.area_est = 0;
+        m.arrival = 0;
+        break;}
 
     case gate_Bar:
     case gate_Sel:
-        // Treat barriers and pin selectors as PIs except for delay:
-        impl[0](w).area_est = 0;
-        impl[0](w).arrival = impl[0][w[0]].arrival;
+        // Treat barriers and pin selectors as PIs, but with area and delay:
+        for (uint i = 0; i < impl.size(); i++){
+            CutImpl& m = impl[i](w);
+            CutImpl& n = impl[i](w[0]);
+            if (n.idx == CutImpl::NO_CUT)
+                m.idx = CutImpl::NO_CUT;
+            else{
+                m.idx = CutImpl::TRIV_CUT;
+                m.area_est = n.area_est;
+                m.arrival = n.arrival;
+            }
+        }
         break;
 
     case gate_Delay:{
         // Treat delay gates as PIs except for delay:
-        impl[0](w).area_est = 0;
-        float arr = 0;
-        For_Inputs(w, v)
-            newMax(arr, impl[0][v].arrival);
-        impl[0](w).arrival = arr + w.arg() * P.delay_fraction;
+        CutImpl& md = impl[0](w);
+        md.idx = CutImpl::TRIV_CUT;
+        l_tuple(md.arrival, md.area_est) = cutImpl_bestDelay(w, impl);
+
+        if (impl.size() >= 1){
+            CutImpl& ma = impl[1](w);
+            md.idx = CutImpl::TRIV_CUT;
+            l_tuple(ma.arrival, ma.area_est) = cutImpl_bestArea(w, impl, FLT_MAX);
+
+            float prev_arrival = ma.arrival;
+            for (uint i = 2; i < impl.size(); i++){
+                CutImpl& ma = impl[i](w);
+                if (prev_arrival - P.delta_delay < md.arrival){
+                    ma.idx = CutImpl::NO_CUT;
+                    break; }
+
+                l_tuple(ma.arrival, ma.area_est) = cutImpl_bestArea(w, impl, prev_arrival - P.delta_delay);
+                if (ma.area_est == FLT_MAX){
+                    ma.idx = CutImpl::NO_CUT;
+                    break;
+
+                }else{
+                    ma.idx = CutImpl::TRIV_CUT;
+                    prev_arrival = ma.arrival;
+                }
+            }
+        }
+
+        // Add box delay:
+        for (uint i = 0; i < impl.size(); i++)
+            impl[i](w).arrival += w.arg() * P.delay_fraction;
+
         break;}
 
     case gate_And:
@@ -625,6 +778,9 @@ void TechMap::updateEstimates()
         }
     }
 
+    For_Gates(N, w)
+        assert(!active[w] || depart[w] != FLT_MAX);
+
     float mapped_delay = 0.0f;
     For_Gates(N, w)
         if (isCI(w))
@@ -641,6 +797,9 @@ void TechMap::updateEstimates()
     }
 
     /**/Dump(total_area, total_luts);
+
+    if (iter == 0)
+        target_arrival = mapped_delay;
 }
 
 
@@ -691,7 +850,7 @@ void TechMap::run()
     cuts_enumerated = 0;
 
     // Map:     <<== use Iter_Params here.... (how to score cuts, how to update target delay, whether to recycle cuts...)
-    for (iter = 0; iter < 1; iter++){
+    for (iter = 0; iter < 2; iter++){
         // Generate cuts:
         double T0 ___unused = cpuTime();
         For_All_Gates(N, w)
@@ -704,12 +863,12 @@ void TechMap::run()
 
         // Computer estimations:
         updateEstimates();
+
+        mem.clear();
     }
 
 
     // Cleanup:
-
-    /**/mem.report();
 }
 
 
@@ -769,7 +928,8 @@ void test(int argc, char** argv)
     Wire t ___unused = N.add(gate_PO).init(~h);
   #endif
 
-    TechMap map(N);
+    Params_TechMap P;
+    TechMap map(N, P);
     map.run();
 #endif
 }
