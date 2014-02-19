@@ -679,8 +679,8 @@ void Gig::load(In& in)
     uint n_types = getu(in);
     Vec<char> buf;
 
-    Vec<bool> ban_size_change(n_types, false);
-    Vec<bool> ban_attr_change(n_types, false);
+    Vec<bool> ban_size_change(GateType_size, false);
+    Vec<bool> ban_attr_change(GateType_size, false);
     for (uint i = 0; i < n_types; i++){
         getz(in, buf);
         uint size = getu(in);
