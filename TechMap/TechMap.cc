@@ -335,17 +335,20 @@ struct CutImpl {
 // the assumption that 'arrival_lim' is not exceeded. If no such cut exists, 
 // '(FLT_MAX, FLT_MAX') is returned.  If 'sel' is non-null, cut selection is recorded there.
 template<class CUT>
-inline Pair<float,float> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& impl, float arrival_lim, uchar* sel = NULL)
+inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& impl, float arrival_lim, uchar* sel = NULL)
 {
     // Find best arrival:
     float arrival = 0;
     for (uint i = 0; i < cut.size(); i++)
         newMax(arrival, impl[0][GLit(cut[i])].arrival);     // -- impl[0] is delay optimal
 
+    bool late = false;
     if (arrival_lim == -FLT_MAX)            // -- special value => return delay optimal selection
         arrival_lim = arrival;
-    else if (arrival > arrival_lim)
-        return tuple(FLT_MAX, FLT_MAX);     // -- no solution
+    else if (arrival > arrival_lim){
+        late = true;
+        arrival_lim = arrival;
+    }
 
     // Pick best area meeting that arrival:
     float total_area_est = 0;
@@ -368,7 +371,7 @@ inline Pair<float,float> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& im
             sel[i] = best_j;
     }
 
-    return tuple(arrival, total_area_est);
+    return tuple(arrival, total_area_est, late);
 }
 
 
@@ -377,7 +380,9 @@ inline Pair<float,float> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& im
 template<class CUT>
 inline Pair<float,float> cutImpl_bestDelay(CUT cut, const Vec<WMap<CutImpl> >& impl, uchar* sel = NULL)
 {
-    return cutImpl_bestArea(cut, impl, -FLT_MAX, sel);
+    Trip<float,float,bool> t = cutImpl_bestArea(cut, impl, -FLT_MAX, sel);
+    assert(!t.trd);
+    return tuple(t.fst, t.snd);
 }
 
 
@@ -387,6 +392,7 @@ inline Pair<float,float> cutImpl_bestDelay(CUT cut, const Vec<WMap<CutImpl> >& i
 
 struct Cost {
     uint    idx;
+    bool    late;       // -- implementation does not meet timing requirement
     float   delay;
     float   area;
 };
@@ -394,16 +400,25 @@ struct Cost {
 
 template<> fts_macro void write_(Out& out, const Cost& v)
 {
-    FWrite(out) "Cost{idx=%_; delay=%_; area=%_}", v.idx, v.delay, v.area;
+    FWrite(out) "Cost{idx=%_; late=%_; delay=%_; area=%_}", v.idx, v.late, v.delay, v.area;
 }
 
 
 struct Area_lt {
     bool operator()(const Cost& x, const Cost& y) const {
-        if (x.area < y.area) return true;
-        if (x.area > y.area) return false;
-        if (x.delay < y.delay) return true;
-        if (x.delay > y.delay) return false;
+        if (!x.late && y.late) return true;
+        if (x.late && !y.late) return false;
+        if (!x.late){
+            if (x.area < y.area) return true;
+            if (x.area > y.area) return false;
+            if (x.delay < y.delay) return true;
+            if (x.delay > y.delay) return false;
+        }else{
+            if (x.delay < y.delay) return true;
+            if (x.delay > y.delay) return false;
+            if (x.area < y.area) return true;
+            if (x.area > y.area) return false;
+        }
         return false;
     }
 };
@@ -538,13 +553,16 @@ void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
 
     // Compute optimal delay:
     float best_delay = FLT_MAX;
+    uint  best_delay_idx = UINT_MAX;
     for (uint i = 0; i < dcuts.size(); i++){
-        costs[i].idx = i;
+        costs[i].idx  = i;
+        costs[i].late = false;
         l_tuple(costs[i].delay, costs[i].area) = cutImpl_bestDelay(dcuts[i], impl);
 
-        newMin(best_delay, costs[i].delay);
+        if (newMin(best_delay, costs[i].delay))
+            best_delay_idx = i;
 
-        costs[i].area += P.lut_cost[dcuts[i].size()];
+        costs[i].area  += P.lut_cost[dcuts[i].size()];
         costs[i].delay += 1.0f;
     }
 
@@ -552,29 +570,24 @@ void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
     if (iter == 0){
         assert(impl.size() == 1);
         sobSort(sob(costs, Delay_lt()));
-//        sobSort(sob(costs, Area_lt()));
 
     }else{
         float req_time = active[w] ? target_arrival - depart[w] - 1.0f : best_delay;
-        /**/req_time += 2;
+        if (req_time < best_delay)
+            req_time = best_delay;   // -- if we change heuristics so we cannot always meet timing, at least do the best we can
+
         for (uint i = 0; i < dcuts.size(); i++){
             costs[i].idx = i;
-#if 1
-            l_tuple(costs[i].delay, costs[i].area) = cutImpl_bestArea(dcuts[i], impl, req_time);
-#else
-            l_tuple(costs[i].delay, costs[i].area) = cutImpl_bestDelay(dcuts[i], impl);
-            if (costs[i].delay > req_time)
-                costs[i].delay = costs[i].area = FLT_MAX;
-#endif
-            // <<== if FLT_MAX, then don't store this cut?
+            l_tuple(costs[i].delay, costs[i].area, costs[i].late) = cutImpl_bestArea(dcuts[i], impl, req_time);
             assert(costs[i].delay >= best_delay);
 
             costs[i].area += P.lut_cost[dcuts[i].size()];
             costs[i].delay += 1.0f;
         }
 
-        sobSort(sob(costs, Area_lt()));
-//        assert(costs[0].delay <= req_time + 1.0f);  // <<== assumes we keep winner from prev. iter. (or subsuming cut)
+        swp(costs[0], costs[best_delay_idx]);
+        Array<Cost> tail = costs.slice(1);
+        sobSort(sob(tail, Area_lt()));
     }
 
     // Implement order:
@@ -592,11 +605,24 @@ void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
         dcuts.swap(i, w);
     }
 
-    //
+    // Store implementations:
+    impl[0](w).idx      = 0;
     impl[0](w).area_est = costs[0].area / fanout_est[w];
     impl[0](w).arrival  = costs[0].delay;
 
-    dcuts.shrinkTo(8);
+    if (impl.size() > 1){
+        uint idx = (costs[0].area < costs[1].area) ? 0 : 1;
+        impl[1](w).idx      = idx;
+        impl[1](w).area_est = costs[idx].area / fanout_est[w];
+        impl[1](w).arrival  = costs[idx].delay;
+
+        /**/float req_time = active[w] ? target_arrival - depart[w] - 1.0f : best_delay;
+        /**/if (idx == 1 && impl[1][w].arrival <= req_time){
+        /**/    dcuts.swap(0, 1);
+        /**/    swp(impl[0](w), impl[1](w)); }
+    }
+
+    //dcuts.shrinkTo(8);
 }
 
 
@@ -621,10 +647,12 @@ void TechMap::generateCuts(Wire w)
     case gate_PI:
     case gate_FF:{
         // Global sources have only the implicit trivial cut:
-        CutImpl& m = impl[0](w);
-        m.idx = CutImpl::TRIV_CUT;
-        m.area_est = 0;
-        m.arrival = 0;
+        for (uint i = 0; i < impl.size(); i++){
+            CutImpl& m = impl[i](w);
+            m.idx = CutImpl::TRIV_CUT;
+            m.area_est = 0;
+            m.arrival = 0;
+        }
         break;}
 
     case gate_Bar:
@@ -651,8 +679,10 @@ void TechMap::generateCuts(Wire w)
 
         if (impl.size() >= 1){
             CutImpl& ma = impl[1](w);
-            md.idx = CutImpl::TRIV_CUT;
-            l_tuple(ma.arrival, ma.area_est) = cutImpl_bestArea(w, impl, FLT_MAX);
+            ma.idx = CutImpl::TRIV_CUT;
+            bool late;
+            l_tuple(ma.arrival, ma.area_est, late) = cutImpl_bestArea(w, impl, FLT_MAX);
+            assert(!late);
 
             float prev_arrival = ma.arrival;
             for (uint i = 2; i < impl.size(); i++){
@@ -661,8 +691,8 @@ void TechMap::generateCuts(Wire w)
                     ma.idx = CutImpl::NO_CUT;
                     break; }
 
-                l_tuple(ma.arrival, ma.area_est) = cutImpl_bestArea(w, impl, prev_arrival - P.delta_delay);
-                if (ma.area_est == FLT_MAX){
+                l_tuple(ma.arrival, ma.area_est, late) = cutImpl_bestArea(w, impl, prev_arrival - P.delta_delay);
+                if (late){
                     ma.idx = CutImpl::NO_CUT;
                     break;
 
@@ -839,8 +869,6 @@ void TechMap::run()
     {
         Auto_Gob(N, FanoutCount);
         For_Gates(N, w){
-            impl[0](w).arrival  = FLT_MAX;  // <<==
-            impl[0](w).area_est = 0;        // <<==
             fanout_est(w) = nFanouts(w);
             depart    (w) = FLT_MAX;
             active    (w) = true;
@@ -851,6 +879,11 @@ void TechMap::run()
 
     // Map:     <<== use Iter_Params here.... (how to score cuts, how to update target delay, whether to recycle cuts...)
     for (iter = 0; iter < 2; iter++){
+        if (iter == 1){
+            impl.push();
+            impl[1].reserve(N.size());
+        }
+
         // Generate cuts:
         double T0 ___unused = cpuTime();
         For_All_Gates(N, w)
@@ -919,13 +952,20 @@ void test(int argc, char** argv)
 
   #else
     Gig N;
-    Wire x = N.add(gate_PI);
-    Wire y = N.add(gate_PI);
-    Wire z = N.add(gate_PI);
-    Wire f = N.add(gate_And).init(x, y);
-    Wire g = N.add(gate_And).init(~x, z);
-    Wire h = N.add(gate_And).init(~f, ~g);
-    Wire t ___unused = N.add(gate_PO).init(~h);
+    Wire x0 = N.add(gate_PI);
+    Wire x1 = N.add(gate_PI);
+    Wire x2 = N.add(gate_PI);
+    Wire x3 = N.add(gate_PI);
+    Wire x4 = N.add(gate_PI);
+    Wire x5 = N.add(gate_PI);
+    Wire x6 = N.add(gate_PI);
+    Wire a1 = N.add(gate_And).init(x0, x1);
+    Wire a2 = N.add(gate_And).init(a1, x2);
+    Wire a3 = N.add(gate_And).init(a2, x3);
+    Wire a4 = N.add(gate_And).init(a3, x4);
+    Wire a5 = N.add(gate_And).init(a4, x5);
+    Wire a6 = N.add(gate_And).init(a5, x6);
+    Wire t ___unused = N.add(gate_PO).init(a6);
   #endif
 
     Params_TechMap P;
