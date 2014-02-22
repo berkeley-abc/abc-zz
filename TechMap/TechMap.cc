@@ -830,20 +830,25 @@ void TechMap::updateEstimates()
     For_All_Gates_Rev(N, w){
         if (isCO(w))
             active(w) = true;
-        if (!active[w]) continue;
 
-        if (isLogic(w)){
+        if (!active[w]){
+            depart(w) = FLT_MAX;    // <<== for now, give a well defined value to inactive nodes
 
         }else{
-            if (!isCI(w)){
-                float delay = (w != gate_Delay) ? 0.0f : w.arg() * P.delay_fraction;
-                For_Inputs(w, v){
-                    fanouts(v)++;
-                    newMax(depart(v), depart[w] + delay);
+            if (isLogic(w)){
+
+            }else{
+                if (!isCI(w)){
+                    float delay = (w != gate_Delay) ? 0.0f : w.arg() * P.delay_fraction;
+                    For_Inputs(w, v){
+                        active(v) = true;
+                        fanouts(v)++;
+                        newMax(depart(v), depart[w] + delay);
+                    }
                 }
             }
         }
-
+    }
 #endif
 
     For_Gates(N, w)
