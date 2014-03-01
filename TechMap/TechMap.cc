@@ -827,24 +827,48 @@ void TechMap::updateEstimates()
     WMap<uint> fanouts(N, 0);
     fanouts.reserve(N.size());
 
-    For_All_Gates_Rev(N, w){
-        if (isCO(w))
-            active(w) = true;
+    if (iter == 0){
+        target_arrival = 0;
+        For_Gates(N, w){
+            if (isCO(w)){
+                newMax(target_arrival, impl[0][w[0]].arrival);  // -- impl[0] is delay optimal
+                active(w[0]) = true;
+                depart(w[0]) = 0;
+            }
+        }
+    }
 
+    uchar* sel = (uchar*)alloca(P.cut_size);
+    For_All_Gates_Rev(N, w){
         if (!active[w]){
             depart(w) = FLT_MAX;    // <<== for now, give a well defined value to inactive nodes
+            continue; }
+
+        float req_time = target_arrival - depart[w];
+        if (isLogic(w)){
+            float arrival, area_est;
+            bool  late;
+            l_tuple(m.arrival, m.area_est, late) = cutImpl_bestArea(w, impl, req_time);
+
+            CutImpl impl;
+            if (iter == 0){
+                l_tuple(md.arrival, md.area_est) = cutImpl_bestDelay(w, impl);
+            }else{
+            }
+int     idx;
+float   arrival;
+float   area_est;
+            const Cut& cut = cutmap[w][0];
+            for (uint i = 0; i < cut.size(); i++)
+                active(cut[i] + N) = true;
 
         }else{
-            if (isLogic(w)){
-
-            }else{
-                if (!isCI(w)){
-                    float delay = (w != gate_Delay) ? 0.0f : w.arg() * P.delay_fraction;
-                    For_Inputs(w, v){
-                        active(v) = true;
-                        fanouts(v)++;
-                        newMax(depart(v), depart[w] + delay);
-                    }
+            if (!isCI(w)){
+                float delay = (w != gate_Delay) ? 0.0f : w.arg() * P.delay_fraction;
+                For_Inputs(w, v){
+                    active(v) = true;
+                    fanouts(v)++;
+                    newMax(depart(v), depart[w] + delay);
                 }
             }
         }
