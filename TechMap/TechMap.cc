@@ -331,11 +331,11 @@ struct CutImpl {
 };
 
 
-// Returns '(arrival, area_est)'; arrival and area for an area optimal selection UNDER
-// the assumption that 'arrival_lim' is not exceeded. If no such cut exists, 
-// '(FLT_MAX, FLT_MAX') is returned.  If 'sel' is non-null, cut selection is recorded there.
+// Returns '(arrival, area_est, late)'; arrival and area for an area optimal selection UNDER
+// the assumption that 'req_time' is not exceeded. If no such cut exists, 
+// '(FLT_MAX, FLT_MAX)' is returned.  If 'sel' is non-null, cut selection is recorded there.
 template<class CUT>
-inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& impl, float arrival_lim, uchar* sel = NULL)
+inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& impl, float req_time, uchar* sel = NULL)
 {
     // Find best arrival:
     float arrival = 0;
@@ -343,11 +343,11 @@ inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> 
         newMax(arrival, impl[0][GLit(cut[i])].arrival);     // -- impl[0] is delay optimal
 
     bool late = false;
-    if (arrival_lim == -FLT_MAX)            // -- special value => return delay optimal selection
-        arrival_lim = arrival;
-    else if (arrival > arrival_lim){
+    if (req_time == -FLT_MAX)            // -- special value => return delay optimal selection
+        req_time = arrival;
+    else if (arrival > req_time){
         late = true;
-        arrival_lim = arrival;
+        req_time = arrival;
     }
 
     // Pick best area meeting that arrival:
@@ -358,7 +358,7 @@ inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> 
         uint best_j = 0;
         for (uint j = 1; j < impl.size(); j++){
             if (impl[j][p].idx == CutImpl::NO_CUT) break;
-            if (impl[j][p].arrival <= arrival_lim){
+            if (impl[j][p].arrival <= req_time){
                 if (newMin(area_est, impl[j][p].area_est))
                     best_j = j;
             }
@@ -452,7 +452,7 @@ struct Params_TechMap {
         balanced_cuts (2),
         delta_delay   (0.1)
     {
-        for (uint i = 0; i <= cut_size; i++)        // -- default LUT cost is "number of inputs" 
+        for (uint i = 0; i <= cut_size; i++)        // -- default LUT cost is "number of inputs"
             lut_cost.push(i);
     }
 };
@@ -782,7 +782,6 @@ void TechMap::updateEstimates()
             const Cut& cut = cutmap[w][0];
             for (uint i = 0; i < cut.size(); i++)
                 active(cut[i] + N) = true;
-          #endif
 
         }else if (!isCI(w)){
             For_Inputs(w, v)
@@ -822,6 +821,15 @@ void TechMap::updateEstimates()
 
 #else
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    //if (iter == 0)
+    {
+        target_arrival = 0;
+        For_Gates(N, w)
+            if (isCO(w))
+                newMax(target_arrival, impl[0][w[0]].arrival);
+        /**/Dump(target_arrival);
+    }
+
     active.clear();
     depart.clear();
     WMap<uint> fanouts(N, 0);
@@ -836,6 +844,44 @@ void TechMap::updateEstimates()
 
         }else{
             if (isLogic(w)){
+                float req_time = target_arrival - depart[w];
+
+              #if 1
+                // Pick best implementation among current choices:
+                uint  best_i    = UINT_MAX;
+                float best_area = FLT_MAX;
+                for (uint i = 0; i < impl.size(); i++){
+                    //**/Dump(w, req_time, impl[i][w].arrival);
+                    if (impl[i][w].arrival <= req_time)
+                        if (newMin(best_area, impl[i][w].area_est))
+                            best_i = i;
+                }
+                assert(best_i != UINT_MAX);
+
+                uint j = impl[best_i][w].idx;
+                Cut cut = cutmap[w][j];
+
+              #else
+
+                    // <<== plocka rätt implementering direkt!!
+                    uint j = impl[i][w].idx;
+                    Cut cut = cutmap[w][j];
+
+                    float arrival;
+                    float area_est;
+                    bool  late;
+                    l_tuple(arrival, area_est, late) = cutImpl_bestArea(cut, impl, req_time);
+                    //**/Dump(req_time, arrival, w);
+                    assert(!late);
+                }
+              #endif
+
+                for (uint k = 0; k < cut.size(); k++){
+                    Wire v = cut[k] + N;
+                    active(v) = true;
+                    fanouts(v)++;
+                    newMax(depart(v), depart[w] + 1.0f);                // <<== 1.0f should not be used for F7 and F8 etc
+                }
 
             }else{
                 if (!isCI(w)){
@@ -858,7 +904,7 @@ void TechMap::updateEstimates()
     For_Gates(N, w)
         if (isCI(w))
             newMax(mapped_delay, depart[w]);
-    /**/WriteLn "Delay: %_", mapped_delay;
+    /**/WriteLn "Delay: %_   (target: %_)", mapped_delay, target_arrival;
 
     double total_area = 0;
     double total_luts = 0;
@@ -870,9 +916,6 @@ void TechMap::updateEstimates()
     }
 
     /**/Dump(total_area, total_luts);
-
-    if (iter == 0)
-        target_arrival = mapped_delay;
 }
 
 
