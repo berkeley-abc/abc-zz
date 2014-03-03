@@ -441,6 +441,8 @@ struct Delay_lt {
 
 struct Params_TechMap {
     uint        cut_size;             // -- maximum cut size
+    uint        n_iters;              // -- refinement iterations
+    uint        cuts_per_node;        // -- how many cuts to store for each node in the subject graph
     float       delay_fraction;       // -- delay value in 'gate_Delay' are multiplied by this value
     uint        balanced_cuts;        // -- #cuts to compute between "best area" and "best delay"
     float       delta_delay;          // -- minimum delay improvement to consider when computing balanced cuts.
@@ -448,6 +450,8 @@ struct Params_TechMap {
 
     Params_TechMap() :
         cut_size      (6),
+        n_iters       (4),
+        cuts_per_node (10),
         delay_fraction(1.0),
         balanced_cuts (2),
         delta_delay   (0.1)
@@ -614,19 +618,49 @@ void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
     impl[0](w).area_est = costs[0].area / fanout_est[w];
     impl[0](w).arrival  = costs[0].delay;
 
+    for (uint n = 1; n < impl.size(); n++)
+        impl[n](w).idx = CutImpl::NO_CUT;
+
     if (impl.size() > 1){
-        uint idx = (costs[0].area < costs[1].area) ? 0 : 1;
+        uint idx = (costs.size() == 1 || costs[0].area < costs[1].area) ? 0 : 1;
         impl[1](w).idx      = idx;
         impl[1](w).area_est = costs[idx].area / fanout_est[w];
         impl[1](w).arrival  = costs[idx].delay;
 
-        //**/float req_time = active[w] ? target_arrival - depart[w] - 1.0f : best_delay;
-        //**/if (idx == 1 && impl[1][w].arrival <= req_time){
-        //**/    dcuts.swap(0, 1);
-        //**/    swp(impl[0](w), impl[1](w)); }
+        // Compute and store balanced cuts:
+        uint  next_i = P.cuts_per_node - 1;
+        float req_time = costs[0].delay - 1.0 - P.delta_delay;
+        for (uint n = 2; n < impl.size() && next_i >= 2; n++){
+            uint  best_i    = UINT_MAX;
+            float best_area = FLT_MAX;
+            float arrival_i = FLT_MAX;
+            for (uint i = 0; i < dcuts.size(); i++){
+                float arrival;
+                float area_est;
+                bool  late;
+                l_tuple(arrival, area_est, late) = cutImpl_bestArea(dcuts[i], impl, req_time);
+                if (!late && newMin(best_area, area_est)){
+                    best_i = i;
+                    arrival_i = arrival; }
+            }
+
+            if (best_i != UINT_MAX){
+                if (best_i >= P.cuts_per_node){
+                    dcuts.swap(best_i, next_i);
+                    best_i = next_i;
+                    next_i--;
+                }
+
+                impl[n](w).idx      = best_i;
+                impl[n](w).area_est = best_area + P.lut_cost[dcuts[best_i].size()];
+                impl[n](w).arrival  = arrival_i + 1.0;
+
+                req_time = arrival_i - P.delta_delay;
+            }
+        }
     }
 
-    dcuts.shrinkTo(10);
+    dcuts.shrinkTo(P.cuts_per_node);
 }
 
 
@@ -766,68 +800,13 @@ void TechMap::generateCuts(Wire w)
 
 void TechMap::updateEstimates()
 {
-#if 0
-    active.clear();
-
-    For_Gates(N, w){
-        if (isCO(w))
-            active(w) = true;
-    }
-
-    For_All_Gates_Rev(N, w){
-        if (!active[w]) continue;
-
-        if (isLogic(w)){
-            //<<== reprioritizeCuts(w, cutmap[w]);
-            const Cut& cut = cutmap[w][0];
-            for (uint i = 0; i < cut.size(); i++)
-                active(cut[i] + N) = true;
-
-        }else if (!isCI(w)){
-            For_Inputs(w, v)
-                active(v) = true;
-        }
-    }
-
-    WMap<uint> fanouts(N, 0);
-    fanouts.reserve(N.size());
-    depart.clear();
-    For_All_Gates_Rev(N, w){
-        if (isLogic(w)){
-            if (active[w]){
-              #if 0
-                CutImpl m;
-                bool    late;
-                l_tuple(m.arrival, m.area_est, late) = cutImpl_bestArea(w, impl, target_arrival);
-              #else
-                const Cut& cut = cutmap[w][0];
-                for (uint i = 0; i < cut.size(); i++){
-                    Wire v = cut[i] + N;
-                    fanouts(v)++;
-                    newMax(depart(v), depart[w] + 1.0f);    // <<== something different here for MUX7?
-                }
-              #endif
-            }else
-                depart(w) = FLT_MAX;    // <<== for now, give a well defined value to inactive nodes
-
-        }else if (!isCI(w)){
-            float delay = (w != gate_Delay) ? 0.0f : w.arg() * P.delay_fraction;
-            For_Inputs(w, v){
-                fanouts(v)++;
-                newMax(depart(v), depart[w] + delay);
-            }
-        }
-    }
-
-#else
-    //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     //if (iter == 0)
     {
         target_arrival = 0;
         For_Gates(N, w)
             if (isCO(w))
                 newMax(target_arrival, impl[0][w[0]].arrival);
-        /**/Dump(target_arrival);
+        //**/Dump(target_arrival);
     }
 
     active.clear();
@@ -846,35 +825,38 @@ void TechMap::updateEstimates()
             if (isLogic(w)){
                 float req_time = target_arrival - depart[w];
 
-              #if 1
-                // Pick best implementation among current choices:
                 uint  best_i    = UINT_MAX;
                 float best_area = FLT_MAX;
+              #if 0
+                // Pick best implementation among current choices:
                 for (uint i = 0; i < impl.size(); i++){
-                    //**/Dump(w, req_time, impl[i][w].arrival);
                     if (impl[i][w].arrival <= req_time)
                         if (newMin(best_area, impl[i][w].area_est))
                             best_i = i;
                 }
-                assert(best_i != UINT_MAX);
-
-                uint j = impl[best_i][w].idx;
-                Cut cut = cutmap[w][j];
-
               #else
+                // Pick best implementation among updated choices:
+                for (uint i = 0; i < impl.size(); i++){
+                    int j = impl[i][w].idx;
+                    if (j == CutImpl::NO_CUT) continue;
 
-                    // <<== plocka rätt implementering direkt!!
-                    uint j = impl[i][w].idx;
                     Cut cut = cutmap[w][j];
 
                     float arrival;
                     float area_est;
                     bool  late;
-                    l_tuple(arrival, area_est, late) = cutImpl_bestArea(cut, impl, req_time);
-                    //**/Dump(req_time, arrival, w);
-                    assert(!late);
+                    l_tuple(arrival, area_est, late) = cutImpl_bestArea(cut, impl, req_time - 1.0f);    // <<== 1.0f
+
+                    if (!late)
+                        if (newMin(best_area, area_est))
+                            best_i = i;
                 }
               #endif
+
+                assert(best_i != UINT_MAX);
+
+                uint j = impl[best_i][w].idx; assert(j < cutmap[w].size());
+                Cut cut = cutmap[w][j];
 
                 for (uint k = 0; k < cut.size(); k++){
                     Wire v = cut[k] + N;
@@ -895,16 +877,27 @@ void TechMap::updateEstimates()
             }
         }
     }
-#endif
 
     For_Gates(N, w)
         assert(!active[w] || depart[w] != FLT_MAX);
 
+    // Fanout est. (temporary)
+    uint  r = iter + 1;
+    float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 2.0f);
+    float beta  = 1.0f - alpha;
+
+    For_Gates(N, w){
+        if (isLogic(w)){
+            fanout_est(w) = alpha * max_(fanouts[w], 1u)
+                          + beta  * fanout_est[w];
+        }
+    }
+
+
     float mapped_delay = 0.0f;
     For_Gates(N, w)
-        if (isCI(w))
+        if (isCI(w) && active[w])
             newMax(mapped_delay, depart[w]);
-    /**/WriteLn "Delay: %_   (target: %_)", mapped_delay, target_arrival;
 
     double total_area = 0;
     double total_luts = 0;
@@ -915,8 +908,29 @@ void TechMap::updateEstimates()
         }
     }
 
-    /**/Dump(total_area, total_luts);
+    /**/WriteLn "Delay: %_   (target: %_)    Area: %,d    LUTs: %,d", mapped_delay, target_arrival, (uint64)total_area, (uint64)total_luts;
+
+    //**/Dump(total_area, total_luts);
+
+    //TEMPORARY:
+    if (iter == P.n_iters - 1){
+        Write "%>11%,d    ", (uint64)total_luts;
+        Write "%>11%,d    ", (uint64)total_area;
+        Write "%>6%d    "  , (uint64)mapped_delay;
+        Write "%>10%t"     , cpuTime();
+        NewLine;
+    }
 }
+
+
+/*
+- Fanout estimation
+- Balanced implementations
+- Area recovery (reprioritization? maybe not needed anymore)
+
++ Figure out how to embedd +1.0f in cut impl.
+*/
+
 
 
 //=================================================================================================
@@ -964,10 +978,14 @@ void TechMap::run()
     cuts_enumerated = 0;
 
     // Map:     <<== use Iter_Params here.... (how to score cuts, how to update target delay, whether to recycle cuts...)
-    for (iter = 0; iter < 2; iter++){
+    for (iter = 0; iter < P.n_iters; iter++){
         if (iter == 1){
             impl.push();
             impl[1].reserve(N.size());
+
+            for (uint n = 0; n < P.balanced_cuts; n++){
+                impl.push();
+                impl[2 + n].reserve(N.size()); }
         }
 
         // Generate cuts:
@@ -1016,6 +1034,7 @@ void test(int argc, char** argv)
 
   #if 1
     cli.add("input", "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
+    cli.add("batch", "bool"  , "no"        , "Print batch friendly output at the last line.");
     cli.parseCmdLine(argc, argv);
     String input = cli.get("input").string_val;
 
@@ -1057,6 +1076,9 @@ void test(int argc, char** argv)
     Params_TechMap P;
     TechMap map(N, P);
     map.run();
+
+    //WriteLn "CPU time: %t", cpuTime();
+
 #endif
 }
 

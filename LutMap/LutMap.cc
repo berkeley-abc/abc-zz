@@ -368,7 +368,8 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
 // Applied during instantiation where some 'area_est[w]' is set to zero.
 void LutMap::reprioritizeCuts(Wire w, Array<Cut> cuts)
 {
-//**/return;
+    if (!P.reprio) return;
+
     float best_delay = FLT_MAX;
     float best_area  = FLT_MAX;
     uint  best_i = 0;

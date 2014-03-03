@@ -439,6 +439,7 @@ int main(int argc, char** argv)
     cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (default is area).");
     cli.add("recycle", "bool"  , "yes"       , "Recycle cuts for faster iterations.");
     cli.add("ela"    , "bool"  , "yes"       , "Use exact-local-area post-processing after each mapping phase.");
+    cli.add("reprio" , "bool"  , "yes"       , "Use reprioritization during induce-phase.");
     cli.add("fmux"   , "bool"  , "no"        , "Use special F7MUX and F8MUX in Xilinx series 7.");
     cli.add("cost"   , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
     cli.add("params" , "string", ""          , "A file containing options '-N' through '-cost'; one line per round (so number of lines sets '-rounds'). Omitted options will take values set by command line (use \"-\" for empty lines = all options are default)");
@@ -459,6 +460,7 @@ int main(int argc, char** argv)
     P.map_for_delay = cli.get("dopt").bool_val;
     P.recycle_cuts  = cli.get("recycle").bool_val;
     P.use_ela       = cli.get("ela").bool_val;
+    P.reprio        = cli.get("reprio").bool_val;
     P.use_fmux      = cli.get("fmux").bool_val;
 
     if (cli.get("cost").enum_val == 0){

@@ -33,6 +33,7 @@ struct Params_LutMap {
     uint    mux_cost;           // Cost of a F7- or F8MUX.
     bool    use_ela;            // Use exact local area optimizaton.
     bool    use_fmux;           // Some architectures have a free MUX that can combine the outputs of two LUT6 with a third signal.
+    bool    reprio;             // Re-prioritize cuts (should only be turned off for experimental purposes)
     bool    quiet;
 
     Params_LutMap() :
@@ -43,6 +44,7 @@ struct Params_LutMap {
         recycle_cuts(true),
         use_ela(true),
         use_fmux(false),
+        reprio(true),
         quiet(false)
     {
         for (uint i = 0; i < elemsof(lut_cost); i++)
