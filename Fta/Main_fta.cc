@@ -20,6 +20,7 @@ int main(int argc, char** argv)
 
     cli.add("input", "string", arg_REQUIRED, "Input fault-tree (.tree file).", 0);
     cli.add("output", "string", "", "Output file.");
+    cli.add("proc-no", "int", "-1", "Process number (for FTP files). '-1' means OR of all processes.");
     cli.add("profile", "bool", "yes", "Print profiling information at exit.");
 
     CLI cli_bound;
@@ -40,13 +41,21 @@ int main(int argc, char** argv)
     cli.parseCmdLine(argc, argv);
     String input  = cli.get("input").string_val;
     String output = cli.get("output").string_val;
+    uint   proc_no = (uint)(int)cli.get("proc-no").int_val;
 
     Gig N;
     Vec<String> ev_names;
     Vec<double> ev_probs;
 
     try{
-        readFaultTree(input, N, ev_probs, ev_names);
+        if (hasExtension(input, "tree"))
+            readFaultTree(input, N, ev_probs, ev_names);
+        else if (hasExtension(input, "ftp") || hasExtension(input, "FTP"))
+            readFtp(input, N, ev_probs, ev_names, proc_no);
+        else{
+            ShoutLn "Unkown input format: %_", input;
+            exit(1);
+        }
     }catch (const Excp_Msg& msg){
         ShoutLn "PARSE ERROR! %_", msg;
         return 1;

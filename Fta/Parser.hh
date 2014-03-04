@@ -24,6 +24,7 @@ using namespace std;
 
 
 void readFaultTree(String tree_file, /*outputs:*/Gig& N, Vec<double>& ev_probs, Vec<String>& ev_names);
+void readFtp(String ftp_file, /*outputs:*/Gig& N, Vec<double>& ev_probs, Vec<String>& ev_names, uint proc_no = UINT_MAX);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

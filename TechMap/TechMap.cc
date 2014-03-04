@@ -469,6 +469,7 @@ class TechMap {
 
     // State:
     StackAlloc<uint64>  mem;
+    StackAlloc<uint64>  mem_old;
     WMap<CutSet>        cutmap;
 //    WMap<Cut>           winner;
     Vec<WMap<CutImpl> > impl;
