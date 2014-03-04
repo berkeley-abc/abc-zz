@@ -12,8 +12,6 @@ int main(int argc, char** argv)
     ZZ_Init;
 
     Gig N;
-    Dump(N.isEmpty());
-    return 0;
 
     Wire sel = N.add(gate_PI);
     Wire d1  = N.add(gate_PI);
@@ -23,14 +21,13 @@ int main(int argc, char** argv)
     Wire r0 = N.add(gate_And).init(~sel, ~d0);
     Wire f  = N.add(gate_And).init(~r0, ~r1);
 
-    Dump(sel, d1, d0);
-    if (isMux(f, sel, d1, d0))
-        Dump(sel, d1, d0);
+    N.save("tmp.gnl");
 
-    Dump(isReach(N));
+    Gig M;
+    M.load("tmp.gnl");
 
-    for (uint i = 0; i < N.size(); i++)
-        Dump(N[i]);
+    WriteLn "N: %_", info(N);
+    WriteLn "M: %_", info(M);
 
     return 0;
 };
