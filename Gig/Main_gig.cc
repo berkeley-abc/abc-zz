@@ -19,7 +19,7 @@ int main(int argc, char** argv)
 
     Wire r1 = N.add(gate_And).init(sel, ~d1);
     Wire r0 = N.add(gate_And).init(~sel, ~d0);
-    Wire f  = N.add(gate_And).init(~r0, ~r1);
+    Wire f ___unused = N.add(gate_And).init(~r0, ~r1);
 
     N.save("tmp.gnl");
 

@@ -17,6 +17,7 @@
 #include "ZZ_BFunc.hh"
 #include "ZZ_Npn4.hh"
 #include "ZZ/Generics/Sort.hh"
+#include "Unmap.hh"
 
 namespace ZZ {
 using namespace std;
@@ -113,8 +114,12 @@ public:
     Cut(uint64* base_) : base(base_) {}
 
     static uint allocSz(uint n_inputs);
+
     Cut(uint64* base_, Array<gate_id> inputs, uint64* ftb) : base(base_) { init(inputs, ftb); }
         // -- size of 'ftb' should be 'ceil(2^n / 64)' i.e. '(1 << inputs.size() + 63) >> 6'.
+
+    template<class ALLOC>   // -- NOTE! 'ALLOC' should allocate 'uint64's
+    Cut dup(ALLOC& allocator);
 
     Null_Method(Cut) { return base == NULL; }
 
@@ -134,6 +139,18 @@ inline uint Cut::allocSz(uint n_inputs)
     uint ftb_words = ((1ull << n_inputs) + 63) >> 6;
     uint alloc_sz = ((n_inputs + 3) >> 1) + ftb_words;
     return alloc_sz;
+}
+
+
+// Duplicate cut 
+template<class ALLOC>
+inline Cut Cut::dup(ALLOC& allocator)
+{
+    uint sz = allocSz(this->size());
+    uint64* new_base = allocator.alloc(sz);
+    for (uint i = 0; i < sz; i++)
+        new_base[i] = base[i];
+    return Cut(new_base);
 }
 
 
@@ -315,7 +332,7 @@ macro bool subsumes(const Cut& c, const Cut& d)
 // Cut implementation:
 
 
-// NOTE! Through out the code, 'impl' is indexed 'impl[sel][wire]' where 
+// NOTE! Through out the code, 'impl' is indexed 'impl[sel][wire]' where
 //   'sel == 0' is delay optimal
 //   'sel == 1' is area optimal
 //   'sel == 2..' are trade-off choices ("balanced" cuts)
@@ -332,7 +349,7 @@ struct CutImpl {
 
 
 // Returns '(arrival, area_est, late)'; arrival and area for an area optimal selection UNDER
-// the assumption that 'req_time' is not exceeded. If no such cut exists, 
+// the assumption that 'req_time' is not exceeded. If no such cut exists,
 // '(FLT_MAX, FLT_MAX)' is returned.  If 'sel' is non-null, cut selection is recorded there.
 template<class CUT>
 inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& impl, float req_time, uchar* sel = NULL)
@@ -375,7 +392,7 @@ inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> 
 }
 
 
-// Returns '(arrival, area_est)'; arrival and area of a delay optimal selection for 'cut'. 
+// Returns '(arrival, area_est)'; arrival and area of a delay optimal selection for 'cut'.
 // If 'sel' is non-null, cut selection is recorded there.
 template<class CUT>
 inline Pair<float,float> cutImpl_bestDelay(CUT cut, const Vec<WMap<CutImpl> >& impl, uchar* sel = NULL)
@@ -454,7 +471,7 @@ struct Params_TechMap {
         cuts_per_node (10),
         delay_fraction(1.0),
         balanced_cuts (2),
-        delta_delay   (0.1)
+        delta_delay   (1)
     {
         for (uint i = 0; i <= cut_size; i++)        // -- default LUT cost is "number of inputs"
             lut_cost.push(i);
@@ -469,9 +486,9 @@ class TechMap {
 
     // State:
     StackAlloc<uint64>  mem;
-    StackAlloc<uint64>  mem_old;
+    StackAlloc<uint64>  mem_win;
     WMap<CutSet>        cutmap;
-//    WMap<Cut>           winner;
+    WMap<Cut>           winner;
     Vec<WMap<CutImpl> > impl;
 
     WMap<float>         fanout_est;
@@ -480,6 +497,7 @@ class TechMap {
 
     uint                iter;
     float               target_arrival;
+    WMap<uint>          fanouts;
 
     // Temporaries:
     DynCutSet           dcuts;
@@ -496,7 +514,10 @@ class TechMap {
     void generateCuts(Wire w);
     void generateCuts_LogicGate(Wire w, DynCutSet& out_dcuts);
     void prioritizeCuts(Wire w, DynCutSet& dcuts);
+    void updateTargetArrival();
+    void induceMapping();
     void updateEstimates();
+    void copyWinners();
 
 public:
     TechMap(Gig& N_, const Params_TechMap& P_) : N(N_), P(P_) {}
@@ -506,47 +527,6 @@ public:
 
 //=================================================================================================
 // == Cut prioritization:
-
-
-#if 0
-
-    [internal] arrival     <<== make internal?
-    [internal] area_est    <<== make internal?
-
-fanout_est
-
-iter_no
-target_arrival
-depart
-active
-
-lut_cost (mux_cost)
-
-temporaries...
-
-
-CutImpl {
-    current choice (
-    k scored cuts
-    n-k more cuts for enumeration purposes
-
-
-categories: lut6, mux7, mux8
-spread (delay heavy, area heavy,
-
-for each cut:
-  selectors     (0 = trivial cut? or -1?
-  area_est
-  arrival
-#endif
-
-
-
-/*
-0 1 2 3 4 5 6 7
-
-A A A A A D D M
-*/
 
 
 void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
@@ -753,10 +733,16 @@ void TechMap::generateCuts(Wire w)
         // Logic:
   //      if (!cutmap[w]){    // -- else reuse cuts from previous iteration
 
-          #if 0     // <<== LATER
-            if (!winner[w].null())
-                cuts.push(winner[w]);     // <<==FT cannot push last winner if mux_depth gets too big
-          #endif
+#if 1
+            if (winner[w]){
+                assert(dcuts.inputs.size() == 0);
+                for (uint i = 0; i < winner[w].size(); i++)
+                    dcuts.inputs.push(winner[w][i]);
+                for (uint i = 0; i < winner[w].ftbSz(); i++)
+                    dcuts.ftb.push(winner[w].ftb(i));
+                dcuts.next();
+            }
+#endif
 
             generateCuts_LogicGate(w, dcuts);
             cuts_enumerated += dcuts.size();    // -- for statistics
@@ -799,21 +785,22 @@ void TechMap::generateCuts(Wire w)
 // -- Update estimates:
 
 
-void TechMap::updateEstimates()
+void TechMap::updateTargetArrival()
 {
-    //if (iter == 0)
-    {
-        target_arrival = 0;
-        For_Gates(N, w)
-            if (isCO(w))
-                newMax(target_arrival, impl[0][w[0]].arrival);
-        //**/Dump(target_arrival);
-    }
+    target_arrival = 0;
+    For_Gates(N, w)
+        if (isCO(w))
+            newMax(target_arrival, impl[0][w[0]].arrival);
 
+    target_arrival *= 1.0;      // <<== parameter
+}
+
+
+void TechMap::induceMapping()
+{
     active.clear();
     depart.clear();
-    WMap<uint> fanouts(N, 0);
-    fanouts.reserve(N.size());
+    fanouts.clear();
 
     For_All_Gates_Rev(N, w){
         if (isCO(w))
@@ -859,6 +846,9 @@ void TechMap::updateEstimates()
                 uint j = impl[best_i][w].idx; assert(j < cutmap[w].size());
                 Cut cut = cutmap[w][j];
 
+                assert(j < 254);
+                active(w) = j + 2;
+
                 for (uint k = 0; k < cut.size(); k++){
                     Wire v = cut[k] + N;
                     active(v) = true;
@@ -881,7 +871,11 @@ void TechMap::updateEstimates()
 
     For_Gates(N, w)
         assert(!active[w] || depart[w] != FLT_MAX);
+}
 
+
+void TechMap::updateEstimates()
+{
     // Fanout est. (temporary)
     uint  r = iter + 1;
     float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 2.0f);
@@ -924,11 +918,22 @@ void TechMap::updateEstimates()
 }
 
 
-/*
-- Fanout estimation
-- Balanced implementations
-- Area recovery (reprioritization? maybe not needed anymore)
+void TechMap::copyWinners()
+{
+    mem_win.clear();
+    For_Gates(N, w){
+        if (active[w] < 2)
+            winner(w) = Cut_NULL;
+        else{
+            Cut cut = cutmap[w][active[w] - 2];
+            winner(w) = cut.dup(mem_win);
+        }
+    }
+}
 
+
+/*
+- Area recovery (reprioritization? maybe not needed anymore)
 + Figure out how to embedd +1.0f in cut impl.
 */
 
@@ -963,6 +968,7 @@ void TechMap::run()
     fanout_est.reserve(N.size());
     depart    .reserve(N.size());
     active    .reserve(N.size());
+    fanouts   .reserve(N.size());
 
     impl.push();
     impl[0].reserve(N.size());
@@ -1000,11 +1006,14 @@ void TechMap::run()
         //<<== if not recycling cuts, set 'winner'
 
         // Computer estimations:
+        if (iter == 0)
+            updateTargetArrival();
+        induceMapping();
         updateEstimates();
+        copyWinners();
 
         mem.clear();
     }
-
 
     // Cleanup:
 }
@@ -1055,6 +1064,7 @@ void test(int argc, char** argv)
         ShoutLn "PARSE ERROR! %_", err.msg;
         exit(1);
     }
+    WriteLn "Parsed: %_", info(N);
 
   #else
     Gig N;
@@ -1077,6 +1087,16 @@ void test(int argc, char** argv)
     Params_TechMap P;
     TechMap map(N, P);
     map.run();
+
+    // Temporary unmap:
+    unmap(N);
+    N.unstrash();
+    N.compact();
+    WriteLn "Unmap: %_", info(N);
+    putIntoLut4(N);
+
+    TechMap map2(N, P);
+    map2.run();
 
     //WriteLn "CPU time: %t", cpuTime();
 

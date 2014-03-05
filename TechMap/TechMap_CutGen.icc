@@ -12,7 +12,7 @@
 //|________________________________________________________________________________________________
 
 
-#define STRUCTURAL_MAPPING
+//#define STRUCTURAL_MAPPING
 
 
 // Perform subsumption tests on the last cut in 'out' against all other cuts (in both diretcions). 
