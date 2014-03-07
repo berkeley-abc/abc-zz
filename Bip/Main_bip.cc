@@ -41,6 +41,7 @@
 #include "Live.hh"
 #include "LtlCheck.hh"
 #include "ConstrExtr.hh"
+#include "SimpInvar.hh"
 
 #define NO_BERKELEY_ABC
 
@@ -1037,6 +1038,11 @@ int main(int argc, char** argv)
     cli_invar.add("add-prop", "bool", "yes", "Add property to invariant.");
     cli.addCommand("check-invar", "Verify an invariant", &cli_invar);
 
+    // Command line -- simp-invar:
+    CLI cli_simp_invar;
+    cli_simp_invar.add("invar", "string", arg_REQUIRED, "Invariant in clausal form.");
+    cli.addCommand("simp-invar", "Simplify an invariant", &cli_simp_invar);
+
     // Command line -- miscellaneous:
     CLI cli_save_gig;
     cli_save_gig.add("names", "bool", "no", "Keep names from input file.");
@@ -1671,6 +1677,15 @@ int main(int argc, char** argv)
             else
                 WriteLn "Invariant does not imply property %_", failed_prop;
         }
+
+    }else if (cli.cmd == "simp-invar"){
+        Vec<Vec<Lit> > invar;
+        String filename = cli.get("invar").string_val;
+
+        if (!readInvariant(filename, invar)){
+            ShoutLn "ERROR! Could not read file: %_", filename;
+            exit(1); }
+        simpInvariant(N, prop_nums, invar);
 
     }else if (cli.cmd == "saber"){
         uint target_enl = cli.get("k").int_val;
