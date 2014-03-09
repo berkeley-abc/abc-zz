@@ -1685,7 +1685,7 @@ int main(int argc, char** argv)
         if (!readInvariant(filename, invar)){
             ShoutLn "ERROR! Could not read file: %_", filename;
             exit(1); }
-        simpInvariant(N, prop_nums, invar);
+        simpInvariant(N, props, invar, output);
 
     }else if (cli.cmd == "saber"){
         uint target_enl = cli.get("k").int_val;
