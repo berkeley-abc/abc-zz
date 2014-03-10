@@ -8,7 +8,7 @@ using namespace std;
 
 
 bool readInvariant(String filename, Vec<Vec<Lit> >& invar);
-void simpInvariant(NetlistRef N0, const Vec<Wire>& props, Vec<Vec<Lit> >& invar, String output_filename = "");
+void simpInvariant(NetlistRef N0, const Vec<Wire>& props, Vec<Vec<Lit> >& invar, String output_filename = "", bool fast = false);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

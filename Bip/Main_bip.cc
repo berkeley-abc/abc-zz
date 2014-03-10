@@ -1041,6 +1041,7 @@ int main(int argc, char** argv)
     // Command line -- simp-invar:
     CLI cli_simp_invar;
     cli_simp_invar.add("invar", "string", arg_REQUIRED, "Invariant in clausal form.");
+    cli_simp_invar.add("fast" , "bool"  , "no"        , "In fast mode, only whole clauses are considered for removal.");
     cli.addCommand("simp-invar", "Simplify an invariant", &cli_simp_invar);
 
     // Command line -- miscellaneous:
@@ -1323,7 +1324,7 @@ int main(int argc, char** argv)
     if (show_logo && !quiet){
         WriteLn "\a*_______________________________________________________________________________\a0";
         WriteLn " \a/__  ___ __\a/                                                                    ";
-        WriteLn " \a/|_)  |  |_)\a/             Author: \a*Niklas Een\a*                (C) UC Berkeley 2013";
+        WriteLn " \a/|_)  |  |_)\a/             Author: \a*Niklas Een\a*                (C) UC Berkeley 2014";
         WriteLn " \a/|_) _|_ |\a/               Built:  \a*%<18%_\a*            Licence: \a*MIT/X11\a*", compileDate();
         WriteLn "\a*_______________________________________________________________________________\a0";
         NewLine;
@@ -1681,11 +1682,12 @@ int main(int argc, char** argv)
     }else if (cli.cmd == "simp-invar"){
         Vec<Vec<Lit> > invar;
         String filename = cli.get("invar").string_val;
+        bool   fast     = cli.get("fast").bool_val;
 
         if (!readInvariant(filename, invar)){
             ShoutLn "ERROR! Could not read file: %_", filename;
             exit(1); }
-        simpInvariant(N, props, invar, output);
+        simpInvariant(N, props, invar, output, fast);
 
     }else if (cli.cmd == "saber"){
         uint target_enl = cli.get("k").int_val;

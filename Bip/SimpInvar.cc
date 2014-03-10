@@ -12,6 +12,7 @@
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
+#include "ZZ/Generics/Sort.hh"
 #include "ZZ_Netlist.hh"
 #include "ZZ_MetaSat.hh"
 #include "ZZ_Bip.Common.hh"
@@ -21,6 +22,7 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Helpers:
 
 
 // Read an invariant on clausal form (as produced by 'treb')
@@ -70,6 +72,7 @@ bool readInvariant(String filename, Vec<Vec<Lit> >& invar)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Simplifiation Induction Check:
 
 
 macro void markClauseRemoved(Vec<Lit>& cl) { cl.setSize(1); cl[0] = Lit_MAX; }
@@ -83,6 +86,7 @@ private:
     // Input:
     NetlistRef            N;
     const Vec<Vec<Lit> >& invar;    // -- removed clauses will be set to a unit clause containing 'Lit_MAX'; remove literals will be set to 'Lit_PRUNED'.
+
     // State:
     MiniSat2           S;
     WMap<Lit>          n2s;
@@ -165,13 +169,14 @@ void SI_Check::setupLhs()
 void SI_Check::setupRhs()
 {
     for (uint i = 0; i < invar.size(); i++){
-        if (act[i] == S.True()) continue;
+        assert(act[i] != S.True());
 
         fail.push(S.addLit());
         S.addClause(~fail[LAST], act[i]);
         for (uint j = 0; j < invar[i].size(); j++){
             Lit x = invar[i][j];
             Lit p = getLit(flop_in[x.id] ^ x.sign);
+            S.addClause(~fail[LAST], ~p);
             S.addClause(~fail[LAST], ~p);
         }
     }
@@ -226,8 +231,10 @@ bool SI_Check::tryRemoveCla(uint cl_num)
     if (S.solve(assumps) == l_True)
         return false;
     else{
-        if (cl_num != UINT_MAX)
+        if (cl_num != UINT_MAX){
+            S.addClause(~act[cl_num]);
             act[cl_num] = S.True();
+        }
         return true;
     }
 }
@@ -272,16 +279,70 @@ bool SI_Check::tryRemoveLit(uint cl_num, uint lit_num)
         return false;
     }else{
         new_fail.copyTo(fail);
+        S.addClause(~act[cl_num]);
         act[cl_num] = new_act;
         return true;
     }
 }
 
 
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Simplify procedure:
+
+
+void cleanInvar(Vec<Vec<Lit> >& invar, uint* idx1 = NULL, uint* idx2 = NULL)
+{
+    // Clean up invariant:
+    uint j = 0;
+    for (uint i = 0; i < invar.size(); i++){
+        if (idx1 && i == *idx1) *idx1 = j;
+        if (idx2 && i == *idx2) *idx2 = j;
+
+        if (!isClauseRemoved(invar[i])){
+            invar[i].moveTo(invar[j]);
+            uint m = 0;
+            for (uint n = 0; n < invar[j].size(); n++)
+                if (invar[j][n] != Lit_PRUNED)
+                    invar[j][m++] = invar[j][n];
+            invar[j].shrinkTo(m);
+            j++;
+        }
+    }
+    invar.shrinkTo(j);
+
+    if (idx1 && *idx1 == invar.size()) *idx1 = 0;
+    if (idx2 && *idx2 == invar.size()) *idx2 = 0;
+}
+
+
+struct SizeLt {
+    bool operator()(const Vec<Lit>& x, const Vec<Lit>& y) const { return x.size() < y.size(); }
+};
+
+
 // Here 'invar' is a set of clauses expressed in normalized literals, meaning 'Lit(0)' corresponds
 // to state variable 0 of 'N', no matter what gate id (and thus 'GLit') that gate has.
-void simpInvariant(NetlistRef N0, const Vec<Wire>& props, Vec<Vec<Lit> >& invar, String output_filename)
+void simpInvariant(NetlistRef N0, const Vec<Wire>& props, Vec<Vec<Lit> >& invar, String output_filename, bool fast)
 {
+    // Consistency check:
+    IntZet<uint> flop_nums;
+    For_Gatetype(N0, gate_Flop, w)
+        flop_nums.add(attr_Flop(w).number);
+    for (uint i = 0; i < invar.size(); i++){
+        for (uint j = 0; j < invar[i].size(); j++){
+            if (!flop_nums.has(invar[i][j].id)){
+                ShoutLn "INTERNAL ERROR! Invariant contains state variables not present in the design.";
+                assert(false);
+            }
+        }
+    }
+
+    // Sort clauses:
+    SizeLt lt;
+    sobSort(ordReverse(sob(invar, lt)));
+
+    // Simplify:
+    uint orig_invar_sz = invar.size();
     if (invar.size() > 0){
         Netlist N;
         initBmcNetlist(N0, props, N, true);
@@ -298,6 +359,7 @@ void simpInvariant(NetlistRef N0, const Vec<Wire>& props, Vec<Vec<Lit> >& invar,
         uint last_update = 0;
         uint clauses_removed = 0;
         uint literals_pruned = 0;   // -- doesn't include literals removed as part of whole clauses (but do include literals removed from a clause that was later removed entirely)
+        uint lit_tries = 0;
         do{
             if (!isClauseRemoved(invar[i])){
                 if (check.tryRemoveCla(i)){
@@ -306,29 +368,48 @@ void simpInvariant(NetlistRef N0, const Vec<Wire>& props, Vec<Vec<Lit> >& invar,
                     last_update = i;
                     clauses_removed++;
 
-                    /**/WriteLn "%_ / %_ clauses left", invar.size() - clauses_removed, invar.size();
+                    /**/WriteLn "Removed clause_%_ -- %_ / %_ clauses left", i, orig_invar_sz - clauses_removed, orig_invar_sz;
 
                 }else{
-                    // Try to prune individual literals from current clause:
-                    uint j = 0;
-                    uint last_pruned = 0;
-                    do{
-                        if (invar[i][j] != Lit_PRUNED){
-                            if (check.tryRemoveLit(i, j)){
-                                invar[i][j] = Lit_PRUNED;
-                                last_pruned = j;
-                                literals_pruned++;
+                    if (!fast){
+                        // Try to prune individual literals from current clause:
+                        uint j = 0;
+                        uint last_pruned = 0;
+                        bool changed = false;
+                        do{
+                            if (invar[i][j] != Lit_PRUNED){
+                                lit_tries++;
+                                if (check.tryRemoveLit(i, j)){
+                                    invar[i][j] = Lit_PRUNED;
+                                    last_pruned = j;
+                                    literals_pruned++;
+                                    changed = true;
 
-                                /**/WriteLn "%_ literals pruned (clause%_[%_])", literals_pruned, i, j;
+                                    /**/WriteLn "%_ literals pruned (clause_%_[%_])", literals_pruned, i, j;
+                                }
                             }
-                        }
 
-                        j++;
-                        if (j == invar[i].size())
-                            j = 0;
-                    }while (j != last_pruned);
+                            j++;
+                            if (j == invar[i].size())
+                                j = 0;
+                        }while (j != last_pruned);
 
-                    // <<== if changed, then mark as last update...
+                        if (changed)
+                            last_update = i;
+                    }
+                }
+
+                // Recycle SAT?                       
+                if (lit_tries > /*lim*/2 * invar.size() + 100){
+                    WriteLn "Recycling SAT...";
+                    //**/Dump(last_update, i);
+                    cleanInvar(invar, &last_update, &i);
+                    //**/Dump(last_update, i);
+
+                    check.~SI_Check();
+                    new (&check) SI_Check(N, invar);
+
+                    lit_tries = 0;
                 }
             }
 
@@ -337,28 +418,18 @@ void simpInvariant(NetlistRef N0, const Vec<Wire>& props, Vec<Vec<Lit> >& invar,
                 i = 0;
         }while (i != last_update);
 
-        // Clean up invariant:
-        uint j = 0;
-        for (uint i = 0; i < invar.size(); i++){
-            if (!isClauseRemoved(invar[i])){
-                invar[i].moveTo(invar[j]);
-                uint m = 0;
-                for (uint n = 0; n < invar[j].size(); n++)
-                    if (invar[j][n] != Lit_PRUNED)
-                        invar[j][m++] = invar[j][n];
-                invar[j].shrinkTo(m);
-                j++;
-            }
-        }
-        invar.shrinkTo(j);
+        cleanInvar(invar);
     }
 
     // Write invariant to file:
     if (output_filename != ""){
         OutFile out(output_filename);
+        sobSort(sob(invar, lt));
         FWrite(out) "%\ns", invar;
         WriteLn "Wrote: \a*%_\a*", output_filename;
     }
+
+    WriteLn "CPU time: %t", cpuTime();
 
     // remove clauses, prefering clauses with rare literals
     // removing literals
@@ -368,3 +439,11 @@ void simpInvariant(NetlistRef N0, const Vec<Wire>& props, Vec<Vec<Lit> >& invar,
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
+
+
+/*
+bip ,simp-invar ~/Performance/single/0013__adi-new.aig -invar=orig.invar simp.invar
+
+65 literals pruned (clause388[3])
+468 / 894 clauses left
+*/

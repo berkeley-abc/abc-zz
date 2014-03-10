@@ -685,6 +685,7 @@ template struct Clausify<SatStd>;
 template struct Clausify<SatPfl>;
 template struct Clausify<MetaSat>;
 template struct Clausify<MiniSat2>;
+template struct Clausify<AbcSat>;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
