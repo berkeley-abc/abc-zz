@@ -42,6 +42,7 @@
 #include "LtlCheck.hh"
 #include "ConstrExtr.hh"
 #include "SimpInvar.hh"
+#include "PropCluster.hh"
 
 #define NO_BERKELEY_ABC
 
@@ -1044,6 +1045,13 @@ int main(int argc, char** argv)
     cli_simp_invar.add("fast" , "bool"  , "no"        , "In fast mode, only whole clauses are considered for removal.");
     cli.addCommand("simp-invar", "Simplify an invariant", &cli_simp_invar);
 
+    // Command line -- simp-invar:
+    CLI cli_cluster;
+    cli_cluster.add("n",      "int[1:]", "4",   "Number of clusters to partition properties into.");
+    cli_cluster.add("pivots", "int[1:]", "256", "Number of state variables to track in support computation.");
+    cli_cluster.add("seq",    "int[1:]", "5",   "Sequential depth of support analysis.");
+    cli.addCommand("cluster", "Cluster properties according to support.", &cli_cluster);
+
     // Command line -- miscellaneous:
     CLI cli_save_gig;
     cli_save_gig.add("names", "bool", "no", "Keep names from input file.");
@@ -1688,6 +1696,13 @@ int main(int argc, char** argv)
             ShoutLn "ERROR! Could not read file: %_", filename;
             exit(1); }
         simpInvariant(N, props, invar, output, fast);
+
+    }else if (cli.cmd == "cluster"){
+        uint n_clusters = cli.get("n").int_val;
+        uint n_pivots   = cli.get("pivots").int_val;
+        uint seq_depth  = cli.get("seq").int_val;
+        Vec<Vec<uint> > clusters;
+        clusterProperties(N, n_clusters, n_pivots, seq_depth, clusters);
 
     }else if (cli.cmd == "saber"){
         uint target_enl = cli.get("k").int_val;
