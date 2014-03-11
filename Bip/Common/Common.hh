@@ -245,6 +245,11 @@ void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized, /
 void lutClausify(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized, /*outputs:*/ SatStd&  S, Vec<LLMap<GLit,Lit> >& m2s);
     // -- 'roots' is a list of pairs '(frame#, gate)'.
 
+macro Lit lutClausify(NetlistRef M, uint depth, GLit w_root, bool initialized, /*outputs:*/ MetaSat& S, Vec<LLMap<GLit,Lit> >& m2s) {
+    Vec<Pair<uint,GLit> > roots(1, tuple(depth, w_root));
+    lutClausify(M, roots, initialized, S, m2s);
+    return m2s[depth][w_root]; }
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Constraint handling:
