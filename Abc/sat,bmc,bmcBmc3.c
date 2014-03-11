@@ -119,7 +119,7 @@ static inline int Saig_ManBmcSimInfoClear( unsigned * pInfo, Aig_Obj_t * pObj )
   Synopsis    [Returns the number of LIs with binary ternary info.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -142,7 +142,7 @@ int Saig_ManBmcTerSimCount01( Aig_Man_t * p, unsigned * pInfo )
   Synopsis    [Performs ternary simulation of one frame.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -184,7 +184,7 @@ unsigned * Saig_ManBmcTerSimOne( Aig_Man_t * p, unsigned * pPrev )
             Val0 = Saig_ManBmcSimInfoNot( Val0 );
         Saig_ManBmcSimInfoSet( pInfo, pObj, Val0 );
     }
-    return pInfo;    
+    return pInfo;
 }
 
 /**Function*************************************************************
@@ -192,7 +192,7 @@ unsigned * Saig_ManBmcTerSimOne( Aig_Man_t * p, unsigned * pPrev )
   Synopsis    [Collects internal nodes and PIs in the DFS order.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -221,7 +221,7 @@ Vec_Ptr_t * Saig_ManBmcTerSim( Aig_Man_t * p )
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -246,14 +246,14 @@ void Saig_ManBmcTerSimTest( Aig_Man_t * p )
   Synopsis    [Count the number of non-ternary per frame.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
 
 ***********************************************************************/
 int Saig_ManBmcCountNonternary_rec( Aig_Man_t * p, Aig_Obj_t * pObj, Vec_Ptr_t * vInfos, unsigned * pInfo, int f, int * pCounter )
-{ 
+{
     int Value = Saig_ManBmcSimInfoClear( pInfo, pObj );
     if ( Value == SAIG_TER_NON )
         return 0;
@@ -288,7 +288,7 @@ void Saig_ManBmcCountNonternary( Aig_Man_t * p, Vec_Ptr_t * vInfos, int iFrame )
   Synopsis    [Returns the number of POs with binary ternary info.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -337,7 +337,7 @@ void Saig_ManBmcTerSimTestPo( Aig_Man_t * p )
   Synopsis    [Collects internal nodes in the DFS order.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -362,7 +362,7 @@ void Saig_ManBmcDfs_rec( Aig_Man_t * p, Aig_Obj_t * pObj, Vec_Ptr_t * vNodes )
   Synopsis    [Collects internal nodes and PIs in the DFS order.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -384,7 +384,7 @@ Vec_Ptr_t * Saig_ManBmcDfsNodes( Aig_Man_t * p, Vec_Ptr_t * vRoots )
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -432,7 +432,7 @@ Vec_Vec_t * Saig_ManBmcSections( Aig_Man_t * p )
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -457,7 +457,7 @@ void Saig_ManBmcSectionsTest( Aig_Man_t * p )
   Synopsis    [Collects the supergate.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -481,7 +481,7 @@ void Saig_ManBmcSupergate_rec( Aig_Obj_t * pObj, Vec_Ptr_t * vSuper )
   Synopsis    [Collect the topmost supergate.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -515,7 +515,7 @@ Vec_Ptr_t * Saig_ManBmcSupergate( Aig_Man_t * p, int iPo )
   Synopsis    [Returns the number of nodes with ref counter more than 1.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -538,7 +538,7 @@ int Saig_ManBmcCountRefed( Aig_Man_t * p, Vec_Ptr_t * vSuper )
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -564,7 +564,7 @@ void Saig_ManBmcSupergateTest( Aig_Man_t * p )
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -649,7 +649,7 @@ void Saig_ManBmcWriteBlif( Aig_Man_t * p, Vec_Int_t * vMapping, char * pFileName
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -669,7 +669,7 @@ void Saig_ManBmcMappingTest( Aig_Man_t * p )
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -700,7 +700,7 @@ Vec_Int_t * Saig_ManBmcComputeMappingRefs( Aig_Man_t * p, Vec_Int_t * vMap )
   Synopsis    [Create manager.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -738,7 +738,7 @@ Gia_ManBmc_t * Saig_Bmc3ManStart( Aig_Man_t * pAig, int nTimeOutOne )
     p->pSat     = sat_solver_new();
     sat_solver_setnvars( p->pSat, 1000 );
     Cnf_ReadMsops( &p->pSopSizes, &p->pSops );
-    // terminary simulation 
+    // terminary simulation
     p->nWordNum = Abc_BitWordNum( 2 * Aig_ManObjNumMax(pAig) );
     // hash table
     p->vData = Vec_IntAlloc( 5 * 10000 );
@@ -759,7 +759,7 @@ Gia_ManBmc_t * Saig_Bmc3ManStart( Aig_Man_t * pAig, int nTimeOutOne )
   Synopsis    [Delete manager.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -770,10 +770,10 @@ void Saig_Bmc3ManStop( Gia_ManBmc_t * p )
     if ( p->pPars->fVerbose )
     {
         int nUsedVars = sat_solver_count_usedvars(p->pSat);
-        Abc_Print( 1, "LStart(P) = %d  LDelta(Q) = %d  LRatio(R) = %d  ReduceDB = %d  Vars = %d  Used = %d (%.2f %%)\n", 
-            p->pSat->nLearntStart, p->pSat->nLearntDelta, p->pSat->nLearntRatio, 
+        Abc_Print( 1, "LStart(P) = %d  LDelta(Q) = %d  LRatio(R) = %d  ReduceDB = %d  Vars = %d  Used = %d (%.2f %%)\n",
+            p->pSat->nLearntStart, p->pSat->nLearntDelta, p->pSat->nLearntRatio,
             p->pSat->nDBreduces, p->pSat->size, nUsedVars, 100.0*nUsedVars/p->pSat->size );
-        Abc_Print( 1, "Buffs = %d. Dups = %d.   Hash hits = %d.  Hash misses = %d.  UniProps = %d.\n", 
+        Abc_Print( 1, "Buffs = %d. Dups = %d.   Hash hits = %d.  Hash misses = %d.  UniProps = %d.\n",
             p->nBufNum, p->nDupNum, p->nHashHit, p->nHashMiss, p->nUniProps );
     }
 //    Aig_ManCleanMarkA( p->pAig );
@@ -808,7 +808,7 @@ void Saig_Bmc3ManStop( Gia_ManBmc_t * p )
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -826,7 +826,7 @@ static inline int * Saig_ManBmcMapping( Gia_ManBmc_t * p, Aig_Obj_t * pObj )
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -849,7 +849,7 @@ static inline int Saig_ManBmcLiteral( Gia_ManBmc_t * p, Aig_Obj_t * pObj, int iF
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -878,7 +878,7 @@ static inline int Saig_ManBmcSetLiteral( Gia_ManBmc_t * p, Aig_Obj_t * pObj, int
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -913,7 +913,7 @@ static inline int Saig_ManBmcCofEqual( int t, int v )
   Synopsis    [Derives CNF for one node.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -946,7 +946,7 @@ static inline int Saig_ManBmcReduceTruth( int uTruth, int Lits[] )
   Synopsis    [Derives CNF for one node.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -992,7 +992,7 @@ static inline void Saig_ManBmcAddClauses( Gia_ManBmc_t * p, int uTruth, int Lits
   Synopsis    [Derives CNF for one node.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -1004,7 +1004,7 @@ int Saig_ManBmcCreateCnf_rec( Gia_ManBmc_t * p, Aig_Obj_t * pObj, int iFrame )
     int * pMapping, i, iLit, Lits[5], uTruth;
     iLit = Saig_ManBmcLiteral( p, pObj, iFrame );
     if ( iLit != ~0 )
-        return iLit; 
+        return iLit;
     assert( iFrame >= 0 );
     if ( Aig_ObjIsCi(pObj) )
     {
@@ -1044,7 +1044,7 @@ int Saig_ManBmcCreateCnf_rec( Gia_ManBmc_t * p, Aig_Obj_t * pObj, int iFrame )
         iLit = Abc_LitNotCond( Lits[0], uTruth == 0x5555 );
         p->nBufNum++;
     }
-    else 
+    else
     {
         int iEntry, iRes;
         int fCompl = (uTruth & 1);
@@ -1119,7 +1119,7 @@ void Saig_ManBmcCreateCnf_iter( Gia_ManBmc_t * p, Aig_Obj_t * pObj, int iFrame, 
   Synopsis    [Recursively performs terminary simulation.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -1194,7 +1194,7 @@ int Saig_ManBmcRunTerSim_rec( Gia_ManBmc_t * p, Aig_Obj_t * pObj, int iFrame )
   Synopsis    [Derives CNF for one node.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -1241,7 +1241,7 @@ int Saig_ManBmcCreateCnf( Gia_ManBmc_t * p, Aig_Obj_t * pObj, int iFrame )
   Synopsis    [Procedure used for sorting the nodes in decreasing order of levels.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -1252,14 +1252,14 @@ int Aig_NodeCompareRefsIncrease( Aig_Obj_t ** pp1, Aig_Obj_t ** pp2 )
     int Diff = Aig_ObjRefs(*pp1) - Aig_ObjRefs(*pp2);
     if ( Diff < 0 )
         return -1;
-    if ( Diff > 0 ) 
+    if ( Diff > 0 )
         return 1;
     Diff = Aig_ObjId(*pp1) - Aig_ObjId(*pp2);
     if ( Diff < 0 )
         return -1;
-    if ( Diff > 0 ) 
+    if ( Diff > 0 )
         return 1;
-    return 0; 
+    return 0;
 }
 
 /**Function*************************************************************
@@ -1267,7 +1267,7 @@ int Aig_NodeCompareRefsIncrease( Aig_Obj_t ** pp1, Aig_Obj_t ** pp2 )
   Synopsis    [This procedure sets default parameters.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -1276,8 +1276,8 @@ int Aig_NodeCompareRefsIncrease( Aig_Obj_t ** pp1, Aig_Obj_t ** pp2 )
 void Saig_ParBmcSetDefaultParams( Saig_ParBmc_t * p )
 {
     memset( p, 0, sizeof(Saig_ParBmc_t) );
-    p->nStart         =     0;    // maximum number of timeframes 
-    p->nFramesMax     =     0;    // maximum number of timeframes 
+    p->nStart         =     0;    // maximum number of timeframes
+    p->nFramesMax     =     0;    // maximum number of timeframes
     p->nConfLimit     =     0;    // maximum number of conflicts at a node
     p->nConfLimitJump =     0;    // maximum number of conflicts after jumping
     p->nFramesJump    =     0;    // the number of tiemframes to jump
@@ -1289,8 +1289,8 @@ void Saig_ParBmcSetDefaultParams( Saig_ParBmc_t * p )
     p->nLearnedStart  = 10000;    // starting learned clause limit
     p->nLearnedDelta  =  2000;    // delta of learned clause limit
     p->nLearnedPerce  =    80;    // ratio of learned clause limit
-    p->fVerbose       =     0;    // verbose 
-    p->fNotVerbose    =     0;    // skip line-by-line print-out 
+    p->fVerbose       =     0;    // verbose
+    p->fNotVerbose    =     0;    // skip line-by-line print-out
     p->iFrame         =    -1;    // explored up to this frame
     p->nFailOuts      =     0;    // the number of failed outputs
     p->nDropOuts      =     0;    // the number of timed out outputs
@@ -1302,7 +1302,7 @@ void Saig_ParBmcSetDefaultParams( Saig_ParBmc_t * p )
   Synopsis    [Returns time to stop.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -1326,7 +1326,7 @@ abctime Saig_ManBmcTimeToStop( Saig_ParBmc_t * pPars, abctime nTimeToStopNG )
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -1373,7 +1373,7 @@ int Saig_ManCallSolver( Gia_ManBmc_t * p, int Lit )
   Synopsis    [Bounded model checking engine.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -1408,12 +1408,12 @@ int Saig_ManBmcScalable( Aig_Man_t * pAig, Saig_ParBmc_t * pPars )
         p->vCexes = Vec_PtrStart( Saig_ManPoNum(pAig) );
     if ( pPars->fVerbose )
     {
-        Abc_Print( 1, "Running \"bmc3\". PI/PO/Reg = %d/%d/%d. And =%7d. Lev =%6d. ObjNums =%6d.\n",// Sect =%3d.\n", 
+        Abc_Print( 1, "Running \"bmc3\". PI/PO/Reg = %d/%d/%d. And =%7d. Lev =%6d. ObjNums =%6d.\n",// Sect =%3d.\n",
             Saig_ManPiNum(pAig), Saig_ManPoNum(pAig), Saig_ManRegNum(pAig),
             Aig_ManNodeNum(pAig), Aig_ManLevelNum(pAig), p->nObjNums );//, Vec_VecSize(p->vSects) );
-        Abc_Print( 1, "Params: FramesMax = %d. Start = %d. ConfLimit = %d. TimeOut = %d. SolveAll = %d.\n", 
+        Abc_Print( 1, "Params: FramesMax = %d. Start = %d. ConfLimit = %d. TimeOut = %d. SolveAll = %d.\n",
             pPars->nFramesMax, pPars->nStart, pPars->nConfLimit, pPars->nTimeOut, pPars->fSolveAll );
-    } 
+    }
     pPars->nFramesMax = pPars->nFramesMax ? pPars->nFramesMax : ABC_INFINITY;
     // set runtime limit
     if ( nTimeToStop )
@@ -1449,7 +1449,7 @@ int Saig_ManBmcScalable( Aig_Man_t * pAig, Saig_ParBmc_t * pPars )
             int iFrameOld = f - 2*Vec_VecSize( p->vSects );
             void * pMemory = Vec_IntReleaseArray( Vec_PtrEntry(p->vId2Var, iFrameOld) );
             ABC_FREE( pMemory );
-        } 
+        }
 */
         // prepare some nodes
         Saig_ManBmcSetLiteral( p, Aig_ManConst1(pAig), f, 1 );
@@ -1498,7 +1498,7 @@ clkOther += Abc_Clock() - clk2;
             }
         }
         // solve SAT
-        clk = Abc_Clock(); 
+        clk = Abc_Clock();
         Saig_ManForEachPo( pAig, pObj, i )
         {
             if ( i >= Saig_ManPoNum(pAig) )
@@ -1599,7 +1599,7 @@ nTimeSat += Abc_Clock() - clk2;
                 }
                 pPars->nFailOuts++;
                 if ( !pPars->fNotVerbose )
-                    Abc_Print( 1, "Output %*d was asserted in frame %2d (solved %*d out of %*d outputs).\n",  
+                    Abc_Print( 1, "Output %*d was asserted in frame %2d (solved %*d out of %*d outputs).\n",
                         nOutDigits, i, f, nOutDigits, pPars->nFailOuts, nOutDigits, Saig_ManPoNum(pAig) );
                 if ( p->vCexes == NULL )
                     p->vCexes = Vec_PtrStart( Saig_ManPoNum(pAig) );
@@ -1644,14 +1644,14 @@ nTimeSat += Abc_Clock() - clk2;
                             nOutDigits, k, f, nOutDigits, pPars->nFailOuts, nOutDigits, Saig_ManPoNum(pAig) );
                     // report to the bridge
                     if ( p->pPars->fUseBridge )
-                        Gia_ManToBridgeResult( stdout, 0, pCexNew0, pCexNew0->iPo );
+                        Gia_ManToBridgeResult( stdout, 0, pCexNew0, /*pCexNew0->iPo*/k );
                     // remember solved output
                     Vec_PtrWriteEntry( p->vCexes, k, Abc_CexDup(pCexNew, Saig_ManRegNum(pAig)) );
                 }
                 Abc_CexFreeP( &pCexNew0 );
                 Abc_CexFree( pCexNew );
             }
-            else 
+            else
             {
 nTimeUndec += Abc_Clock() - clk2;
                 assert( status == l_Undef );
@@ -1666,7 +1666,7 @@ nTimeUndec += Abc_Clock() - clk2;
                     goto finish;
             }
         }
-        if ( pPars->fVerbose ) 
+        if ( pPars->fVerbose )
         {
             if ( fFirst == 1 && f > 0 && p->pSat->stats.conflicts > 1 )
             {
@@ -1726,4 +1726,3 @@ finish:
 
 
 ABC_NAMESPACE_IMPL_END
-
