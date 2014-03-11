@@ -251,13 +251,13 @@ void Gia_ManFromBridgeUnknown( FILE * pFile, int iPoUnknown )
     Gia_AigerWriteUnsignedFile( pFile, iPoUnknown ); // number of the property (Armin's encoding)
     fflush(pFile);
 }
-void Gia_ManFromBridgeCex( FILE * pFile, Abc_Cex_t * pCex )
+void Gia_ManFromBridgeCex( FILE * pFile, Abc_Cex_t * pCex, int iPoProved )
 {
     int i, f, iBit;//, RetValue;
     Vec_Str_t * vStr = Vec_StrAlloc( 1000 );
     Vec_StrPush( vStr, (char)BRIDGE_VALUE_0 ); // false
     Vec_StrPush( vStr, (char)1 ); // size of vector (Armin's encoding)
-    Gia_AigerWriteUnsigned( vStr, pCex->iPo ); // number of the property (Armin's encoding)
+    Gia_AigerWriteUnsigned( vStr, iPoProved ); // number of the property (Armin's encoding)
     Vec_StrPush( vStr, (char)1 ); // size of vector (Armin's encoding)
     Gia_AigerWriteUnsigned( vStr, pCex->iFrame ); // depth
 
@@ -284,7 +284,7 @@ void Gia_ManFromBridgeCex( FILE * pFile, Abc_Cex_t * pCex )
 int Gia_ManToBridgeResult( FILE * pFile, int Result, Abc_Cex_t * pCex, int iPoProved )
 {
     if ( Result == 0 ) // sat
-        Gia_ManFromBridgeCex( pFile, pCex );
+        Gia_ManFromBridgeCex( pFile, pCex, iPoProved );
     else if ( Result == 1 ) // unsat
         Gia_ManFromBridgeHolds( pFile, iPoProved );
     else if ( Result == -1 ) // undef
