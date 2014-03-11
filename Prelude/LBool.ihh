@@ -57,10 +57,10 @@ inline char  name      (lbool l)     { static char name[4] = {'?','!','0','1'}; 
 
 //#if defined(ZZ_CONSTANTS_AS_MACROS)
 #if 0   // -- clashes with public version of MiniSat 2.2
-#define l_Undef (ZZ::lbool_new(0))
-#define l_Error (ZZ::lbool_new(1))
-#define l_False (ZZ::lbool_new(2))
-#define l_True  (ZZ::lbool_new(3))
+#define l_Undef lbool_new(0)
+#define l_Error lbool_new(1)
+#define l_False lbool_new(2)
+#define l_True  lbool_new(3)
     // -- polluting macro name space, but unfortunatelly needed for efficiency
 #else
 static const lbool l_Undef = lbool_new(0);

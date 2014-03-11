@@ -78,8 +78,8 @@ template<> fts_macro uint64 hash_<Connect>(const Connect& c) {
 
 // Special connects:
 #if defined(ZZ_CONSTANTS_AS_MACROS)
-    #define Connect_NULL  (Connect())
-    #define Connect_ERROR (Connect(Wire_ERROR, UINT_MAX))
+    #define Connect_NULL  Connect()
+    #define Connect_ERROR Connect(::ZZ::Wire_ERROR, UINT_MAX)
 #else
     static const Connect Connect_NULL  = Connect();
     static const Connect Connect_ERROR = Connect(Wire_ERROR, UINT_MAX);

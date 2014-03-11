@@ -81,8 +81,8 @@ macro void swp(Lit& p, Lit& q){ Lit tmp = p; p = q; q = tmp; }
 
 #if defined(ZZ_CONSTANTS_AS_MACROS)
     #define id_MAX   0x7FFFFFFFu
-    #define Lit_MAX  ::ZZ::Lit(id_MAX, false)
-    #define Lit_NULL ::ZZ::Lit()
+    #define Lit_MAX  Lit(id_MAX, false)
+    #define Lit_NULL Lit()
 #else
     static const uint id_MAX  = 0x7FFFFFFFu;
     static const Lit  Lit_MAX = Lit(id_MAX, false);

@@ -244,7 +244,7 @@ lbool imcStd_(NetlistRef           N0,
                 d = 0;
 
                 //**/static uint64 seed = 42; const_cast<SatPfl&>(imc.solver()).randomizeVarOrder(seed); WriteLn "<randomized variable order>";
-                /**/const_cast<SatPfl&>(imc.solver()).clearLearnts(); WriteLn "<cleared learned clauses>";
+                /**/const_cast<SatPfl&>(imc.solver()).clearLearnts(); if (!P.quiet) WriteLn "<cleared learned clauses>";
             }
 
         }else if (s == Wire_ERROR){

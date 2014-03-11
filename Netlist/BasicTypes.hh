@@ -78,13 +78,13 @@ enum {
 };
 
 #if defined(ZZ_CONSTANTS_AS_MACROS)
-    #define glit_NULL      ::ZZ::GLit(gid_NULL    , false)
-    #define glit_ERROR     ::ZZ::GLit(gid_ERROR   , false)
-    #define glit_Unbound   ::ZZ::GLit(gid_Unbound , false)
-    #define glit_Conflict  ::ZZ::GLit(gid_Conflict, false)
-    #define glit_False     ::ZZ::GLit(gid_False   , false)
-    #define glit_True      ::ZZ::GLit(gid_True    , false)
-    #define glit_MAX       ::ZZ::GLit(gid_MAX     , false)
+    #define glit_NULL      GLit(::ZZ::gid_NULL    , false)
+    #define glit_ERROR     GLit(::ZZ::gid_ERROR   , false)
+    #define glit_Unbound   GLit(::ZZ::gid_Unbound , false)
+    #define glit_Conflict  GLit(::ZZ::gid_Conflict, false)
+    #define glit_False     GLit(::ZZ::gid_False   , false)
+    #define glit_True      GLit(::ZZ::gid_True    , false)
+    #define glit_MAX       GLit(::ZZ::gid_MAX     , false)
 #else
     static const GLit glit_NULL     = GLit(gid_NULL    , false);
     static const GLit glit_ERROR    = GLit(gid_ERROR   , false);

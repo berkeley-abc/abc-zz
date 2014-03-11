@@ -145,10 +145,10 @@ struct PobCondDisposer {
 #define Has_Pob(N, obj_name) (!static_cast<Pec&>(regpob_##obj_name.get(N)).null())
 #define Remove_Pob(N, obj_name) N.removePob(regpob_##obj_name.get(N))
 
-#define Get_Pob2(   N, obj_name, var_name) PecType_of_object_##obj_name& var_name ___unused = regpob_##obj_name.get(N); assert(!var_name.Pec::null());
-#define Add_Pob2(   N, obj_name, var_name) PecType_of_object_##obj_name& var_name ___unused = regpob_##obj_name.add(N);
-#define Assure_Pob2(N, obj_name, var_name) PecType_of_object_##obj_name& var_name ___unused = regpob_##obj_name.assure(N);
-#define Get_PobText(N, obj_name, var_name) PecType_of_object_##obj_name& var_name ___unused = regpob_##obj_name.get(N)
+#define Get_Pob2(   N, obj_name, var_name) PecType_of_object_##obj_name& var_name ___unused = ::ZZ::regpob_##obj_name.get(N); assert(!var_name.Pec::null());
+#define Add_Pob2(   N, obj_name, var_name) PecType_of_object_##obj_name& var_name ___unused = ::ZZ::regpob_##obj_name.add(N);
+#define Assure_Pob2(N, obj_name, var_name) PecType_of_object_##obj_name& var_name ___unused = ::ZZ::regpob_##obj_name.assure(N);
+#define Get_PobText(N, obj_name, var_name) PecType_of_object_##obj_name& var_name ___unused = ::ZZ::regpob_##obj_name.get(N)
     // -- last macro is for internal use in other macros
 
 #define Scoped_Pob2(N, obj_name, var_name) \

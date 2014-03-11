@@ -176,8 +176,8 @@ template<> fts_macro uint64 hash_<Wire>(const Wire& w) { return w.hash(); }
 
 // Special wires:
 #if defined(ZZ_CONSTANTS_AS_MACROS)
-    #define Wire_NULL  (Wire(nid_NULL, gid_NULL))
-    #define Wire_ERROR (Wire(nid_NULL, gid_ERROR))
+    #define Wire_NULL  Wire(::ZZ::nid_NULL, ::ZZ::gid_NULL)
+    #define Wire_ERROR Wire(::ZZ::nid_NULL, ::ZZ::gid_ERROR)
     // -- NOTE! For speed reasons, the netlist ID part is ignored in the wire comparison operators
     // and multiple representations of these two wires are used (differing in the netlist ID part).
     // For that reason, it is illegal to ask 'nl(w)' if 'w' is "null" or "error".

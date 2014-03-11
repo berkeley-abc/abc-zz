@@ -41,16 +41,16 @@
 // NOTE! 'netlist' and 'type' are used as expressions, but 'w' as a name.
 //
 #define For_Gatetype(netlist, type, w)                                     \
-    if (NetlistRef N__##w = NetlistRef()); else                            \
+    if (::ZZ::NetlistRef N__##w = ::ZZ::NetlistRef()); else                \
     if (N__##w = (netlist), false); else                                   \
     if (uind i__##w = 0); else                                             \
     if (uint off__##w = 0); else                                           \
-    if (Wire w = Wire_NULL); else                                          \
-    if (NetlistRef::GateBlock B__##w = NetlistRef::GateBlock()); else      \
+    if (::ZZ::Wire w = ::ZZ::Wire_NULL); else                              \
+    if (::ZZ::NetlistRef::GateBlock B__##w = ::ZZ::NetlistRef::GateBlock()); else \
     for (i__##w = 0; i__##w < N__##w.nGateBlocks(type); i__##w++)          \
         if (B__##w = N__##w.gateBlock(type, i__##w), false); else          \
         for (off__##w = 0; off__##w < B__##w.end; off__##w = B__##w.next(off__##w)) \
-            if (B__##w.base[off__##w] == glit_NULL || (w = N__##w[B__##w.base[off__##w]], false)); else
+            if (B__##w.base[off__##w] == ::ZZ::glit_NULL || (w = N__##w[B__##w.base[off__##w]], false)); else
 
 
 // Iterate over all non-NULL inputs of a given gate 'wire'.
