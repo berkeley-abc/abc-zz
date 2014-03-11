@@ -22,6 +22,7 @@
 #include "ZZ/Generics/Sort.hh"
 #include "Abstraction.hh"
 #include "Bmc.hh"
+#include "MultiBmc.hh"
 #include "Imc.hh"
 #include "Pdr.hh"
 #include "Treb.hh"
@@ -914,6 +915,10 @@ int main(int argc, char** argv)
 
     cli.addCommand("bmc", "Bounded model checking", &cli_bmc);
 
+    // Command line -- Multi-BMC:
+    CLI cli_multi_bmc;
+    cli.addCommand("multi-bmc", "Multi-property bounded model checking", &cli_multi_bmc);
+
     // Command line -- ping-pong interpolation:
     cli.addCommand("pp" , "Experimental interpolation based MC.");
 
@@ -1443,6 +1448,11 @@ int main(int argc, char** argv)
         lbool result = bmc(N, props, P, &cex, &bug_free_depth, &cb);
 
         outputVerificationResult(N, props, result, &cex, orig_num_pis, NetlistRef(), bug_free_depth, false, output, quiet, T0, Tr0);
+
+    }else if (cli.cmd == "multi-bmc"){
+        Params_MultiBmc P;
+        multiBmc(N, P);
+        // <<== output result etc.
 
     }else if (cli.cmd == "imc"){
         Params_ImcStd P;
