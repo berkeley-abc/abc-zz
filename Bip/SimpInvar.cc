@@ -324,6 +324,8 @@ struct SizeLt {
 // to state variable 0 of 'N', no matter what gate id (and thus 'GLit') that gate has.
 void simpInvariant(NetlistRef N0, const Vec<Wire>& props, Vec<Vec<Lit> >& invar, String output_filename, bool fast)
 {
+    double T0 = cpuTime();
+
     // Consistency check:
     IntZet<uint> flop_nums;
     For_Gatetype(N0, gate_Flop, w)
@@ -429,7 +431,7 @@ void simpInvariant(NetlistRef N0, const Vec<Wire>& props, Vec<Vec<Lit> >& invar,
         WriteLn "Wrote: \a*%_\a*", output_filename;
     }
 
-    WriteLn "CPU time: %t", cpuTime();
+    WriteLn "CPU time: %t", cpuTime() - T0;
 
     // remove clauses, prefering clauses with rare literals
     // removing literals

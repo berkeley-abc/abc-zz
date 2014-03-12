@@ -641,7 +641,7 @@ void outputVerificationResult(
                 if (!result2){
                     Write "\a*\a/Invariant INCORRECT\a0 (%.2f s): ", T_check;
                     if      (failed_prop == VINV_not_inductive) WriteLn "Not inductive!";
-                    else if (failed_prop == VINV_not_initial)   WriteLn "Does not imply initial states!";
+                    else if (failed_prop == VINV_not_initial)   WriteLn "Is not implied by initial states!";
                     else                                        WriteLn "Does not imply property %_", attr_PO(props[failed_prop]).number;
                 }else
                     WriteLn "Invariant checked and found correct (%.2f s)", T_check;

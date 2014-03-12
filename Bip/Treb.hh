@@ -48,12 +48,13 @@ struct Params_Treb {
     bool    abc_refinement;     // Use ABC to refine 
     bool    sort_pob_size;      // Sort proof-obligations on size instead of priority.
     uint    pre_cubes;          // Size of pre-image.
-    float   orbits;             // How many orbits should 'generlize()' try?
+    float   orbits;             // How many orbits should 'generalize()' try?
     bool    gen_with_cex;       // Store counterexamples in 'generalize()' to speedup multiple orbits.
     bool    hq;                 // High quality generalization (slower)
     bool    redund_cubes;       // Store cubes of F[n] at flop output of F[n-1] as well.
     uint    dump_invar;         // Dump invariant (0=no, 1=clauses, 2=PLA).
     SolverType sat_solver;      // SAT-solver to use
+    uint    simp_invar;         // 0=no simplification, 1=fast simplification, 2=full simplification
     bool    quiet;              // Suppress output.
     bool    par_send_result;    // If FALSE; CEX or unsat result is not reported in PAR mode.
     bool    par_send_invar;     // If TRUE, invariant is reported (as clauses) in PAR mode.
@@ -82,6 +83,7 @@ struct Params_Treb {
         redund_cubes(false),
         dump_invar(0),
         sat_solver(sat_Msc),
+        simp_invar(0),
         quiet(false),
         par_send_result(true),
         par_send_invar(false)

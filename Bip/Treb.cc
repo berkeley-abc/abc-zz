@@ -24,6 +24,7 @@
 //*ABC*/#include "ZZ_AbcInterface.hh"
 #include "TrebSat.hh"
 #include "ParClient.hh"
+#include "SimpInvar.hh"
 
 #define PDR_REFINEMENT
 
@@ -168,6 +169,7 @@ class Treb {
     //  Counterexample/Invariant Extraction:
     void    extractCex(ProofObl po, Cex& cex);
     uint    invariantSize();
+    void    simplifyInvariant();
     void    storeInvariant(NetlistRef N_invar);
     void    sendInvariant();
     void    dumpInvar();
@@ -619,6 +621,46 @@ uint Treb::invariantSize()
         size += F[d].size();
 
     return size;
+}
+
+
+void Treb::simplifyInvariant()
+{
+    // Collect invariant:
+    Vec<GLit> ff;       // -- map from flop number to flop wire
+    Vec<Vec<Lit> > invar_clauses;
+    bool adding = false;
+    for (uint d = 1; d < F.size(); d++){
+        if (!adding){
+            if (F[d].size() == 0)
+                adding = true;
+        }else{
+            for (uint i = 0; i < F[d].size(); i++){
+                Cube c = F[d][i];
+
+                invar_clauses.push();
+                for (uint j = 0; j < c.size(); j++){
+                    Wire w = N[c[j]];
+                    int num = attr_Flop(w).number;
+                    ff(num) = +w;
+                    Lit p(num, !c[j].sign);
+                    invar_clauses[LAST].push(p);
+                }
+            }
+            F[d].clear();
+        }
+    }
+
+    // Simplify invariant: 
+    simpInvariant(N, props, invar_clauses, "", P.simp_invar == 1);
+
+    for (uint i = 0; i < invar_clauses.size(); i++){
+        Vec<Lit>& c = invar_clauses[i];
+        for (uint j = 0; j < c.size(); j++)
+            c[j] = ~ff[c[j].id] ^ c[j].sign;
+
+        F[LAST].push(Cube(c));   // -- add cube to F_inf
+    }
 }
 
 
@@ -1518,6 +1560,9 @@ bool Treb::run(Cex* cex_out, NetlistRef N_invar)
     initBmcNetlist(N0, props, N, true, n0_to_n);
     //**/N.write("N.gig"); WriteLn "Wrote: \a*N.gig\a*";
 
+    for (uint i = 0; i < props.size(); i++)
+        props[i] = n0_to_n[props[i]] ^ props[i];
+
     if (P.use_abstr && P.abc_refinement){
 //*ABC*/        gia = createGia(N, gia_nums);
 //*ABC*/        Rnm_ManStart(gia);
@@ -1671,6 +1716,7 @@ bool Treb::run(Cex* cex_out, NetlistRef N_invar)
                 if (propagateBlockedCubes()){     // -- move clauses to their highest provable depth (return TRUE if invariant found)
                     showProgress("final");
                     WriteLn "Inductive invariant found (%_ clauses).", invariantSize();
+                    if (P.simp_invar != 0) simplifyInvariant();
                     if (N_invar) storeInvariant(N_invar);
                     if (par && P.par_send_invar) sendInvariant();
                     dumpInvar();
@@ -1817,6 +1863,7 @@ void addCli_Treb(CLI& cli)
     cli.add("hq"        , "bool"     , P.hq?"yes":"no"              , "Use slow, high-quality generalization procedure.");
     cli.add("redund"    , "bool"     , P.redund_cubes?"yes":"no"    , "Store cubes of F[n] at flop output of F[n-1] as well.");
     cli.add("dump-invar", "int[0:2]" , (FMT "%_", P.dump_invar)     , "Dump invariant: 0=no, 1=clause form, 2=PLA form.");
+    cli.add("simp-invar", "int[0:2]" , (FMT "%_", P.dump_invar)     , "Simplify invariant if property proved.");
     cli.add("sat"       , sat_types  , sat_default                  , "SAT-solver to use.");
     cli.add("send-invar", "bool"     , P.par_send_invar?"yes":"no"  , "Send invariant through PAR interface (only in PAR mode).");
 }
@@ -1848,6 +1895,7 @@ void setParams(const CLI& cli, Params_Treb& P)
     P.hq            = cli.get("hq")        .bool_val;
     P.redund_cubes  = cli.get("redund")    .bool_val;
     P.dump_invar    = cli.get("dump-invar").int_val;
+    P.simp_invar    = cli.get("simp-invar").int_val;
     P.par_send_invar= cli.get("send-invar").bool_val;
 
     P.sat_solver = (cli.get("sat").enum_val == 0) ? sat_Zz :
