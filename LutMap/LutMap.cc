@@ -736,8 +736,7 @@ void LutMap::updateFanoutEst(bool instantiate)
     KeyHeap<GLit, false, InstOrder> ready(lt);
     For_Gates(N, w){
         if (isCO(w)){
-            ready.add(w);
-            /**/assert(w);
+            ready.add(w); assert(w);
             active(w) = true;
         }
     }
@@ -753,9 +752,7 @@ void LutMap::updateFanoutEst(bool instantiate)
                 Wire v = cut[i] + N;
                 area_est(v) = 0;
                 if (!active[v]){
-                    ready.add(v);
-                    /**/if (!(v)) Dump(w, w[0], w[1], w[2], w[3]);
-                    /**/assert(v);
+                    ready.add(v); assert(v);
                     active(v) = true;
                 }
             }
@@ -763,8 +760,7 @@ void LutMap::updateFanoutEst(bool instantiate)
         }else if (!isCI(w)){
             For_Inputs(w, v){
                 if (!active[v]){
-                    ready.add(v);
-                    /**/assert(v);
+                    ready.add(v); assert(v);
                     active(v) = true;
                 }
             }
@@ -1044,8 +1040,6 @@ void lutMap(Gig& N, Params_LutMap P, WMapX<GLit>* remap)
 
 void lutMap(Gig& N, const Vec<Params_LutMap>& Ps, WMapX<GLit>* remap)
 {
-    //**/For_Gates(N, w){ if (isLogicGate(w) || w == gate_PO) WriteLn "%f", w; }
-
     WMapX<GLit> xlat;
     xlat.initBuiltins();
     if (remap)
@@ -1061,8 +1055,11 @@ void lutMap(Gig& N, const Vec<Params_LutMap>& Ps, WMapX<GLit>* remap)
                 xlat.moveTo(*remap);
             else{
                 Vec<GLit>& v = remap->base();
-                for (uint i = gid_FirstUser; i < v.size(); i++)
+                for (uint i = gid_FirstUser; i < v.size(); i++){
+                    //**/Wire w = N_orig[i];
+                    //**/if (!isLogicGate(w) && v[i] && !xlat[v[i]]) WriteLn "LOST: %_ from %_ -> %_", w, v[i] + N_copy, xlat[v[i]];
                     v[i] = xlat[v[i]];
+                }
             }
         }
 

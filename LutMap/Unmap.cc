@@ -167,16 +167,41 @@ GLit build(Gig& N, const Vec<uchar>& prog, Vec<GLit>& nodes)
 #undef GET
 
 
+struct GigLis_Compact : GigLis {
+    WMapX<GLit>* remap;
+    GigLis_Compact(WMapX<GLit>* remap_) : remap(remap_) {}
+
+    virtual void compacting(const GigRemap& xlat) {
+        if (remap){
+            Vec<GLit>& rmap = remap->base();
+            for (gate_id i = 0; i < rmap.size(); i++){
+                rmap[i] = xlat(rmap[i]); }
+        }
+    }
+};
+
+
 // Unmap 6-LUT netlist while considering depth and sharing...
 // <<== add depth awareness
 // <<== add search when (a & b) and (a & c) both exists
 void unmap(Gig& N, WMapX<GLit>* remap)
 {
     assert(!N.is_frozen);
+
+    if (remap){
+        for (uint i = 0; i < N.size(); i++)
+            (*remap)(GLit(i)) = GLit(i);
+    }
+
+    GigLis_Compact lis(remap);
+    N.listen(lis, msg_Compact);
+
     N.compact();
     N.is_frozen = false;
 
     N.strash();
+
+    N.unlisten(lis, msg_Compact);
 
     Params_Dsd P;
     P.use_kary = true;
@@ -207,8 +232,11 @@ void unmap(Gig& N, WMapX<GLit>* remap)
         }
     }
 
-    if (remap)
-        xlat.moveTo(*remap);
+    if (remap){
+        Vec<GLit>& rmap = remap->base();
+        for (uint i = 0; i < rmap.size(); i++)
+            rmap[i] = xlat[rmap[i]];
+    }
 }
 
 

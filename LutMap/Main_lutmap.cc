@@ -565,6 +565,24 @@ int main(int argc, char** argv)
                 protectors.push(N.add(gate_PO).init(w).num());
     }
 
+#if 0   /*DEBUG*/
+{
+    uint n_fixes = 0;
+    For_Gates(N, w){
+        if (w != gate_Box) continue;
+
+        For_Inputs(w, v){
+            if (v != gate_Seq){
+                w.set(Iter_Var(v), N.add(gate_Seq).init(v));
+                n_fixes++;
+            }
+        }
+    }
+    if (n_fixes > 0)
+        WriteLn "Fixed %_ Box/Seq problems", n_fixes;
+}
+#endif  /*END DEBUG*/
+
     double T1 = cpuTime();
     WriteLn "Parsing: %t", T1-T0;
     Write "Input: %_", info(N);
@@ -617,6 +635,7 @@ int main(int argc, char** argv)
         N.copyTo(N_orig);
 
         lutMap(N, Ps, &remap);
+        /**/For_Gates(N_orig, w){ if (!isLogicGate(w)) if (!(+remap[w])){ Dump(w); assert(false); } }
 
         if (cli.get("sig").enum_val == 2){      // -- 2 == 'pos' (no negative literals)
             double T0 = cpuTime();
