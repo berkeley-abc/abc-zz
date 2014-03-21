@@ -73,13 +73,14 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
         Wire w0 = N0[order[i]];
         if (!seen.has(w0)) continue;
         Wire w;
-#if 1   /*DEBUG*/
+
+      #if 1   /*DEBUG*/
         for (uint j = 0; j < w0.size(); j++){
             if (!+w0[j]){
                 WriteLn "%n is missing input %_", w0, j;
             }
         }
-#endif  /*END DEBUG*/
+      #endif  /*END DEBUG*/
 
         if (type(w0) == gate_PI)
             w = N.add(PI_(attr_PI(w0).number));
@@ -164,6 +165,7 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
             assert(type(props[i]) == gate_PO);
             conj = s_And(conj, xlat[props[i][0]] ^ sign(props[i][0]) ^ sign(props[i])); }
         init_bad(1) = N.add(PO_(), s_And(~conj, ~w_cfail));
+        //**/Dump(props[0], props[0][0], init_bad[1]);
 
         // Add singleton 'properties' for compatibility:
         Assure_Pob(N, properties);

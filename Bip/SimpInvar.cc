@@ -219,7 +219,6 @@ bool SI_Check::tryRemoveCla(uint cl_num)
     if (cl_num == UINT_MAX){
         // Only need to check initial states for original hypothesis (removing a clause will only make the problem more UNSAT):
         if (!invarCoversInit()){
-            /**/Ping;
             return false; }
     }
 
@@ -230,7 +229,6 @@ bool SI_Check::tryRemoveCla(uint cl_num)
     assumps.push(~fail[LAST]);
 
     if (S.solve(assumps) == l_True){
-        /**/Ping;
         return false;
     }else{
         if (cl_num != UINT_MAX){

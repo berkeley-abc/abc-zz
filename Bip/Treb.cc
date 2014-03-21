@@ -1561,8 +1561,15 @@ bool Treb::run(Cex* cex_out, NetlistRef N_invar)
     initBmcNetlist(N0, props, N, true, n0_to_n);
     //**/N.write("N.gig"); WriteLn "Wrote: \a*N.gig\a*";
 
-    for (uint i = 0; i < props.size(); i++)
-        props[i] = n0_to_n[props[i]] ^ props[i];
+    // Translate properties (new):
+    for (uint i = 0; i < props.size(); i++){
+        int num = attr_PO(props[i]).number;
+        For_Gatetype(N, gate_PO, w){
+            if (attr_PO(w).number == num){
+                props[i] = w ^ sign(props[i]);
+                break; }
+        }
+    }
 
     if (P.use_abstr && P.abc_refinement){
 //*ABC*/        gia = createGia(N, gia_nums);

@@ -121,7 +121,12 @@ void shrinkAig(NetlistRef N, NetlistRef M, uint64& seed)
 int run(NetlistRef N, String script, String filename, uint timeout)
 {
     renumber(N);
-    bool ok = writeAigerFile(filename, N); assert(ok);
+    if (hasExtension(filename, "aig")){
+        bool ok = writeAigerFile(filename, N); assert(ok);
+    }else if (hasExtension(filename, "gig")){
+        N.write(filename);
+    }else
+        assert(false);
 
     String cmd = (FMT "rm -f __shrink.out; ulimit -t %_; %_ %_ > __shrink.out 2> __shrink.err", timeout, script, filename);
     //**/WriteLn "Command: %_", cmd;
@@ -168,13 +173,22 @@ int main(int argc, char** argv)
     // Read input AIGER:
     Netlist N;
     try{
-        readAigerFile(input, N);
+        if (hasExtension(input, "aig"))
+            readAigerFile(input, N);
+        else if (hasExtension(input, "gig"))
+            N.read(input);
+        else{
+            ShoutLn "Unknown input format.";
+            exit(1);
+        }
     }catch (Excp_Msg err){
         ShoutLn "ERROR! %_", err;
         exit(1);
     }
     WriteLn "Read: \a*%_\a* -- %_", input, info(N);
     WriteLn "Seed: %_", seed;
+
+    bool is_aiger = hasExtension(input, "aig");
 
     // Give user a way to stop shrinking:
     WriteLn "\n    \a*kill -1 %d\a*\n", getpid();
@@ -184,7 +198,7 @@ int main(int argc, char** argv)
     int ignore ___unused = system("chmod +x kill_shrink.sh");
 
     // Run shrink:
-    int valid_exitcode = run(N, script, "shrunken.aig", timeout);
+    int valid_exitcode = run(N, script, is_aiger ? "shrunken.aig" : "shrunken.gig", timeout);
     if (valid_exitcode == INT_MIN){
         WriteLn "Timeout set too low; could not run script on original file.";
         exit(1); }
@@ -201,17 +215,20 @@ int main(int argc, char** argv)
             shrinkAig<true>(N, M, seed);
         else
             shrinkAig<false>(N, M, seed);
-        int ret = run(M, script, "shrunken.aig", timeout);
+        int ret = run(M, script, is_aiger ? "shrunken.aig" : "shrunken.gig", timeout);
         n_tries++;
         if (ret == valid_exitcode){
             n_successes++;
             N.clear();
-            readAigerFile("shrunken.aig", N);
+            if (is_aiger)
+                readAigerFile("shrunken.aig", N);
+            else
+                N.read("shrunken.gig");
             n_shrinks++;
 
-            if (fileSize("best.aig") != UINT64_MAX){
-                int ret1 ___unused = system("mv -f best.aig best1.aig"); }
-            int ret2 ___unused = system("mv -f shrunken.aig best.aig");
+            if (fileSize(is_aiger ? "best.aig" : "best.gig") != UINT64_MAX){
+                int ret1 ___unused = is_aiger ? system("mv -f best.aig best1.aig") : system("mv -f best.gig best1.gig"); }
+            int ret2 ___unused = is_aiger ? system("mv -f shrunken.aig best.aig") : system("mv -f shrunken.gig best.gig");
         }else if (ret == INT_MIN)
             n_timeouts++;
         else
