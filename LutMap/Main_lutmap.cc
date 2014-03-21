@@ -447,6 +447,7 @@ int main(int argc, char** argv)
     cli.add("sig"    , "{off,full,pos}","off", "Map with signal tracking? (\"full\" includes negative literals).");
     cli.add("remap"  , "string", ""          , "Write signal mapping to this file (requires 'sig' to be set).");
     cli.add("verif"  , "bool"  , "no"        , "Signal tracking verification -- output files for equivalence checking.");
+    cli.add("unmap"  , "bool"  , "no"        , "Unmap final mapped design.");
     cli.parseCmdLine(argc, argv);
 
     String input  = cli.get("input").string_val;
@@ -454,14 +455,15 @@ int main(int argc, char** argv)
     String blif   = cli.get("blif").string_val;
     String pnl    = cli.get("pnl").string_val;
     Params_LutMap P;
-    P.cuts_per_node = cli.get("N").int_val;
-    P.n_rounds      = cli.get("iters").int_val;
-    P.delay_factor  = cli.get("df").float_val;
-    P.map_for_delay = cli.get("dopt").bool_val;
-    P.recycle_cuts  = cli.get("recycle").bool_val;
-    P.use_ela       = cli.get("ela").bool_val;
-    P.reprio        = cli.get("reprio").bool_val;
-    P.use_fmux      = cli.get("fmux").bool_val;
+    P.cuts_per_node  = cli.get("N").int_val;
+    P.n_rounds       = cli.get("iters").int_val;
+    P.delay_factor   = cli.get("df").float_val;
+    P.map_for_delay  = cli.get("dopt").bool_val;
+    P.recycle_cuts   = cli.get("recycle").bool_val;
+    P.use_ela        = cli.get("ela").bool_val;
+    P.reprio         = cli.get("reprio").bool_val;
+    P.use_fmux       = cli.get("fmux").bool_val;
+    P.end_with_unmap = cli.get("unmap").bool_val;
 
     if (cli.get("cost").enum_val == 0){
         for (uint i = 0; i <= 6; i++)
@@ -764,6 +766,12 @@ int main(int argc, char** argv)
         }else if (hasExtension(output, "gig")){
             writeGigForTechmap(output, N);
             WriteLn "Wrote: \a*%_\a*", output;
+        }else if (hasExtension(output, "aig")){
+            expandXigGates(N);
+            WriteLn "Expanded to AIG: %_", info(N);
+            writeGigForTechmap(output, N);      // <<<== temporary
+            WriteLn "Wrote: \a*%_\a*", output;
+            WriteLn "NOTE! AIGER writer not finished yet; file is in .gig format for now!!";
         }else{
             ShoutLn "ERROR! Unknown file extension: %_", output;
             exit(1);
@@ -822,32 +830,34 @@ int main(int argc, char** argv)
     }
 
 
-    NewLine;
-    WriteLn "Statistics:";
-    for (uint i = 0; i <= 6; i++)
-        if (sizeC[i] > 0)
-            WriteLn "    LUT %_: %>11%,d  (%.1f %%)", i, sizeC[i], double(sizeC[i]) / N.typeCount(gate_Lut6) * 100;
-    NewLine;
-    WriteLn "    LUTs : %>11%,d", N.typeCount(gate_Lut6);
-    if (P.use_fmux)
-        WriteLn "    MUXs : %>11%,d", N.typeCount(gate_Mux);
-    WriteLn "    Edges: %>11%,d", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6] + N.typeCount(gate_Mux);
-    WriteLn "    Delay: %>11%,d", max_delay;
-    NewLine;
-    WriteLn "    CPU-time: %t", cpuTime();
-
-    if (cli.get("batch").bool_val){
-        Write "%>11%,d    ", N.typeCount(gate_Lut6);
-        Write "%>11%,d    ", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6] + N.typeCount(gate_Mux);
-        Write "%>6%d    ", max_delay;
-        Write "%>10%t", cpuTime();
+    if (!P.end_with_unmap){
         NewLine;
-    }
+        WriteLn "Statistics:";
+        for (uint i = 0; i <= 6; i++)
+            if (sizeC[i] > 0)
+                WriteLn "    LUT %_: %>11%,d  (%.1f %%)", i, sizeC[i], double(sizeC[i]) / N.typeCount(gate_Lut6) * 100;
+        NewLine;
+        WriteLn "    LUTs : %>11%,d", N.typeCount(gate_Lut6);
+        if (P.use_fmux)
+            WriteLn "    MUXs : %>11%,d", N.typeCount(gate_Mux);
+        WriteLn "    Edges: %>11%,d", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6] + N.typeCount(gate_Mux);
+        WriteLn "    Delay: %>11%,d", max_delay;
+        NewLine;
+        WriteLn "    CPU-time: %t", cpuTime();
 
-#if 1   /*DEBUG*/
-    if (P.use_fmux && !P.quiet && !cli.get("batch").bool_val)
-        checkFmuxes(N);
-#endif  /*END DEBUG*/
+        if (cli.get("batch").bool_val){
+            Write "%>11%,d    ", N.typeCount(gate_Lut6);
+            Write "%>11%,d    ", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6] + N.typeCount(gate_Mux);
+            Write "%>6%d    ", max_delay;
+            Write "%>10%t", cpuTime();
+            NewLine;
+        }
+
+      #if 1   /*DEBUG*/
+        if (P.use_fmux && !P.quiet && !cli.get("batch").bool_val)
+            checkFmuxes(N);
+      #endif  /*END DEBUG*/
+    }
 
     return 0;
 }

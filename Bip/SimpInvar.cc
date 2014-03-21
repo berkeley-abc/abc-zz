@@ -3,12 +3,12 @@
 //| Name        : SimpInvar.cc
 //| Author(s)   : Niklas Een
 //| Module      : Bip
-//| Description : 
-//| 
+//| Description :
+//|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -218,8 +218,9 @@ bool SI_Check::tryRemoveCla(uint cl_num)
 {
     if (cl_num == UINT_MAX){
         // Only need to check initial states for original hypothesis (removing a clause will only make the problem more UNSAT):
-        if (!invarCoversInit())
-            return false;
+        if (!invarCoversInit()){
+            /**/Ping;
+            return false; }
     }
 
     Vec<Lit> assumps;
@@ -228,9 +229,10 @@ bool SI_Check::tryRemoveCla(uint cl_num)
             assumps.push(act[i]);
     assumps.push(~fail[LAST]);
 
-    if (S.solve(assumps) == l_True)
+    if (S.solve(assumps) == l_True){
+        /**/Ping;
         return false;
-    else{
+    }else{
         if (cl_num != UINT_MAX){
             S.addClause(~act[cl_num]);
             act[cl_num] = S.True();
@@ -347,7 +349,7 @@ void simpInvariant(NetlistRef N0, const Vec<Wire>& props, Vec<Vec<Lit> >& invar,
     uint orig_invar_sz = invar.size();
     if (invar.size() > 0){
         Netlist N;
-        initBmcNetlist(N0, props, N, true);
+        initBmcNetlist(N0, props, N, true, NULL, false, true);
 
         // Create check classes:
         SI_Check check(N, invar);

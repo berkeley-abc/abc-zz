@@ -34,6 +34,7 @@ struct Params_LutMap {
     bool    use_ela;            // Use exact local area optimizaton.
     bool    use_fmux;           // Some architectures have a free MUX that can combine the outputs of two LUT6 with a third signal.
     bool    reprio;             // Re-prioritize cuts (should only be turned off for experimental purposes)
+    bool    end_with_unmap;     // Instead of producing a mapped netlist, unmap the final design
     bool    quiet;
 
     Params_LutMap() :
@@ -45,6 +46,7 @@ struct Params_LutMap {
         use_ela(true),
         use_fmux(false),
         reprio(true),
+        end_with_unmap(false),
         quiet(false)
     {
         for (uint i = 0; i < elemsof(lut_cost); i++)

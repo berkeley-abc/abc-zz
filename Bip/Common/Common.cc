@@ -33,7 +33,7 @@ using namespace std;
 // If 'liveness_monitor' is non-NULL, a 'Buf' gate will be written as a place holder there.
 // The signal should be true for the fairness monitor to be active.
 //
-void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, WMap<Wire>& xlat, Wire* fairness_monitor, bool toggle_bad)
+void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, WMap<Wire>& xlat, Wire* fairness_monitor, bool toggle_bad, bool keep_flops)
 {
     Assure_Pob0(N, strash);
     Assure_Pob (N, init_bad);
@@ -48,6 +48,10 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
         seen.add(+props[i]);
     for (uind i = 0; i < constraints.size(); i++)
         seen.add(+constraints[i]);
+    if (keep_flops){
+        For_Gatetype(N0, gate_Flop, w)
+            seen.add(+w);
+    }
     for (uind i = 0; i < seen.size(); i++){
         Wire w = seen.list()[i];
         For_Inputs(w, v){
@@ -242,10 +246,10 @@ void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool ke
 }
 
 
-void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, Wire* fairness_monitor, bool toggle_bad)
+void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, Wire* fairness_monitor, bool toggle_bad, bool keep_flops)
 {
     WMap<Wire> xlat;
-    initBmcNetlist(N0, props, N, keep_flop_init, xlat, fairness_monitor, toggle_bad);
+    initBmcNetlist(N0, props, N, keep_flop_init, xlat, fairness_monitor, toggle_bad, keep_flops);
 }
 
 

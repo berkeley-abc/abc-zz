@@ -37,8 +37,8 @@ static const double SEC_TO_VIRT_TIME = 10000000;
 // Prepare netlist for verification:
 
 
-void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, Wire* fairness_monitor = NULL, bool toggle_bad = false);
-void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, WMap<Wire>& xlat, Wire* fairness_monitor = NULL, bool toggle_bad = false);
+void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, Wire* fairness_monitor = NULL, bool toggle_bad = false, bool keep_flops = false);
+void initBmcNetlist(NetlistRef N0, const Vec<Wire>& props, NetlistRef N, bool keep_flop_init, WMap<Wire>& xlat, Wire* fairness_monitor = NULL, bool toggle_bad = false, bool keep_flops = false);
 void instantiateAbstr(NetlistRef N, const IntSet<uint>& abstr, /*outputs:*/ NetlistRef M, WMap<Wire>& n2m, IntMap<uint,uint>& pi2ff);
 void addReset(NetlistRef N, int flop_num = num_NULL, int pi_num = num_ERROR);
 

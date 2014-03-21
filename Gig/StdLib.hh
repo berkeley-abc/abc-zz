@@ -101,6 +101,12 @@ macro Wire mkMux  (Wire s, Wire d1, Wire d0) { return ~mkAnd(~mkAnd(s, d1), ~mkA
 macro Wire mkXor  (Wire x, Wire y)           { return mkMux(x, ~y,  y); }
 macro Wire mkEquiv(Wire x, Wire y)           { return mkMux(x,  y, ~y); }
 
+macro Wire mkMaj  (Wire a, Wire b, Wire c)   { return mkOr(mkAnd(a, mkOr(b, c)), mkAnd(b, c)); }
+macro Wire mkGamb (Wire a, Wire b, Wire c)   { return mkOr(mkAnd(a, mkAnd(b, c)), mkAnd(~a, mkAnd(~b, ~c))); }
+macro Wire mkOne  (Wire a, Wire b, Wire c)   { return mkOr(mkAnd(a, mkAnd(~b, ~c)), mkAnd(~a, mkXor(b, c))); }
+macro Wire mkDot  (Wire a, Wire b, Wire c)   { return mkOr(mkXor(a, b), mkAnd(a, c)); }
+
+
 Wire copyGate(Wire w, Gig& N, WMapX<GLit>& xlat);
     // -- copy a gate 'w' from netlist 'M' to netlist 'N', using 'xlat' to translate its inputs
     // (with exception of 'gate_Seq', which are ignored since they break cycles and have to be
@@ -124,6 +130,9 @@ void putIntoNpn4(Gig& N, WSeen* out_inverted = NULL);
 
 void putIntoLut4(Gig& N);
     // -- Same as 'putIntoNpn4()' but for 'gate_Lut4' instead of 'gate_Npn4'.
+
+void expandXigGates(Gig& N);
+    // -- Replace Xor, Mux, Maj Gamb, One and Dot with And-gates and strash the result.
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

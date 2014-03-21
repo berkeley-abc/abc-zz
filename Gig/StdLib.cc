@@ -463,6 +463,34 @@ void putIntoLut4(Gig& N)
 }
 
 
+void expandXigGates(Gig& N)
+{
+    N.unstrash();
+
+    WMapX<GLit> xlat;
+    xlat.initBuiltins();
+
+    For_UpOrder(N, w){
+        switch (w.type()){
+        case gate_Xor:  xlat(w) = mkXor (xlat[w[0]]+N, xlat[w[1]]+N);               remove(w); break;
+        case gate_Mux:  xlat(w) = mkMux (xlat[w[0]]+N, xlat[w[1]]+N, xlat[w[2]]+N); remove(w); break;
+        case gate_Maj:  xlat(w) = mkMaj (xlat[w[0]]+N, xlat[w[1]]+N, xlat[w[2]]+N); remove(w); break;
+        case gate_Gamb: xlat(w) = mkGamb(xlat[w[0]]+N, xlat[w[1]]+N, xlat[w[2]]+N); remove(w); break;
+        case gate_One:  xlat(w) = mkOne (xlat[w[0]]+N, xlat[w[1]]+N, xlat[w[2]]+N); remove(w); break;
+        case gate_Dot:  xlat(w) = mkDot (xlat[w[0]]+N, xlat[w[1]]+N, xlat[w[2]]+N); remove(w); break;
+        default:
+            xlat(w) = w;
+            For_Inputs(w, v)
+                if (v != gate_Seq)
+                    w.set(Input_Pin(v), xlat[v]);
+        }
+    }
+
+    removeUnreach(N);
+    N.strash();
+}
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Debug:
 

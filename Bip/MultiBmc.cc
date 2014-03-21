@@ -89,8 +89,10 @@ void multiBmc(NetlistRef M, const Params_MultiBmc& P)
     // Run BMC:
     MultiSat S(sat_Msc);
     Vec<LLMap<GLit,Lit> > n2s;
+    uint n_props = props.size();
     for (uint depth = 0;; depth++){
-        WriteLn "Depth %_   (#clauses: %,d)", depth, S.nClauses();
+        WriteLn "Depth %_   (#clauses: %,d)  [%t]", depth, S.nClauses(), cpuTime();
+
         for (uint i = 0; i < props.size(); i++){
             if (props[i] == glit_NULL) continue;
 
@@ -101,9 +103,15 @@ void multiBmc(NetlistRef M, const Params_MultiBmc& P)
             if (result == l_True){
                 WriteLn "Property #%_: CEX found.", i;
                 props[i] = glit_NULL;
+
+                n_props--;
+                if (n_props == 0) goto Done;
             }
         }
     }
+  Done:;
+
+    WriteLn "CPU-time: %t", cpuTime();
     // <<== lazy constraints (enforce in every frame or just failing frames?)
     // <<== per output timeout? (continue on old properties by going back in the trace?)
 }

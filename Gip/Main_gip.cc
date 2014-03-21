@@ -198,7 +198,7 @@ int main(int argc, char** argv)
     try{
         if (hasExtension(input, "aig"))
             readAigerFile(input, N, true);
-        if (hasExtension(input, "gig"))
+        else if (hasExtension(input, "gig"))
             readGigFile(input, N);
         else{
             ShoutLn "ERROR! Unknown file extension: %_", input;
@@ -212,8 +212,8 @@ int main(int argc, char** argv)
     Params_Bmc P;
     DefaultRep rep(N);
     P.sat_solver = sat_Msc;
-//    bmc(N, P, rep);
-    testPdr(N);
+    bmc(N, P, rep);
+//    testPdr(N);
 
 
     return 0;

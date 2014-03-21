@@ -1063,7 +1063,7 @@ void lutMap(Gig& N, const Vec<Params_LutMap>& Ps, WMapX<GLit>* remap)
             }
         }
 
-        if (i != Ps.size() - 1){
+        if (i != Ps.size() - 1 || Ps[LAST].end_with_unmap){
             NewLine;
             WriteLn "==== Unmapping %_ ====", i + 1;
             unmap(N, &xlat);
@@ -1089,7 +1089,8 @@ void lutMap(Gig& N, const Vec<Params_LutMap>& Ps, WMapX<GLit>* remap)
                                      + N.typeCount(gate_Gamb) * 5
                                      + N.typeCount(gate_Dot)  * 5;
 
-            putIntoLut4(N);
+            if (i != Ps.size() - 1)
+                putIntoLut4(N);     // -- keep structured form for final unmapping if this is the end result
         }
     }
     NewLine;

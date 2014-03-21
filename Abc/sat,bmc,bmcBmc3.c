@@ -9,7 +9,7 @@
   Synopsis    [Simple BMC package.]
 
   Author      [Alan Mishchenko in collaboration with Niklas Een.]
-  
+
   Affiliation [UC Berkeley]
 
   Date        [Ver. 1.0. Started - June 20, 2005.]
@@ -42,7 +42,7 @@ struct Gia_ManBmc_t_
     Vec_Int_t *       vMapping;    // mapping
     Vec_Int_t *       vMapRefs;    // mapping references
 //    Vec_Vec_t *       vSects;      // sections
-    Vec_Int_t *       vId2Num;     // number of each node 
+    Vec_Int_t *       vId2Num;     // number of each node
     Vec_Ptr_t *       vTerInfo;    // ternary information
     Vec_Ptr_t *       vId2Var;     // SAT vars for each object
     Vec_Wec_t *       vVisited;    // visited nodes
@@ -67,6 +67,16 @@ struct Gia_ManBmc_t_
 };
 
 extern int Gia_ManToBridgeResult( FILE * pFile, int Result, Abc_Cex_t * pCex, int iPoProved );
+
+
+void Gia_ManReportProgress( FILE * pFile, int prop_no, int depth )
+{
+    extern int Gia_ManToBridgeProgress( FILE * pFile, int Size, unsigned char * pBuffer );
+    char buf[100];
+    sprintf(buf, "property: safe<%d>\nbug-free-depth: %d\n", prop_no, depth);
+    Gia_ManToBridgeProgress(pFile, strlen(buf), buf);
+}
+
 
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///
@@ -1426,12 +1436,18 @@ int Saig_ManBmcScalable( Aig_Man_t * pAig, Saig_ParBmc_t * pPars )
         // stop BMC after exploring all reachable states
         if ( !pPars->nFramesJump && Aig_ManRegNum(pAig) < 30 && f == (1 << Aig_ManRegNum(pAig)) )
         {
+            Abc_Print( 1, "Stopping BMC because all 2^%d reachable states are visited.\n", Aig_ManRegNum(pAig) );
+            if ( p->pPars->fUseBridge )
+                Saig_ManForEachPo( pAig, pObj, i )
+                    if ( !(p->vCexes && Vec_PtrEntry(p->vCexes, i)) && !(p->pTime4Outs && p->pTime4Outs[i] == 0) ) // not SAT and not timed out
+                        Gia_ManToBridgeResult( stdout, 1, NULL, i );
             RetValue = pPars->nFailOuts ? 0 : 1;
             goto finish;
         }
         // stop BMC if all targets are solved
         if ( pPars->fSolveAll && pPars->nFailOuts + pPars->nDropOuts >= Saig_ManPoNum(pAig) )
         {
+            Abc_Print( 1, "Stopping BMC because all targets are disproved.\n" );
             RetValue = pPars->nFailOuts ? 0 : 1;
             goto finish;
         }
@@ -1565,6 +1581,8 @@ nTimeUnsat += Abc_Clock() - clk2;
                     // propagate units
                     sat_solver_compress( p->pSat );
                 }
+                if ( p->pPars->fUseBridge )
+                    Gia_ManReportProgress( stdout, i, f );
             }
             else if ( status == l_True )
             {

@@ -651,7 +651,7 @@ void Treb::simplifyInvariant()
         }
     }
 
-    // Simplify invariant: 
+    // Simplify invariant:
     simpInvariant(N, props, invar_clauses, "", P.simp_invar == 1);
 
     for (uint i = 0; i < invar_clauses.size(); i++){
@@ -729,6 +729,7 @@ void Treb::sendInvariant()
     }
 
     sendMsg_ClauseInvar(clauses);
+    WriteLn "Invariant sent over PAR.";
 }
 
 
@@ -1792,6 +1793,13 @@ lbool treb( NetlistRef          N0,
             EffortCB*           cb
             )
 {
+#if 0
+    /**/removeFlopInit(N0);
+    /**/Add_Pob(N0, flop_init);
+    /**/For_Gatetype(N0, gate_Flop, w)
+    /**/    flop_init(w) = l_False;
+    /**/N0.write("tmp.gig");
+#endif
     if (P.use_abstr){
         if (Has_Pob(N0, strash))
             Remove_Pob(N0, strash);

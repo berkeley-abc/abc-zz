@@ -1108,6 +1108,7 @@ int main(int argc, char** argv)
     // Pre-handling of commands:
     if (input == "@@"){
         startPar();
+
         WriteLn "Bip started with process id: %_", getpid();
         Write   "    and command line:";
         for (int i = 1; i < argc; i++)

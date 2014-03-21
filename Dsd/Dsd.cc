@@ -49,7 +49,7 @@ Non-decomposable, symmetric:
 Non-decomposable, asymmetric:
 
     MUX(a, b, c)   -- a ? b : c
-    X2AND(a,b,c)   -- a^b | ac
+    DOT(a,b,c)     -- a^b | ac
 
 Smaller functions:
 
