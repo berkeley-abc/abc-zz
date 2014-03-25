@@ -59,6 +59,7 @@ void sendMsg(Msg msg, int fd = 1);
 void receiveMsg_Task(NetlistRef N, String& params);
 
 void sendMsg_Text(uint type, const String& text);
+void sendMsg_Progress(uint prop_no, uint prop_type, const String& text);
 
 void sendMsg_UnreachCube(NetlistRef N, TCube c);                     // -- for 'Treb'
 void sendMsg_UnreachCube(const Vec<GLit>& s, uint frame);            // -- for 'Pdr'

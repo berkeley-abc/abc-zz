@@ -55,6 +55,7 @@ void checkFmuxes(Gig& N)
         }
     }
 
+#if 0
     // Count potential violations (assuming selector signal is NOT independent):
     {
         uint total = 0;
@@ -69,32 +70,48 @@ void checkFmuxes(Gig& N)
 
         WriteLn "Potential MUX routing violations: %_ / %_  (= %.2f %%)", failC, total, double(failC) / total * 100;
     }
+#endif
     {
-        Auto_Gob(N, FanoutCount);
         WMap<uint> mux_fanouts(0);
 
         uint total = 0;
         uint inv_failC = 0;
         uint out_failC = 0;
+        uint inp_failC = 0;
         For_Gates(N, w){
-            if (w == gate_Mux){
-                total++;
-                if ((w[1].sign && nFanouts(w[1]) > 1) || (w[2].sign && nFanouts(w[2]) > 1))
-                    inv_failC++;
+            if (w != gate_Mux) continue;
 
-                for (uint i = 1; i <= 2; i++){
-                    if (w[i] == gate_Mux){
-                        mux_fanouts(w[i])++;
-                        if (mux_fanouts[w[i]] >= 2)
-                            out_failC++;
-                    }
+            for (uint i = 1; i <= 2; i++){
+                if (w[i] == gate_Mux){
+                    mux_fanouts(w[i])++;
+                    if (mux_fanouts[w[i]] >= 2)
+                        out_failC++;
                 }
             }
         }
 
-        WriteLn "Potential MUX inverter violations: %_ / %_  (= %.2f %%)", inv_failC, total, double(inv_failC) / total * 100;
+        For_Gates(N, w){
+            if (w != gate_Mux) continue;
+
+            total++;
+            if ((w[1].sign && mux_fanouts[w[1]] > 1) || (w[2].sign && mux_fanouts[w[2]] > 1))
+                inv_failC++;
+        }
+
+
+        For_Gates(N, w){
+            if (w != gate_Mux) continue;
+
+            if (w[1] != gate_Lut6 && w[1] != gate_Mux) inp_failC++;
+            if (w[2] != gate_Lut6 && w[2] != gate_Mux) inp_failC++;
+        }
+
+        WriteLn "Non-trivial MUX inverter violations: %_ / %_  (= %.2f %%)", inv_failC, total, double(inv_failC) / total * 100;
         WriteLn "Actual MUX fanout violations: %_ / %_  (= %.2f %%)", out_failC, total, double(out_failC) / total * 100;
+        WriteLn "Non-LUT feeding MUX: %_ / %_  (= %.2f %%)", inp_failC, total, double(inp_failC) / total * 100;
     }
+
+    // Check how many MUXes feed from non-
 }
 
 

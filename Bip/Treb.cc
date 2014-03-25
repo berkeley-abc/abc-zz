@@ -817,7 +817,7 @@ void Treb::dumpInvar()
 void Treb::addBlockedCube(TCube s, bool subsumption)
 {
     //**/WriteLn "addBlockedCube(\a/%_\a/)", fmt(s);
-//    if (par) sendMsg_UnreachCube(N, s);
+    if (par && P.par_send_cubes) sendMsg_UnreachCube(N, s);
 
     if (refining){
         //**/WriteLn "!!  rtrace learned: %_", s;
@@ -1713,7 +1713,7 @@ bool Treb::run(Cex* cex_out, NetlistRef N_invar)
                 newFrame();
 
                 if (par && P.par_send_result)
-                    sendMsg_Text(3/*Progress*/, (FMT "bug-free-depth: %_\n", bugFreeDepth()));
+                    sendMsg_Progress(0, 1, (FMT "bug-free-depth: %_\n", bugFreeDepth()));
 
                 showProgress("block");
                 if (P.semant_coi & 1){
@@ -1881,6 +1881,7 @@ void addCli_Treb(CLI& cli)
     cli.add("simp-invar", "int[0:2]" , (FMT "%_", P.dump_invar)     , "Simplify invariant if property proved.");
     cli.add("sat"       , sat_types  , sat_default                  , "SAT-solver to use.");
     cli.add("send-invar", "bool"     , P.par_send_invar?"yes":"no"  , "Send invariant through PAR interface (only in PAR mode).");
+    cli.add("send-cubes", "bool"     , P.par_send_cubes?"yes":"no"  , "Send blocked cubes during run (only in PAR mode).");
 }
 
 
@@ -1912,6 +1913,7 @@ void setParams(const CLI& cli, Params_Treb& P)
     P.dump_invar    = cli.get("dump-invar").int_val;
     P.simp_invar    = cli.get("simp-invar").int_val;
     P.par_send_invar= cli.get("send-invar").bool_val;
+    P.par_send_cubes= cli.get("send-cubes").bool_val;
 
     P.sat_solver = (cli.get("sat").enum_val == 0) ? sat_Zz :
                    (cli.get("sat").enum_val == 1) ? sat_Msc :

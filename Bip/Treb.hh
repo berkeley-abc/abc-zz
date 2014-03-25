@@ -58,6 +58,7 @@ struct Params_Treb {
     bool    quiet;              // Suppress output.
     bool    par_send_result;    // If FALSE; CEX or unsat result is not reported in PAR mode.
     bool    par_send_invar;     // If TRUE, invariant is reported (as clauses) in PAR mode.
+    bool    par_send_cubes;     // If TRUE, blocked cubes are reported (as cubes) in PAR mode.
 
     Params_Treb() :
         seed(0),

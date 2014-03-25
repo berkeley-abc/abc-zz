@@ -37,7 +37,7 @@ ABC_NAMESPACE_IMPL_START
 #define BRIDGE_TEXT_MESSAGE 999996
 
 #define BRIDGE_ABORT        5
-#define BRIDGE_PROGRESS     3
+#define BRIDGE_PROGRESS     6
 #define BRIDGE_RESULTS      101
 #define BRIDGE_BAD_ABS      105
 //#define BRIDGE_NETLIST      106
@@ -51,6 +51,25 @@ ABC_NAMESPACE_IMPL_START
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///
 ////////////////////////////////////////////////////////////////////////
+
+
+static inline void Gia_PutUInt32( FILE * pFile, unsigned x )
+{
+    fputc( (unsigned char)x, pFile );
+    fputc( (unsigned char)(x >> 8), pFile );
+    fputc( (unsigned char)(x >> 16), pFile );
+    fputc( (unsigned char)(x >> 24), pFile );
+}
+
+
+static inline void Vec_PutUInt32(Vec_Str_t* p, unsigned x)
+{
+    Vec_StrPush(p, (unsigned char)x);
+    Vec_StrPush(p, (unsigned char)(x>>8));
+    Vec_StrPush(p, (unsigned char)(x>>16));
+    Vec_StrPush(p, (unsigned char)(x>>24));
+}
+
 
 /**Function*************************************************************
 
@@ -228,41 +247,47 @@ static int aigerNumSize( unsigned x )
 ***********************************************************************/
 void Gia_ManFromBridgeHolds( FILE * pFile, int iPoProved )
 {
-    fprintf( pFile, "%.6d", 101 /*message type = Result*/);
+    fprintf( pFile, "%.6d", 111 /*message type = Result*/);
     fprintf( pFile, " " );
-    fprintf( pFile, "%.16d", 3 + aigerNumSize(iPoProved) /*size in bytes*/);
+    fprintf( pFile, "%.16d", 13/*size in bytes*/);
     fprintf( pFile, " " );
 
-    fputc( (char)BRIDGE_VALUE_1, pFile ); // true
-    fputc( (char)1, pFile ); // size of vector (Armin's encoding)
-    Gia_AigerWriteUnsignedFile( pFile, iPoProved ); // number of the property (Armin's encoding)
-    fputc( (char)0, pFile ); // no invariant
+    fputc( (char)BRIDGE_VALUE_1, pFile );   // result: 1=proved
+    Gia_PutUInt32( pFile, iPoProved );      // number of the property 
+    Gia_PutUInt32( pFile, 1 );              // property type (1=safety, 2=liveness)
+    Gia_PutUInt32( pFile, (unsigned)-1 );   // loop frame (liveness CEX's only)
     fflush(pFile);
 }
+
+
 void Gia_ManFromBridgeUnknown( FILE * pFile, int iPoUnknown )
 {
-    fprintf( pFile, "%.6d", 101 /*message type = Result*/);
+    fprintf( pFile, "%.6d", 111 /*message type = Result*/);
     fprintf( pFile, " " );
-    fprintf( pFile, "%.16d", 2 + aigerNumSize(iPoUnknown) /*size in bytes*/);
+    fprintf( pFile, "%.16d", 13/*size in bytes*/);
     fprintf( pFile, " " );
 
-    fputc( (char)BRIDGE_VALUE_X, pFile ); // undef
-    fputc( (char)1, pFile ); // size of vector (Armin's encoding)
-    Gia_AigerWriteUnsignedFile( pFile, iPoUnknown ); // number of the property (Armin's encoding)
+    fputc( (char)BRIDGE_VALUE_X, pFile );   // result
+    Gia_PutUInt32( pFile, iPoUnknown );     // number of the property 
+    Gia_PutUInt32( pFile, 1 );              // property type (1=safety, 2=liveness)
+    Gia_PutUInt32( pFile, (unsigned)-1 );   // loop frame (liveness CEX's only)
     fflush(pFile);
 }
-void Gia_ManFromBridgeCex( FILE * pFile, Abc_Cex_t * pCex, int iPoProved )
-{
-    int i, f, iBit;//, RetValue;
-    Vec_Str_t * vStr = Vec_StrAlloc( 1000 );
-    Vec_StrPush( vStr, (char)BRIDGE_VALUE_0 ); // false
-    Vec_StrPush( vStr, (char)1 ); // size of vector (Armin's encoding)
-    Gia_AigerWriteUnsigned( vStr, iPoProved ); // number of the property (Armin's encoding)
-    Vec_StrPush( vStr, (char)1 ); // size of vector (Armin's encoding)
-    Gia_AigerWriteUnsigned( vStr, pCex->iFrame ); // depth
 
-    Gia_AigerWriteUnsigned( vStr, 1 ); // concrete
-    Gia_AigerWriteUnsigned( vStr, pCex->iFrame + 1 ); // number of frames (1 more than depth)
+
+void Gia_ManFromBridgeCex( FILE * pFile, Abc_Cex_t * pCex, int iPoFailed )
+{
+    int i, f, iBit;
+    Vec_Str_t * vStr = Vec_StrAlloc( 1000 );
+
+    Vec_StrPush( vStr, (char)BRIDGE_VALUE_0 );  // result: 0=CEX found
+    Vec_PutUInt32( vStr, iPoFailed );          // number of the property 
+    Vec_PutUInt32( vStr, 1 );                  // property type (1=safety, 2=liveness)
+    Vec_PutUInt32( vStr, (unsigned)-1 );       // loop frame (liveness CEX's only)
+
+    // CEX:
+    Gia_AigerWriteUnsigned( vStr, 1 );                  // concrete
+    Gia_AigerWriteUnsigned( vStr, pCex->iFrame + 1 );   // number of frames (1 more than depth)
     iBit = pCex->nRegs;
     for ( f = 0; f <= pCex->iFrame; f++ )
     {
@@ -275,20 +300,21 @@ void Gia_ManFromBridgeCex( FILE * pFile, Abc_Cex_t * pCex, int iPoProved )
     Gia_AigerWriteUnsigned( vStr, pCex->nRegs ); // num of flops
     for ( i = 0; i < pCex->nRegs; i++ )
         Vec_StrPush( vStr, (char)BRIDGE_VALUE_0 ); // always zero!!!
-//    RetValue = fwrite( Vec_StrArray(vStr), Vec_StrSize(vStr), 1, pFile );
-    Gia_CreateHeader(pFile, 101/*type=Result*/, Vec_StrSize(vStr), (unsigned char*)Vec_StrArray(vStr));
 
-    Vec_StrFree( vStr );
+    Gia_CreateHeader(pFile, 111/*type=Result*/, Vec_StrSize(vStr), (unsigned char*)Vec_StrArray(vStr));
     fflush(pFile);
+    Vec_StrFree( vStr );
 }
-int Gia_ManToBridgeResult( FILE * pFile, int Result, Abc_Cex_t * pCex, int iPoProved )
+
+
+int Gia_ManToBridgeResult( FILE * pFile, int Result, Abc_Cex_t * pCex, int iPo )
 {
     if ( Result == 0 ) // sat
-        Gia_ManFromBridgeCex( pFile, pCex, iPoProved );
+        Gia_ManFromBridgeCex( pFile, pCex, iPo );
     else if ( Result == 1 ) // unsat
-        Gia_ManFromBridgeHolds( pFile, iPoProved );
+        Gia_ManFromBridgeHolds( pFile, iPo );
     else if ( Result == -1 ) // undef
-        Gia_ManFromBridgeUnknown( pFile, iPoProved );
+        Gia_ManFromBridgeUnknown( pFile, iPo );
     else assert( 0 );
     return 1;
 }

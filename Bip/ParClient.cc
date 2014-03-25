@@ -346,6 +346,15 @@ macro void putu(Vec<uchar>& out, uint64 x)
 }
 
 
+macro void putu32(Vec<uchar>& out, uint x)
+{
+    out.push(x);
+    out.push(x >> 8);
+    out.push(x >> 16);
+    out.push(x >> 24);
+}
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Netlist marshalling: [internal]
 
@@ -853,6 +862,17 @@ void sendMsg_Text(uint type, const String& text)
 }
 
 
+void sendMsg_Progress(uint prop_no, uint prop_type, const String& text)
+{
+    Vec<uchar> data;
+    putu32(data, prop_no);
+    putu32(data, prop_type);
+    for (uint i = 0; i < text.size(); i++)
+        data.push(text[i]);
+    sendMsg(6/*Progress*/, data.slice());
+}
+
+
 // Send a cube which have been proved to be unreachble for the first 'k' time frames
 // (where 'k' may be 'UINT_MAX'). NOTE! Literals of 's' are expressed in gate IDs!
 // (that's why 'N' is needed; to convert them into 'number's)
@@ -900,17 +920,30 @@ void unpack_UCube(Pkg pkg, /*outputs:*/ uint& frame, Vec<GLit>& state)
 
 void sendMsg_Result_unknown(const Vec<uint>& props, uint prop_type)
 {
+  #if 0   // -- old format 
     Vec<uchar> data;
     data.push(l_Undef.value);
     put_vec_uint(data, props);
-    sendMsg(101/*Result*/, data.slice());
     putu(data, prop_type);
+    sendMsg(101/*OldResult*/, data.slice());
+
+  #else
+    assert(props.size() == 1);
+    Vec<uchar> data;
+
+    data.push(l_Undef.value);
+    putu32(data, props[0]);
+    putu32(data, prop_type);
+    putu32(data, UINT_MAX);
+    sendMsg(111/*Result*/, data.slice());
+  #endif
 }
 
 
 // 'concrete' means flops are not abstracted => only the initial state will be included in the counterexample
 void sendMsg_Result_fails(const Vec<uint>& props, uint prop_type, const Vec<uint>& depths, const Cex& cex, NetlistRef N, bool concrete_cex, uint loop_frame)
 {
+  #if 0   // -- old format 
     Vec<uchar> data;
     data.push(l_False.value);
     put_vec_uint(data, props);
@@ -919,19 +952,44 @@ void sendMsg_Result_fails(const Vec<uint>& props, uint prop_type, const Vec<uint
     putu(data, prop_type);
     if (loop_frame != UINT_MAX)
         putu(data, loop_frame);
-    sendMsg(101/*Result*/, data.slice());
+    sendMsg(101/*OldResult*/, data.slice());
+
+  #else
+    assert(props.size() == 1);
+    assert(depths.size() == 1);
+    assert(depths[0] == cex.size() - 1);
+    Vec<uchar> data;
+
+    data.push(l_False.value);
+    putu32(data, props[0]);
+    putu32(data, prop_type);
+    putu32(data, loop_frame);
+    put_Cex(data, cex, N, concrete_cex);
+    sendMsg(111/*Result*/, data.slice());
+  #endif
 }
 
 
 void sendMsg_Result_holds(const Vec<uint>& props, uint prop_type, NetlistRef N_invar)
 {
+  #if 0   // -- old format 
     Vec<uchar> data;
     data.push(l_True.value);
     put_vec_uint(data, props);
     putu(data, 0);  // -- boolean; 0 = no invariant follows
-        // <<== 'N_invar' should be put here if used
     putu(data, prop_type);
-    sendMsg(101/*Result*/, data.slice());
+    sendMsg(101/*OldResult*/, data.slice());
+
+  #else
+    assert(props.size() == 1);
+    Vec<uchar> data;
+
+    data.push(l_True.value);
+    putu32(data, props[0]);
+    putu32(data, prop_type);
+    putu32(data, UINT_MAX);
+    sendMsg(111/*Result*/, data.slice());
+  #endif
 }
 
 

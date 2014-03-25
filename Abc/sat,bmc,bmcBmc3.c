@@ -66,15 +66,25 @@ struct Gia_ManBmc_t_
     char * pSopSizes, ** pSops;    // CNF representation
 };
 
+
 extern int Gia_ManToBridgeResult( FILE * pFile, int Result, Abc_Cex_t * pCex, int iPoProved );
+extern int Gia_ManToBridgeProgress( FILE * pFile, int Size, unsigned char * pBuffer );
 
 
 void Gia_ManReportProgress( FILE * pFile, int prop_no, int depth )
 {
-    extern int Gia_ManToBridgeProgress( FILE * pFile, int Size, unsigned char * pBuffer );
     char buf[100];
-    sprintf(buf, "property: safe<%d>\nbug-free-depth: %d\n", prop_no, depth);
-    Gia_ManToBridgeProgress(pFile, strlen(buf), buf);
+    buf[0] = (char)((unsigned)prop_no);
+    buf[1] = (char)((unsigned)prop_no >> 8);
+    buf[2] = (char)((unsigned)prop_no >> 16);
+    buf[3] = (char)((unsigned)prop_no >> 24);
+    buf[4] = 1;   // -- safety property
+    buf[5] = 0;
+    buf[6] = 0;
+    buf[7] = 0;
+
+    sprintf(buf + 8, "bug-free-depth: %d\n", depth);
+    Gia_ManToBridgeProgress(pFile, strlen(buf + 8) + 8, buf);
 }
 
 

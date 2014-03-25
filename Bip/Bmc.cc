@@ -330,7 +330,7 @@ lbool lookaheadBmc(BmcTrace& T, const Params_Bmc& P, Cex* cex, int* bf_depth, Ne
             if (bf_depth)
                 *bf_depth = d;
             if (par)
-                sendMsg_Text(3/*Progress*/, (FMT "bug-free-depth: %_\n", d));
+                sendMsg_Progress(0, 1, (FMT "bug-free-depth: %_\n", d));
             if (!T.force(~w_bad))       // -- returns FALSE if clausification timed out
                 return l_Undef;
         }else{ assert(result == l_Undef);
@@ -448,7 +448,7 @@ lbool bmc_(NetlistRef N0, const Vec<Wire>& props, const Params_Bmc& P, Cex* cex,
             if (bf_depth)
                 *bf_depth = d;
             if (par)
-                sendMsg_Text(3/*Progress*/, (FMT "bug-free-depth: %_\n", d));
+                sendMsg_Progress(0, 1/*safety*/, (FMT "bug-free-depth: %_\n", d));
             if (!T.force(~w_bad))       // -- returns FALSE if clausification timed out
                 return l_Undef;
         }else{ assert(result == l_Undef);

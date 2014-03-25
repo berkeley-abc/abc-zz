@@ -289,7 +289,7 @@ lbool imcStd_(NetlistRef           N0,
                 FWriteLn(progress) "bug-free-depth: %_", *bf_depth;
                 FWriteLn(progress) "last-interpolant-size: %_", legal(s) ? dagSize(s) : 0;
                 FWriteLn(progress) "all-interpolants-size: %_", dagSize(ind.get()) - init_sz;
-                sendMsg_Text(3/*ev_Progress*/, progress);
+                sendMsg_Progress(0, 1/*safety*/, progress);
             }
 
           Skip:;

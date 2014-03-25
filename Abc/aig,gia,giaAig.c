@@ -67,7 +67,7 @@ void Gia_ManFromAig_rec( Gia_Man_t * pNew, Aig_Man_t * p, Aig_Obj_t * pObj )
         iObjNew  = Abc_Lit2Var(pObj->iData);
         iNextNew = Abc_Lit2Var(pNext->iData);
         if ( pNew->pNexts )
-            pNew->pNexts[iObjNew] = iNextNew;        
+            pNew->pNexts[iObjNew] = iNextNew;
     }
 }
 Gia_Man_t * Gia_ManFromAig( Aig_Man_t * p )
@@ -90,7 +90,7 @@ Gia_Man_t * Gia_ManFromAig( Aig_Man_t * p )
         pObj->iData = Gia_ManAppendCi( pNew );
     // add logic for the POs
     Aig_ManForEachCo( p, pObj, i )
-        Gia_ManFromAig_rec( pNew, p, Aig_ObjFanin0(pObj) );        
+        Gia_ManFromAig_rec( pNew, p, Aig_ObjFanin0(pObj) );
     Aig_ManForEachCo( p, pObj, i )
         Gia_ManAppendCo( pNew, Gia_ObjChild0Copy(pObj) );
     Gia_ManSetRegNum( pNew, Aig_ManRegNum(p) );
@@ -126,7 +126,7 @@ void Gia_ManFromAigChoices_rec( Gia_Man_t * pNew, Aig_Man_t * p, Aig_Obj_t * pOb
         iNextNew = Abc_Lit2Var(Aig_ObjEquiv(p, pObj)->iData);
         assert( iObjNew > iNextNew );
         assert( Gia_ObjIsAnd(Gia_ManObj(pNew, iNextNew)) );
-        pNew->pSibls[iObjNew] = iNextNew;        
+        pNew->pSibls[iObjNew] = iNextNew;
     }
 }
 Gia_Man_t * Gia_ManFromAigChoices( Aig_Man_t * p )
@@ -149,7 +149,7 @@ Gia_Man_t * Gia_ManFromAigChoices( Aig_Man_t * p )
         pObj->iData = Gia_ManAppendCi( pNew );
     // add logic for the POs
     Aig_ManForEachCo( p, pObj, i )
-        Gia_ManFromAigChoices_rec( pNew, p, Aig_ObjFanin0(pObj) );        
+        Gia_ManFromAigChoices_rec( pNew, p, Aig_ObjFanin0(pObj) );
     Aig_ManForEachCo( p, pObj, i )
         Gia_ManAppendCo( pNew, Gia_ObjChild0Copy(pObj) );
     Gia_ManSetRegNum( pNew, Aig_ManRegNum(p) );
@@ -202,7 +202,7 @@ Gia_Man_t * Gia_ManFromAigSimple( Aig_Man_t * p )
   Synopsis    [Handles choices as additional combinational outputs.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -227,12 +227,12 @@ Gia_Man_t * Gia_ManFromAigSwitch( Aig_Man_t * p )
     Aig_ManForEachNode( p, pObj, i )
         if ( Aig_ObjRefs(pObj) == 0 )
         {
-            Gia_ManFromAig_rec( pNew, p, pObj );        
+            Gia_ManFromAig_rec( pNew, p, pObj );
             Gia_ManAppendCo( pNew, pObj->iData );
         }
     // add logic for the POs
     Aig_ManForEachCo( p, pObj, i )
-        Gia_ManFromAig_rec( pNew, p, Aig_ObjFanin0(pObj) );        
+        Gia_ManFromAig_rec( pNew, p, Aig_ObjFanin0(pObj) );
     Aig_ManForEachCo( p, pObj, i )
         pObj->iData = Gia_ManAppendCo( pNew, Gia_ObjChild0Copy(pObj) );
     Gia_ManSetRegNum( pNew, Aig_ManRegNum(p) );
@@ -271,7 +271,7 @@ void Gia_ManToAig_rec( Aig_Man_t * pNew, Aig_Obj_t ** ppNodes, Gia_Man_t * p, Gi
         pObjNew  = ppNodes[Gia_ObjId(p, pObj)];
         pNextNew = ppNodes[Gia_ObjId(p, pNext)];
         if ( pNew->pEquivs )
-            pNew->pEquivs[Aig_Regular(pObjNew)->Id] = Aig_Regular(pNextNew);        
+            pNew->pEquivs[Aig_Regular(pObjNew)->Id] = Aig_Regular(pNextNew);
     }
 }
 Aig_Man_t * Gia_ManToAig( Gia_Man_t * p, int fChoices )
@@ -280,6 +280,7 @@ Aig_Man_t * Gia_ManToAig( Gia_Man_t * p, int fChoices )
     Aig_Obj_t ** ppNodes;
     Gia_Obj_t * pObj;
     int i;
+    //**/fprintf(stderr, "fChoices=%d  p->pNexts=%p  p->pReprs=%p\n", fChoices, p->pNexts, p->pReprs); fflush(stderr);
     assert( !fChoices || (p->pNexts && p->pReprs) );
     // create the new manager
     pNew = Aig_ManStart( Gia_ManAndNum(p) );
@@ -302,7 +303,7 @@ Aig_Man_t * Gia_ManToAig( Gia_Man_t * p, int fChoices )
     // add logic for the POs
     Gia_ManForEachCo( p, pObj, i )
     {
-        Gia_ManToAig_rec( pNew, ppNodes, p, Gia_ObjFanin0(pObj) );        
+        Gia_ManToAig_rec( pNew, ppNodes, p, Gia_ObjFanin0(pObj) );
         ppNodes[Gia_ObjId(p, pObj)] = Aig_ObjCreateCo( pNew, Gia_ObjChild0Copy2(ppNodes, pObj, Gia_ObjId(p, pObj)) );
     }
     Aig_ManSetRegNum( pNew, Gia_ManRegNum(p) );
@@ -343,7 +344,7 @@ Aig_Man_t * Gia_ManToAigSkip( Gia_Man_t * p, int nOutDelta )
     // add logic for the POs
     Gia_ManForEachCo( p, pObj, i )
     {
-        Gia_ManToAig_rec( pNew, ppNodes, p, Gia_ObjFanin0(pObj) );        
+        Gia_ManToAig_rec( pNew, ppNodes, p, Gia_ObjFanin0(pObj) );
         if ( i % nOutDelta != 0 )
             continue;
         ppNodes[Gia_ObjId(p, pObj)] = Aig_ObjCreateCo( pNew, Gia_ObjChild0Copy2(ppNodes, pObj, Gia_ObjId(p, pObj)) );
@@ -358,7 +359,7 @@ Aig_Man_t * Gia_ManToAigSkip( Gia_Man_t * p, int nOutDelta )
   Synopsis    [Duplicates AIG in the DFS order.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -402,7 +403,7 @@ Aig_Man_t * Gia_ManToAigSimple( Gia_Man_t * p )
   Synopsis    [Duplicates AIG in the DFS order.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -426,7 +427,7 @@ Aig_Man_t * Gia_ManCofactorAig( Aig_Man_t * p, int nFrames, int nCofFanLit )
   Synopsis    [Transfers representatives from pGia to pAig.]
 
   Description [Assumes that pGia was created from pAig.]
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -478,7 +479,7 @@ void Gia_ManReprToAigRepr2( Aig_Man_t * pAig, Gia_Man_t * pGia )
   Synopsis    [Transfers representatives from pAig to pGia.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -486,7 +487,7 @@ void Gia_ManReprToAigRepr2( Aig_Man_t * pAig, Gia_Man_t * pGia )
 ***********************************************************************/
 void Gia_ManReprFromAigRepr( Aig_Man_t * pAig, Gia_Man_t * pGia )
 {
-    Gia_Obj_t * pObjGia; 
+    Gia_Obj_t * pObjGia;
     Aig_Obj_t * pObjAig, * pReprAig;
     int i;
     assert( pAig->pReprs != NULL );
@@ -542,7 +543,7 @@ void Gia_ManReprFromAigRepr2( Aig_Man_t * pAig, Gia_Man_t * pGia )
   Synopsis    [Applies DC2 to the GIA manager.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -570,7 +571,7 @@ Gia_Man_t * Gia_ManCompress2( Gia_Man_t * p, int fUpdateLevel, int fVerbose )
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -598,7 +599,7 @@ Gia_Man_t * Gia_ManPerformDch( Gia_Man_t * p, void * pPars )
   Synopsis    [Computes equivalences after structural sequential cleanup.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -619,7 +620,7 @@ void Gia_ManSeqCleanupClasses( Gia_Man_t * p, int fConst, int fEquiv, int fVerbo
   Synopsis    [Solves SAT problem.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -640,7 +641,7 @@ int Gia_ManSolveSat( Gia_Man_t * p )
         Gia_ManForEachPi( p, pObj, i )
             pObj->fMark0 = pInit[i];
         Gia_ManForEachAnd( p, pObj, i )
-            pObj->fMark0 = (Gia_ObjFanin0(pObj)->fMark0 ^ Gia_ObjFaninC0(pObj)) & 
+            pObj->fMark0 = (Gia_ObjFanin0(pObj)->fMark0 ^ Gia_ObjFaninC0(pObj)) &
                            (Gia_ObjFanin1(pObj)->fMark0 ^ Gia_ObjFaninC1(pObj));
         Gia_ManForEachPo( p, pObj, i )
             pObj->fMark0 = (Gia_ObjFanin0(pObj)->fMark0 ^ Gia_ObjFaninC0(pObj));
@@ -670,4 +671,3 @@ int Gia_ManSolveSat( Gia_Man_t * p )
 
 
 ABC_NAMESPACE_IMPL_END
-

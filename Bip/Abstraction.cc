@@ -736,7 +736,7 @@ void localAbstr(NetlistRef N0, Vec<Wire>& props, const Params_LocalAbstr& P, /*i
             }
 
             bf_depth = depth;
-            if (par) sendMsg_Text(3/*Progress*/, (FMT "bug-free-depth: %_\n", depth));
+            if (par) sendMsg_Progress(0, 1/*safety*/, (FMT "bug-free-depth: %_\n", depth));
             Write_Progress(true);
             n_cex = 0;
             n_stable++;

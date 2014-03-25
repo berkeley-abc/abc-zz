@@ -2027,7 +2027,7 @@ lbool Pdr::run(Cex* cex, NetlistRef invariant, int* bf_depth)
         }else{
             if (!quiet) NewLine;
             if (bf_depth) *bf_depth = clauses.size();
-            if (par)      sendMsg_Text(3/*Progress*/, (FMT "bug-free-depth: %_\n", clauses.size()));
+            if (par) sendMsg_Progress(0, 1, (FMT "bug-free-depth: %_\n", clauses.size()));
             clauses.push();         // -- open up a new state
 
             info.depth = clauses.size();

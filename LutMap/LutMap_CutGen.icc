@@ -245,7 +245,7 @@ void LutMap::generateCuts_LogicGate(Wire w, Vec<Cut>& out)
                 uint dz = (cutmap[z].size() == 0) ? 0 : cutmap[z][0].mux_depth;
                 uint d = max_(du, max_(dv, dz));
               #endif
-                if (d <= 1){
+                if (d <= 1 && isLogic(u) && isLogic(v)){
                     // Add special MUX cut:
                     Cut cut(empty_);
                     cut.mux_depth = d + 1;
