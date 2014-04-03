@@ -152,15 +152,18 @@ void combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size
   #if !defined(STRUCTURAL_MAPPING)
     // Trim support:
     {
+        //**/WriteLn "BEFORE: out: %_   ftb=%.16x", out.inputs, new_ftb;
         uint j = 0;
         for (uint i = 0; i < out.inputs.size(); i++){
             if (ftb6_inSup(new_ftb, i)){
                 if (i != j)
                     new_ftb = ftb6_swap(new_ftb, i, j);
+                out.inputs[j] = out.inputs[i];
                 j++;
             }
         }
         out.inputs.shrinkTo(j);
+        //**/WriteLn "AFTER : out: %_   ftb=%.16x", out.inputs, new_ftb;
     }
   #endif
     //**/if (watch) WriteLn "new_ftb'=%:.16x", new_ftb;

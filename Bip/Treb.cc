@@ -735,6 +735,24 @@ void Treb::sendInvariant()
 
 void Treb::dumpInvar()
 {
+    if (P.save_invar != ""){
+        // Quick copy-paste code...
+        OutFile out(P.save_invar);
+        for (uint d = firstEmpty(F, 1); d < F.size(); d++){
+            for (uint j = 0; j < F[d].size(); j++){
+                Cube c = F[d][j];
+                FWrite(out) "{";
+                for (uint i = 0; i < c.size(); i++){
+                    Wire w = N[c[i]];
+                    FWrite(out) "%C%Cs%_", (i > 0)?' ':0, sign(w)?0:'~', attr_Flop(w).number;
+                }
+                FWriteLn(out) "}";
+            }
+        }
+        WriteLn "Wrote: \a*%_\a*", P.save_invar;
+    }
+
+
     if (P.dump_invar == 0) return;
 
     NewLine;
@@ -1878,6 +1896,7 @@ void addCli_Treb(CLI& cli)
     cli.add("hq"        , "bool"     , P.hq?"yes":"no"              , "Use slow, high-quality generalization procedure.");
     cli.add("redund"    , "bool"     , P.redund_cubes?"yes":"no"    , "Store cubes of F[n] at flop output of F[n-1] as well.");
     cli.add("dump-invar", "int[0:2]" , (FMT "%_", P.dump_invar)     , "Dump invariant: 0=no, 1=clause form, 2=PLA form.");
+    cli.add("save-invar", "string"   , P.save_invar                 , "Save the invariant to this file.");
     cli.add("simp-invar", "int[0:2]" , (FMT "%_", P.dump_invar)     , "Simplify invariant if property proved.");
     cli.add("sat"       , sat_types  , sat_default                  , "SAT-solver to use.");
     cli.add("send-invar", "bool"     , P.par_send_invar?"yes":"no"  , "Send invariant through PAR interface (only in PAR mode).");
@@ -1912,6 +1931,7 @@ void setParams(const CLI& cli, Params_Treb& P)
     P.redund_cubes  = cli.get("redund")    .bool_val;
     P.dump_invar    = cli.get("dump-invar").int_val;
     P.simp_invar    = cli.get("simp-invar").int_val;
+    P.save_invar    = cli.get("save-invar").string_val;
     P.par_send_invar= cli.get("send-invar").bool_val;
     P.par_send_cubes= cli.get("send-cubes").bool_val;
 

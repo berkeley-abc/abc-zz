@@ -744,6 +744,9 @@ void Gig::load(In& in)
 
                 if (gatetype_attr[t] == attr_Enum)
                     type_list[t](v, gid_NULL) = i;
+
+                if (isNumbered(w.type()))
+                    numbers[w.type()].pick(w.gate().inl[2]);   // -- reserve this "external ID" number
             }
         }
     }

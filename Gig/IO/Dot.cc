@@ -109,6 +109,9 @@ void writeBox(Out& out, Gig& N, Wire w, Vec<char>& namebuf, Vec<String>* uif_nam
             FWrite(name2) " %_", (*uif_names)[sym];
         else
             FWrite(name2) " %_", sym;
+
+    }else if (w == gate_Lut6){
+        FWrite(name2) "  %:.16x", ftb(w);
     }
 
     // Output box:

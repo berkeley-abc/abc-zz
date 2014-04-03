@@ -89,8 +89,11 @@ void removeInverters(Gig& N, WMapX<GLit>* remap)
 
     // Remove inverters between a non-LUT fed by a LUT:
     WSeen flipped;
+    WSeen added;
     WMap<GLit> neg_copy;
     For_Gates(N, w){
+        if (added.has(w)) continue;
+
         For_Inputs(w, v){
             if (!neg.has(v)) continue;
 
@@ -106,6 +109,7 @@ void removeInverters(Gig& N, WMapX<GLit>* remap)
                 // Both negated and non-negated fanouts, duplicate gate:
                 if (!neg_copy[v]){
                     Wire u = N.add(gate_Lut6);
+                    added.add(u);
                     for (uint i = 0; i < 6; i++)
                         u.set(i, v[i]);
                     ftb(u) = ~ftb(v);

@@ -52,9 +52,10 @@ struct Params_Treb {
     bool    gen_with_cex;       // Store counterexamples in 'generalize()' to speedup multiple orbits.
     bool    hq;                 // High quality generalization (slower)
     bool    redund_cubes;       // Store cubes of F[n] at flop output of F[n-1] as well.
-    uint    dump_invar;         // Dump invariant (0=no, 1=clauses, 2=PLA).
     SolverType sat_solver;      // SAT-solver to use
+    uint    dump_invar;         // Dump invariant (0=no, 1=clauses, 2=PLA).
     uint    simp_invar;         // 0=no simplification, 1=fast simplification, 2=full simplification
+    String  save_invar;         // Save the invariant to this file
     bool    quiet;              // Suppress output.
     bool    par_send_result;    // If FALSE; CEX or unsat result is not reported in PAR mode.
     bool    par_send_invar;     // If TRUE, invariant is reported (as clauses) in PAR mode.
@@ -82,9 +83,10 @@ struct Params_Treb {
         gen_with_cex(false),
         hq(false),
         redund_cubes(false),
-        dump_invar(0),
         sat_solver(sat_Msc),
+        dump_invar(0),
         simp_invar(0),
+        save_invar(""),
         quiet(false),
         par_send_result(true),
         par_send_invar(false)

@@ -351,7 +351,7 @@ void constrExtr(NetlistRef N, const Vec<GLit>& bad, uint k, uint l, /*out*/Vec<C
 
         for (uint i = 0; i < cands_fwd.size(); i++){
             for (uint j = 0; j < cands_fwd[i].size(); j++)
-                rep(cands_fwd[i][j]) = cands_fwd[i][0];
+                rep(+cands_fwd[i][j]) = cands_fwd[i][0] ^ cands_fwd[i][j].sign;
         }
     }
 
@@ -373,7 +373,7 @@ void constrExtr(NetlistRef N, const Vec<GLit>& bad, uint k, uint l, /*out*/Vec<C
 
         for (uint i = 0; i < cands_bwd.size(); i++){
             for (uint j = 0; j < cands_bwd[i].size(); j++)
-                rep(cands_bwd[i][j]) = cands_bwd[i][0];
+                rep(+cands_bwd[i][j]) = cands_bwd[i][0] ^ cands_bwd[i][j].sign;
         }
     }
 

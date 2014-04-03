@@ -13,6 +13,7 @@
 
 #include "Prelude.hh"
 #include "Aiger.hh"
+#include "ZZ/Generics/Sort.hh"
 
 namespace ZZ {
 using namespace std;
@@ -241,6 +242,130 @@ void readAigerFile(String filename, Gig& N, bool verif_problem)
         throw Excp_AigerParseError(String("Could not open: ") + filename);
 
     readAiger(in, N, verif_problem);
+}
+
+
+//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+static
+void writeAigerNumbers(Out& out, const Vec<Wire>& gs, char prefix)
+{
+    uind c = 0;
+    for (uint i = 0; i < gs.size(); i++){
+        Wire w = gs[i];
+        out += prefix, c, ' ', '@', prefix, w.num(), '\n';
+        c++;
+    }
+}
+
+
+struct GetNum {
+    typedef Wire Key;
+    int operator() (Wire w) const { return w.num(); }
+};
+
+
+void writeAiger(Out& out, const Gig& N, Array<uchar> comment)
+{
+    // Compute mapping:
+    WMap<uind> n2a;     // -- map wire in 'N' to AIGER literal.
+    n2a(N.True()) = 1;
+
+    Vec<GLit> order;
+    {
+        WZet seen;
+        bool is_ordered = true;
+        For_Gates(N, w){    // -- if netlist is already topologically sorted, use that order (reordering can be invasive)
+            if (w == gate_And && (!seen.has(w[0]) || !seen.has(w[1]))){
+                is_ordered = false;
+                break;
+            }
+            seen.add(w);
+            order.push(w);
+        }
+        if (!is_ordered)
+            upOrder(N, order);
+    }
+
+    Vec<Wire> is, fs, os;
+    Vec<Wire> as(reserve_, N.typeCount(gate_And));
+    for (uind i = 0; i < order.size(); i++){
+        Wire w = N[order[i]];
+        switch (w.type()){
+        case gate_PI  : is.push(w); break;
+        case gate_FF  : fs.push(w); break;
+        case gate_PO  : os.push(w); break;
+        case gate_And : as.push(w); break;
+        default: assert(false); }
+    }
+
+    // If numbering is compact, chose that order for the AIGER file:
+    sobSort(sob(is, proj_lt(GetNum())));
+    sobSort(sob(os, proj_lt(GetNum())));
+    sobSort(sob(fs, proj_lt(GetNum())));
+
+    uind piC   = 1;
+    uind flopC = 1 + is.size();
+    uind andC  = 1 + is.size() + fs.size();
+    for (uind i = 0; i < is.size(); i++) n2a(is[i]) = 2 * piC++;
+    for (uind i = 0; i < fs.size(); i++) n2a(fs[i]) = 2 * flopC++;
+    for (uind i = 0; i < as.size(); i++) n2a(as[i]) = 2 * andC++;
+
+
+    // Write header, flops and POs:
+    out += "aig ", is.size() + fs.size() + as.size(), ' ', is.size(), ' ', fs.size(), ' ', os.size(), ' ', as.size(), '\n';
+
+    for (uind i = 0; i < fs.size(); i++){
+        if (!fs[i])
+            out += '0', '\n';       // -- missing flops are constant 0
+        else{
+            Wire w0 = fs[i][0];
+            out += n2a[w0] ^ uind(sign(w0)), '\n';
+        }
+    }
+    for (uind i = 0; i < os.size(); i++){
+        if (!os[i])
+            out += '0', '\n';
+        else{
+            Wire w0 = os[i][0];     // -- missing primary inputs are constant 0
+            out += n2a[w0] ^ uind(sign(w0)), '\n';
+        }
+    }
+
+    for (uind i = 0; i < as.size(); i++){
+        Wire w = as[i];
+        uind idx_w  = n2a[w];
+        uind idx_w0 = n2a[w[0]] ^ uind(sign(w[0]));
+        uind idx_w1 = n2a[w[1]] ^ uind(sign(w[1]));
+        assert(idx_w > idx_w0); assert(idx_w > idx_w1);    // -- the topological order should assign a higher index to 'w'
+        if (idx_w0 < idx_w1) swp(idx_w0, idx_w1);
+        putu(out, idx_w - idx_w0);
+        putu(out, idx_w0 - idx_w1);
+    }
+
+    // Write external gate numbers:
+    writeAigerNumbers(out, is, 'i');
+    writeAigerNumbers(out, fs, 'l');
+    writeAigerNumbers(out, os, 'o');
+
+    // Write comment:
+    if (comment){
+        out += "c";     // -- standard say 'c' must be followed by newline, but we leave that up to the caller (since ABC doesn't do this)
+        for (uind i = 0; i < comment.size(); i++)
+            out += (char)comment[i];
+    }
+}
+
+
+// Returns FALSE if file could not be created.
+bool writeAigerFile(String filename, const Gig& N, Array<uchar> comment)
+{
+    OutFile out(filename);
+    if (out.null()) return false;
+
+    writeAiger(out, N, comment);
+    return true;
 }
 
 

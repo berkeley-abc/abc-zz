@@ -29,6 +29,10 @@ void readAiger    (In& in         , Gig& N, bool verif_prob);
 void readAigerFile(String filename, Gig& N, bool verif_prob);
     // -- if 'verif_problem' is TRUE and file is in AIGER 1.0, POs are converted to SafeProps
 
+void writeAiger    (Out& out       , const Gig& N, Array<uchar> comment = Array<uchar>());
+bool writeAigerFile(String filename, const Gig& N, Array<uchar> comment = Array<uchar>());
+    // -- returns FALSE if file could not be created.
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }

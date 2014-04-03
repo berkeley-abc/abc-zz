@@ -856,6 +856,12 @@ int main(int argc, char** argv)
       #if 1   /*DEBUG*/
         if (P.use_fmux && !P.quiet && !cli.get("batch").bool_val)
             checkFmuxes(N);
+
+        if (getenv("DUMP_MUXES")){
+            For_Gates(N, w)
+                if (w == gate_Mux)
+                    Dump(w);
+        }
       #endif  /*END DEBUG*/
     }
 
