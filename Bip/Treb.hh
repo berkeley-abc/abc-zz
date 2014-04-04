@@ -89,7 +89,8 @@ struct Params_Treb {
         save_invar(""),
         quiet(false),
         par_send_result(true),
-        par_send_invar(false)
+        par_send_invar(false),
+        par_send_cubes(false)
     {}
 };
 

@@ -1288,13 +1288,12 @@ void test(int argc, char** argv)
 
     // Map round 1:
     Params_TechMap P;
-    P.n_iters = 1;
     {
         TechMap map(N, P);
         map.run();
     }
 
-#if 0
+#if 1
     // Map round 2:
     unmap(N);
     expandXigGates(N);      // <<== remember to remove this when mapper can handle these gates natively
