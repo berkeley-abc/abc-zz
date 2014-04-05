@@ -73,7 +73,7 @@ void Pdr_ManSetDefaultParams( Pdr_Par_t * pPars )
   Synopsis    [Reduces clause using analyzeFinal.]
 
   Description [Assumes that the SAT solver just terminated an UNSAT call.]
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -126,7 +126,7 @@ Pdr_Set_t * Pdr_ManReduceClause( Pdr_Man_t * p, int k, Pdr_Set_t * pCube )
   Synopsis    [Returns 1 if the state could be blocked.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -926,7 +926,7 @@ int Pdr_ManSolve( Aig_Man_t * pAig, Pdr_Par_t * pPars )
         for ( k = 0; k < Saig_ManPoNum(pAig); k++ )
             if ( Vec_IntEntry(pPars->vOutMap, k) == -2 ) // unknown
                 Vec_IntWriteEntry( pPars->vOutMap, k, -1 ); // undec
-    if ( pPars->fUseBridge )
+    if ( pPars->fUseBridge && RetValue == -1)
         Gia_ManToBridgeAbort( stdout, 7, (unsigned char *)"timeout" );
     return RetValue;
 }
