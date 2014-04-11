@@ -27,11 +27,11 @@ ABC_NAMESPACE_IMPL_START
 ////////////////////////////////////////////////////////////////////////
 ///                        DECLARATIONS                              ///
 ////////////////////////////////////////////////////////////////////////
- 
+
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///
 ////////////////////////////////////////////////////////////////////////
- 
+
 /**Function*************************************************************
 
   Synopsis    []
@@ -103,7 +103,7 @@ void Llb_ManPrintAig( Llb_Man_t * p )
   Synopsis    []
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -111,7 +111,7 @@ void Llb_ManPrintAig( Llb_Man_t * p )
 ***********************************************************************/
 int Llb_ManModelCheckAig( Aig_Man_t * pAigGlo, Gia_ParLlb_t * pPars, Vec_Int_t * vHints, DdManager ** pddGlo )
 {
-    Llb_Man_t * p = NULL; 
+    Llb_Man_t * p = NULL;
     Aig_Man_t * pAig;
     int RetValue = -1;
     abctime clk = Abc_Clock();
@@ -143,7 +143,7 @@ int Llb_ManModelCheckAig( Aig_Man_t * pAigGlo, Gia_ParLlb_t * pPars, Vec_Int_t *
         if ( pPars->fVerbose )
         {
             Llb_ManPrintAig( p );
-            printf( "Original matrix:          " );
+            Abc_Print( 1, "Original matrix:          " );
             Llb_MtrPrintMatrixStats( p->pMatrix );
             if ( pPars->fVeryVerbose )
                 Llb_MtrPrint( p->pMatrix, 1 );
@@ -153,7 +153,7 @@ int Llb_ManModelCheckAig( Aig_Man_t * pAigGlo, Gia_ParLlb_t * pPars, Vec_Int_t *
             Llb_ManCluster( p->pMatrix );
             if ( pPars->fVerbose )
             {
-                printf( "Matrix after clustering:  " );
+                Abc_Print( 1, "Matrix after clustering:  " );
                 Llb_MtrPrintMatrixStats( p->pMatrix );
                 if ( pPars->fVeryVerbose )
                     Llb_MtrPrint( p->pMatrix, 1 );
@@ -164,15 +164,15 @@ int Llb_ManModelCheckAig( Aig_Man_t * pAigGlo, Gia_ParLlb_t * pPars, Vec_Int_t *
             Llb_MtrSchedule( p->pMatrix );
             if ( pPars->fVerbose )
             {
-                printf( "Matrix after scheduling:  " );
+                Abc_Print( 1, "Matrix after scheduling:  " );
                 Llb_MtrPrintMatrixStats( p->pMatrix );
                 if ( pPars->fVeryVerbose )
                     Llb_MtrPrint( p->pMatrix, 1 );
             }
         }
     }
-    
-    if ( !p->pPars->fSkipReach ) 
+
+    if ( !p->pPars->fSkipReach )
         RetValue = Llb_ManReachability( p, vHints, pddGlo );
     Llb_ManStop( p );
 
@@ -202,7 +202,7 @@ int Llb_ManModelCheckGia( Gia_Man_t * pGia, Gia_ParLlb_t * pPars )
     pGia2 = Gia_ManDupDfs( pGia );
     pAig  = Gia_ManToAigSimple( pGia2 );
     Gia_ManStop( pGia2 );
-//Aig_ManShow( pAig, 0, NULL ); 
+//Aig_ManShow( pAig, 0, NULL );
 
     if ( pPars->nHintDepth == 0 )
         RetValue = Llb_ManModelCheckAig( pAig, pPars, NULL, NULL );
@@ -219,4 +219,3 @@ int Llb_ManModelCheckGia( Gia_Man_t * pGia, Gia_ParLlb_t * pPars )
 
 
 ABC_NAMESPACE_IMPL_END
-

@@ -110,7 +110,7 @@ Aig_Man_t * Aig_ManStartFrom( Aig_Man_t * p )
   Synopsis    [Duplicates the AIG manager recursively.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -155,16 +155,16 @@ Aig_Man_t * Aig_ManExtractMiter( Aig_Man_t * p, Aig_Obj_t * pNode1, Aig_Obj_t * 
     Aig_ManForEachCi( p, pObj, i )
         pObj->pData = Aig_ObjCreateCi(pNew);
     // dump the nodes
-    Aig_ManDup_rec( pNew, p, pNode1 );   
-    Aig_ManDup_rec( pNew, p, pNode2 );   
+    Aig_ManDup_rec( pNew, p, pNode1 );
+    Aig_ManDup_rec( pNew, p, pNode2 );
     // construct the EXOR
-    pObj = Aig_Exor( pNew, (Aig_Obj_t *)pNode1->pData, (Aig_Obj_t *)pNode2->pData ); 
+    pObj = Aig_Exor( pNew, (Aig_Obj_t *)pNode1->pData, (Aig_Obj_t *)pNode2->pData );
     pObj = Aig_NotCond( pObj, Aig_Regular(pObj)->fPhase ^ Aig_IsComplement(pObj) );
     // add the PO
     Aig_ObjCreateCo( pNew, pObj );
     // check the resulting network
     if ( !Aig_ManCheck(pNew) )
-        printf( "Aig_ManExtractMiter(): The check has failed.\n" );
+        Abc_Print( 1, "Aig_ManExtractMiter(): The check has failed.\n" );
     return pNew;
 }
 
@@ -190,9 +190,9 @@ void Aig_ManStop( Aig_Man_t * p )
     Aig_ManForEachObj( p, pObj, i )
         assert( !pObj->fMarkA && !pObj->fMarkB );
     Tim_ManStopP( (Tim_Man_t **)&p->pManTime );
-    if ( p->pFanData ) 
+    if ( p->pFanData )
         Aig_ManFanoutStop( p );
-    if ( p->pManExdc )  
+    if ( p->pManExdc )
         Aig_ManStop( p->pManExdc );
 //    Aig_TableProfile( p );
     Aig_MmFixedStop( p->pMemObjs, 0 );
@@ -229,7 +229,7 @@ void Aig_ManStop( Aig_Man_t * p )
   Synopsis    [Stops the AIG manager.]
 
   Description []
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -248,7 +248,7 @@ void Aig_ManStopP( Aig_Man_t ** p )
   Synopsis    [Removes combinational logic that does not feed into POs.]
 
   Description [Returns the number of dangling nodes removed.]
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -276,7 +276,7 @@ int Aig_ManCleanup( Aig_Man_t * p )
   Synopsis    [Adds POs for the nodes that otherwise would be dangling.]
 
   Description [Returns the number of POs added.]
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -297,7 +297,7 @@ int Aig_ManAntiCleanup( Aig_Man_t * p )
   Synopsis    [Removes PIs without fanouts.]
 
   Description [Returns the number of PIs removed.]
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -328,7 +328,7 @@ int Aig_ManCiCleanup( Aig_Man_t * p )
   Synopsis    [Removes POs with constant input.]
 
   Description [Returns the number of POs removed.]
-               
+
   SideEffects []
 
   SeeAlso     []
@@ -371,25 +371,25 @@ int Aig_ManCoCleanup( Aig_Man_t * p )
 void Aig_ManPrintStats( Aig_Man_t * p )
 {
     int nChoices = Aig_ManChoiceNum(p);
-    printf( "%-15s : ",      p->pName );
-    printf( "pi = %5d  ",    Aig_ManCiNum(p)-Aig_ManRegNum(p) );
-    printf( "po = %5d  ",    Aig_ManCoNum(p)-Aig_ManRegNum(p) );
+    Abc_Print( 1, "%-15s : ",      p->pName );
+    Abc_Print( 1, "pi = %5d  ",    Aig_ManCiNum(p)-Aig_ManRegNum(p) );
+    Abc_Print( 1, "po = %5d  ",    Aig_ManCoNum(p)-Aig_ManRegNum(p) );
     if ( Aig_ManRegNum(p) )
-    printf( "lat = %5d  ", Aig_ManRegNum(p) );
-    printf( "and = %7d  ",   Aig_ManAndNum(p) );
-//    printf( "Eq = %7d  ",     Aig_ManHaigCounter(p) );
+    Abc_Print( 1, "lat = %5d  ", Aig_ManRegNum(p) );
+    Abc_Print( 1, "and = %7d  ",   Aig_ManAndNum(p) );
+//    Abc_Print( 1, "Eq = %7d  ",     Aig_ManHaigCounter(p) );
     if ( Aig_ManExorNum(p) )
-    printf( "xor = %5d  ",    Aig_ManExorNum(p) );
+    Abc_Print( 1, "xor = %5d  ",    Aig_ManExorNum(p) );
     if ( nChoices )
-    printf( "ch = %5d  ",  nChoices );
+    Abc_Print( 1, "ch = %5d  ",  nChoices );
     if ( Aig_ManBufNum(p) )
-    printf( "buf = %5d  ",    Aig_ManBufNum(p) );
-//    printf( "Cre = %6d  ",  p->nCreated );
-//    printf( "Del = %6d  ",  p->nDeleted );
-//    printf( "Lev = %3d  ",  Aig_ManLevelNum(p) );
-//    printf( "Max = %7d  ",  Aig_ManObjNumMax(p) );
-    printf( "lev = %3d",  Aig_ManLevels(p) );
-    printf( "\n" );
+    Abc_Print( 1, "buf = %5d  ",    Aig_ManBufNum(p) );
+//    Abc_Print( 1, "Cre = %6d  ",  p->nCreated );
+//    Abc_Print( 1, "Del = %6d  ",  p->nDeleted );
+//    Abc_Print( 1, "Lev = %3d  ",  Aig_ManLevelNum(p) );
+//    Abc_Print( 1, "Max = %7d  ",  Aig_ManObjNumMax(p) );
+    Abc_Print( 1, "lev = %3d",  Aig_ManLevels(p) );
+    Abc_Print( 1, "\n" );
     fflush( stdout );
 }
 
@@ -406,13 +406,13 @@ void Aig_ManPrintStats( Aig_Man_t * p )
 ***********************************************************************/
 void Aig_ManReportImprovement( Aig_Man_t * p, Aig_Man_t * pNew )
 {
-    printf( "REG: Beg = %5d. End = %5d. (R =%5.1f %%)  ",
-        Aig_ManRegNum(p), Aig_ManRegNum(pNew), 
+    Abc_Print( 1, "REG: Beg = %5d. End = %5d. (R =%5.1f %%)  ",
+        Aig_ManRegNum(p), Aig_ManRegNum(pNew),
         Aig_ManRegNum(p)? 100.0*(Aig_ManRegNum(p)-Aig_ManRegNum(pNew))/Aig_ManRegNum(p) : 0.0 );
-    printf( "AND: Beg = %6d. End = %6d. (R =%5.1f %%)",
-        Aig_ManNodeNum(p), Aig_ManNodeNum(pNew), 
+    Abc_Print( 1, "AND: Beg = %6d. End = %6d. (R =%5.1f %%)",
+        Aig_ManNodeNum(p), Aig_ManNodeNum(pNew),
         Aig_ManNodeNum(p)? 100.0*(Aig_ManNodeNum(p)-Aig_ManNodeNum(pNew))/Aig_ManNodeNum(p) : 0.0 );
-    printf( "\n" );
+    Abc_Print( 1, "\n" );
 }
 
 /**Function*************************************************************
@@ -448,7 +448,7 @@ void Aig_ManSetRegNum( Aig_Man_t * p, int nRegs )
 ***********************************************************************/
 void Aig_ManFlipFirstPo( Aig_Man_t * p )
 {
-    Aig_ObjChild0Flip( Aig_ManCo(p, 0) ); 
+    Aig_ObjChild0Flip( Aig_ManCo(p, 0) );
 }
 
 /**Function*************************************************************
@@ -463,9 +463,9 @@ void Aig_ManFlipFirstPo( Aig_Man_t * p )
 
 ***********************************************************************/
 void * Aig_ManReleaseData( Aig_Man_t * p )
-{ 
-    void * pD = p->pData; 
-    p->pData = NULL; 
+{
+    void * pD = p->pData;
+    p->pData = NULL;
     return pD;
 }
 
@@ -475,4 +475,3 @@ void * Aig_ManReleaseData( Aig_Man_t * p )
 
 
 ABC_NAMESPACE_IMPL_END
-

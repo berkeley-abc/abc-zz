@@ -70,7 +70,7 @@ Nwk_Man_t * Nwk_ManAlloc()
 ***********************************************************************/
 void Nwk_ManFree( Nwk_Man_t * p )
 {
-//    printf( "The number of realloced nodes = %d.\n", p->nRealloced );
+//    Abc_Print( 1, "The number of realloced nodes = %d.\n", p->nRealloced );
     if ( p->pName )    ABC_FREE( p->pName );
     if ( p->pSpec )    ABC_FREE( p->pSpec );
     if ( p->vCis )     Vec_PtrFree( p->vCis );
@@ -100,9 +100,9 @@ void Nwk_ManPrintLutSizes( Nwk_Man_t * p, If_LibLut_t * pLutLib )
     int i, Counters[256] = {0};
     Nwk_ManForEachNode( p, pObj, i )
         Counters[Nwk_ObjFaninNum(pObj)]++;
-    printf( "LUTs by size: " );
+    Abc_Print( 1, "LUTs by size: " );
     for ( i = 0; i <= pLutLib->LutMax; i++ )
-        printf( "%d:%d ", i, Counters[i] );
+        Abc_Print( 1, "%d:%d ", i, Counters[i] );
 }
 
 /**Function*************************************************************
@@ -151,10 +151,10 @@ int Nwk_ManCompareAndSaveBest( Nwk_Man_t * pNtk, void * pNtl )
     {
         ABC_FREE( ParsBest.pName );
         ParsBest.pName = Abc_UtilStrsav( pNtk->pName );
-        ParsBest.Depth = ParsNew.Depth; 
-        ParsBest.Flops = ParsNew.Flops; 
-        ParsBest.Nodes = ParsNew.Nodes; 
-        ParsBest.nPis  = ParsNew.nPis; 
+        ParsBest.Depth = ParsNew.Depth;
+        ParsBest.Flops = ParsNew.Flops;
+        ParsBest.Nodes = ParsNew.Nodes;
+        ParsBest.nPis  = ParsNew.nPis;
         ParsBest.nPos  = ParsNew.nPos;
         // write the network
 //        Ntl_WriteBlifLogic( pNtk, pNtl, "best.blif" );
@@ -219,7 +219,7 @@ float Nwl_ManComputeTotalSwitching( Nwk_Man_t * pNtk )
     Aig_ManStop( pAig );
     return Result;
 }
- 
+
 /**Function*************************************************************
 
   Synopsis    [Prints stats of the manager.]
@@ -249,22 +249,22 @@ void Nwk_ManPrintStats( Nwk_Man_t * pNtk, If_LibLut_t * pLutLib, int fSaveBest, 
     }
 
     pNtk->pLutLib = pLutLib;
-    printf( "%-15s : ",      pNtk->pName );
-    printf( "pi = %5d  ",    Nwk_ManPiNum(pNtk) );
-    printf( "po = %5d  ",    Nwk_ManPoNum(pNtk) );
-    printf( "ci = %5d  ",    Nwk_ManCiNum(pNtk) );
-    printf( "co = %5d  ",    Nwk_ManCoNum(pNtk) );
-//    printf( "lat = %5d  ",   Ntl_ManLatchNum(pNtl) );
-    printf( "node = %5d  ",  Nwk_ManNodeNum(pNtk) );
-    printf( "edge = %5d  ",  Nwk_ManGetTotalFanins(pNtk) );
-    printf( "aig = %6d  ",   Nwk_ManGetAigNodeNum(pNtk) );
-    printf( "lev = %3d  ",   Nwk_ManLevel(pNtk) );
-//    printf( "lev2 = %3d  ",  Nwk_ManLevelBackup(pNtk) );
-    printf( "delay = %5.2f  ", Nwk_ManDelayTraceLut(pNtk) );
+    Abc_Print( 1, "%-15s : ",      pNtk->pName );
+    Abc_Print( 1, "pi = %5d  ",    Nwk_ManPiNum(pNtk) );
+    Abc_Print( 1, "po = %5d  ",    Nwk_ManPoNum(pNtk) );
+    Abc_Print( 1, "ci = %5d  ",    Nwk_ManCiNum(pNtk) );
+    Abc_Print( 1, "co = %5d  ",    Nwk_ManCoNum(pNtk) );
+//    Abc_Print( 1, "lat = %5d  ",   Ntl_ManLatchNum(pNtl) );
+    Abc_Print( 1, "node = %5d  ",  Nwk_ManNodeNum(pNtk) );
+    Abc_Print( 1, "edge = %5d  ",  Nwk_ManGetTotalFanins(pNtk) );
+    Abc_Print( 1, "aig = %6d  ",   Nwk_ManGetAigNodeNum(pNtk) );
+    Abc_Print( 1, "lev = %3d  ",   Nwk_ManLevel(pNtk) );
+//    Abc_Print( 1, "lev2 = %3d  ",  Nwk_ManLevelBackup(pNtk) );
+    Abc_Print( 1, "delay = %5.2f  ", Nwk_ManDelayTraceLut(pNtk) );
     if ( fPower )
-        printf( "power = %7.2f   ", Nwl_ManComputeTotalSwitching(pNtk) );
+        Abc_Print( 1, "power = %7.2f   ", Nwl_ManComputeTotalSwitching(pNtk) );
     Nwk_ManPrintLutSizes( pNtk, pLutLib );
-    printf( "\n" );
+    Abc_Print( 1, "\n" );
 //    Nwk_ManDelayTracePrint( pNtk, pLutLib );
     fflush( stdout );
 }
@@ -275,4 +275,3 @@ void Nwk_ManPrintStats( Nwk_Man_t * pNtk, If_LibLut_t * pLutLib, int fSaveBest, 
 
 
 ABC_NAMESPACE_IMPL_END
-
