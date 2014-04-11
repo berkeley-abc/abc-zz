@@ -59,14 +59,16 @@ bool applySubsumption(DynCutSet& out)
 // PRE-CONDITION: Inputs of 'cut1' and 'cut2' are sorted.
 // Only the lower 4 bits of 'ftb' is used. If the new cut has <= 'cut_size' inputs, it is
 // pushed onto 'out' (by calling 'out.next()'). Otherwise, 'out' is left unchanged.
+// Returns FALSE if it is time to abort cut enumeration (because buffer/inverter or constant was 
+// detected).
 static
-void combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size, DynCutSet& out)
+bool combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size, DynCutSet& out)
 {
     assert_debug(cut_size <= 6);  // -- larger cuts not yet supported
     assert_debug(out.inputs.size() == 0);
 
     if (moreThanKBitsSet(cut1.sig() | cut2.sig(), cut_size))
-        return;
+        return true;
 
     //**/bool watch = (cut1.size() == 2 && cut1[0] == 10 && cut1[1] == 11 && cut2.size() == 1 && cut2[0] == 9);
 
@@ -84,7 +86,7 @@ void combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size
     if (cut2.size() == 0) goto FlushCut1;
     for(;;){
         uint k = out.inputs.size();
-        if (k == cut_size){ out.inputs.clear(); return; }
+        if (k == cut_size){ out.inputs.clear(); return true; }
         if (cut1[i] < cut2[j]){
             //**/if (watch) WriteLn "  ftb1 swap(%_, %_)", k, (uint)loc1[i];
             ftb1 = ftb6_swap(ftb1, k, loc1[i]); loc1[k] = loc1[i];
@@ -107,7 +109,7 @@ void combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size
     }
 
   FlushCut1:
-    if (out.inputs.size() + cut1.size() - i > cut_size){ out.inputs.clear(); return; }
+    if (out.inputs.size() + cut1.size() - i > cut_size){ out.inputs.clear(); return true; }
     while (i < cut1.size()){
         //**/if (watch) WriteLn "  ftb1' swap(%_, %_)", out.inputs.size(), (uint)loc1[i];
         uint k = out.inputs.size();
@@ -116,7 +118,7 @@ void combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size
     goto Done;
 
   FlushCut2:
-    if (out.inputs.size() + cut2.size() - j > cut_size){ out.inputs.clear(); return; }
+    if (out.inputs.size() + cut2.size() - j > cut_size){ out.inputs.clear(); return true; }
     while (j < cut2.size()){
         //**/if (watch) WriteLn "  ftb2' swap(%_, %_)", out.inputs.size(), (uint)loc2[j];
         uint k = out.inputs.size();
@@ -170,7 +172,7 @@ void combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size
 
     out.ftb.push(new_ftb);
     out.next();
-    applySubsumption(out);  // <<== if returns FALSE, we should stop cut-enumeration for this node
+    return applySubsumption(out);  // <<== if returns FALSE, we should stop cut-enumeration for this node
 
     //**/if (watch){ WriteLn "State of 'out':";
     //**/for (uint i = 0; i < out.size(); i++) WriteLn "  %_", out[i]; }
@@ -194,6 +196,13 @@ macro Cut mkTrivCut(uint64* base, gate_id input)
 }
 
 
+macro Cut mkConstCut(uint64* base)
+{
+    uint64 ftb = 0xFFFFFFFFFFFFFFFFull;
+    return Cut(base, Array<gate_id>(empty_), &ftb);
+}
+
+
 void TechMap::generateCuts_LogicGate(Wire w, DynCutSet& out)
 {
     assert(w == gate_And || w == gate_Lut4);
@@ -208,9 +217,15 @@ void TechMap::generateCuts_LogicGate(Wire w, DynCutSet& out)
     uint    sz;
     for (sz = 0; sz < w.size(); sz++){
         if (+w[sz] == Wire_NULL) break;
-        triv[sz] = mkTrivCut(triv_mem + triv_words * sz, w[sz].id);
-        cs  [sz] = cutmap[w[sz]];
-        lim [sz] = (int)cs[sz].size();
+        if (+w[sz] == GLit_True){
+            triv[sz] = mkConstCut(triv_mem + triv_words * sz);
+            cs  [sz] = CutSet_NULL;
+            lim [sz] = 0;
+        }else{
+            triv[sz] = mkTrivCut(triv_mem + triv_words * sz, w[sz].id);
+            cs  [sz] = cutmap[w[sz]];
+            lim [sz] = (int)cs[sz].size();
+        }
     }
 
     // Combine cut-sets:
@@ -226,10 +241,6 @@ void TechMap::generateCuts_LogicGate(Wire w, DynCutSet& out)
         assert(w.arg() == 0x5555 || w.arg() == 0xAAAA);
         out.inputs.push(w[0].id);
         out.ftb.push( ((w.arg() == 0x5555) != (bool)w[0].sign) ? 0x5555555555555555ull : 0xAAAAAAAAAAAAAAAAull );
-            // <<== should reconnect gates here, omitting this buffer!
-            // (alternatively, just copy (and perhaps negate) cutmap of input
-            // -- this doesn't solve problem of trivial cut for this node though)
-      /**/Ping;
         break;
     }
 
@@ -240,8 +251,10 @@ void TechMap::generateCuts_LogicGate(Wire w, DynCutSet& out)
 
         for (int i0 = -1; i0 < lim[0]; i0++){ const Cut& c0 = (i0 == -1) ? triv[0] : cs[0][i0];
         for (int i1 = -1; i1 < lim[1]; i1++){ const Cut& c1 = (i1 == -1) ? triv[1] : cs[1][i1];
-            combineCuts_Bin(c0, c1, ftb, P.cut_size, out);
+            if (!combineCuts_Bin(c0, c1, ftb, P.cut_size, out))
+                goto Done;
         }}
+      Done:
         break;
     }
 

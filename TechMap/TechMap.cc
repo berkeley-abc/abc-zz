@@ -526,6 +526,7 @@ class TechMap {
     // Helper methods:
 
     // Major internal methods:
+    void bypassTrivialCutsets(Wire w);
     void generateCuts(Wire w);
     void generateCuts_LogicGate(Wire w, DynCutSet& out_dcuts);
     void prioritizeCuts(Wire w, DynCutSet& dcuts);
@@ -671,9 +672,35 @@ void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
 #include "TechMap_CutGen.icc"
 
 
+void TechMap::bypassTrivialCutsets(Wire w)
+{
+    // If a buffer or a constant was detected during cut enumeration, replace input
+    // with input of buffer or the constant that was detected:
+    For_Inputs(w, v){
+        if (cutmap[v].size() == 1 && cutmap[v][0].size() <= 1){
+            assert(cutmap[v][0].ftbSz() == 1);
+            uint64 ftb = cutmap[v][0].ftb();
+            if (ftb == 0x0000000000000000ull)
+                w.set(Input_Pin(v), ~N.True() ^ sign(v));
+            else if (ftb == 0xFFFFFFFFFFFFFFFFull)
+                w.set(Input_Pin(v), N.True() ^ sign(v));
+            else if (ftb == 0x5555555555555555ull)
+                w.set(Input_Pin(v), ~N[cutmap[v][0][0]] ^ sign(v));
+            else if (ftb == 0xAAAAAAAAAAAAAAAAull)
+                w.set(Input_Pin(v), N[cutmap[v][0][0]] ^ sign(v));
+            else
+                assert(false);
+        }
+    }
+}
+
+
 void TechMap::generateCuts(Wire w)
 {
     assert(!w.sign);
+
+    if (!isSeqElem(w))
+        bypassTrivialCutsets(w);
 
     dcuts.begin();
     bool skip = false;
@@ -846,7 +873,7 @@ void TechMap::induceMapping(bool instantiate)
 
                 uint  best_i    = UINT_MAX;
                 float best_area = FLT_MAX;
-              #if 1
+              #if 0
                 //<<== failade här för np.aig, runda 2 (best_i förblev UINT_MAX)
                 // Pick best implementation among current choices:
                 for (uint i = 0; i < impl.size() && impl[i][w].idx != CutImpl::NO_CUT; i++){
@@ -854,24 +881,6 @@ void TechMap::induceMapping(bool instantiate)
                         if (newMin(best_area, impl[i][w].area_est))
                             best_i = i;
                 }
-
-#if 0   /*DEBUG*/
-                    if (best_i == UINT_MAX){
-                        for (uint i = 0; i < impl.size(); i++){
-                            Write "impl[%_] = %_ : ", i, impl[i][w];
-                            if (impl[i][w].idx == CutImpl::NO_CUT)
-                                Write "<no-cut>";
-                            else if (impl[i][w].idx == CutImpl::TRIV_CUT)
-                                Write "<triv-cut>";
-                            else{
-                                int j = impl[i][w].idx;
-                                Cut cut = cutmap[w][j];
-                                Write "%_", cut;
-                            }
-                            NewLine;
-                        }
-                    }
-#endif  /*END DEBUG*/
 
               #else
                 // Pick best implementation among updated choices:
@@ -885,6 +894,7 @@ void TechMap::induceMapping(bool instantiate)
                     float area_est;
                     bool  late;
                     l_tuple(arrival, area_est, late) = cutImpl_bestArea(cut, impl, req_time - 1.0f);    // <<== 1.0f
+                    area_est += P.lut_cost[cut.size()];
 
                     if (!late)
                         if (newMin(best_area, area_est))
@@ -1054,7 +1064,7 @@ void TechMap::run()
     target_arrival = 0;
 
     cutmap    .reserve(N.size());
-    //winner    .reserve(N.size());     // <<==
+    winner    .reserve(N.size());
     fanout_est.reserve(N.size());
     depart    .reserve(N.size());
     active    .reserve(N.size());
@@ -1091,9 +1101,10 @@ void TechMap::run()
             generateCuts(w);
         double T1 ___unused = cpuTime();
 
+        // <<== eliminate buffers/constants feeding COs
+
         // Finalize mapping:
         //<<== set target delay (at least if iter 0)
-        //<<== if not recycling cuts, set 'winner'
 
         // Computer estimations:
         if (iter == 0)
