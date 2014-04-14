@@ -258,8 +258,8 @@ struct Delay_lt {
     bool operator()(const LutMap_Cost& x, const LutMap_Cost& y) const {
         if (x.delay < y.delay) return true;
         if (x.delay > y.delay) return false;
-        //**/if (x.cut_size < y.cut_size) return true;
-        //**/if (x.cut_size > y.cut_size) return false;
+        /**/if (x.cut_size < y.cut_size) return true;
+        /**/if (x.cut_size > y.cut_size) return false;
         if (x.area < y.area) return true;
         if (x.area > y.area) return false;
         if (x.avg_fanout > y.avg_fanout) return true;

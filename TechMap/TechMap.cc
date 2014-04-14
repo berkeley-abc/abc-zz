@@ -12,6 +12,7 @@
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
+#include "TechMap.hh"
 #include "ZZ_Gig.hh"
 #include "ZZ_Gig.IO.hh"
 #include "ZZ_BFunc.hh"
@@ -61,10 +62,10 @@ F7s, F8s
 
 Example circuit:
   #Seq=834,781
-  #Lut4=2,340,883 
-  #Delay=455 
+  #Lut4=2,340,883
+  #Delay=455
   #Box=374,355
-  #Sel=21,965  
+  #Sel=21,965
 
 
 */
@@ -82,6 +83,80 @@ macro uint countInputs(Wire w) {
         if (w[i])
             n++;
     return n;
+}
+
+
+static
+void removeInverters(Gig& N)
+{
+    // Categorize fanout-inverter situation, considering only non-LUT fanouts:
+    WSeen pos, neg;
+    For_Gates(N, w){
+        if (w == gate_Lut6) continue;
+
+        For_Inputs(w, v){
+            if (v.sign){
+                if (v == gate_Lut6){
+                    // LUT has a signed fanout:
+                    neg.add(v);
+                }else{
+                    // Non-LUT to non-LUT connection with inverters -- need to insert a inverter:
+                    Wire u = N.add(gate_Lut6).init(+v);
+                    ftb(u) = 0x5555555555555555ull;
+                    w.set(Input_Pin(v), u);
+                }
+            }else if (v == gate_Lut6)
+                // LUT has a non-signed fanout:
+                pos.add(v);
+        }
+    }
+
+    // Remove inverters between a non-LUT fed by a LUT:
+    WSeen flipped;
+    WSeen added;
+    WMap<GLit> neg_copy;
+    For_Gates(N, w){
+        if (added.has(w)) continue;
+
+        For_Inputs(w, v){
+            if (!neg.has(v)) continue;
+
+            if (!pos.has(v)){
+                // Only negated fanouts; invert FTB:
+                if (!flipped.has(v)){
+                    ftb(v) = ~ftb(v);
+                    flipped.add(v);
+                }
+                w.set(Input_Pin(v), ~v);
+
+            }else{
+                // Both negated and non-negated fanouts, duplicate gate:
+                if (!neg_copy[v]){
+                    Wire u = N.add(gate_Lut6);
+                    added.add(u);
+                    for (uint i = 0; i < 6; i++)
+                        u.set(i, v[i]);
+                    ftb(u) = ~ftb(v);
+                    neg_copy(v) = u;
+                }
+
+                if (v.sign)
+                    w.set(Input_Pin(v), neg_copy[v]);
+            }
+        }
+    }
+
+    // Remove inverters on the input side of a LUT:
+    For_Gates(N, w){
+        if (w != gate_Lut6) continue;
+
+        For_Inputs(w, v){
+            if (v.sign){
+                w.set(Input_Pin(v), +v);
+                ftb(w) = ftb6_neg(ftb(w), Input_Pin(v));
+            }
+        }
+    }
 }
 
 
@@ -151,7 +226,7 @@ inline uint Cut::allocSz(uint n_inputs)
 }
 
 
-// Duplicate cut 
+// Duplicate cut
 template<class ALLOC>
 inline Cut Cut::dup(ALLOC& allocator)
 {
@@ -424,15 +499,16 @@ inline Pair<float,float> cutImpl_bestDelay(CUT cut, const Vec<WMap<CutImpl> >& i
 
 struct Cost {
     uint    idx;
-    bool    late;       // -- implementation does not meet timing requirement
     float   delay;
     float   area;
+    uchar   inputs;
+    uchar   late;     // -- (conceptually of type 'bool') implementation does not meet timing requirement
 };
 
 
 template<> fts_macro void write_(Out& out, const Cost& v)
 {
-    FWrite(out) "Cost{idx=%_; late=%_; delay=%_; area=%_}", v.idx, v.late, v.delay, v.area;
+    FWrite(out) "Cost{idx=%_; late=%_; delay=%_; area=%_; inputs=%_}", v.idx, v.late, v.delay, v.area, v.inputs;
 }
 
 
@@ -460,6 +536,8 @@ struct Delay_lt {
     bool operator()(const Cost& x, const Cost& y) const {
         if (x.delay < y.delay) return true;
         if (x.delay > y.delay) return false;
+        if (x.inputs < y.inputs) return true;
+        if (x.inputs > y.inputs) return false;
         if (x.area < y.area) return true;
         if (x.area > y.area) return false;
         return false;
@@ -469,29 +547,6 @@ struct Delay_lt {
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // TechMap class:
-
-
-struct Params_TechMap {
-    uint        cut_size;             // -- maximum cut size
-    uint        n_iters;              // -- refinement iterations
-    uint        cuts_per_node;        // -- how many cuts to store for each node in the subject graph
-    float       delay_fraction;       // -- delay value in 'gate_Delay' are multiplied by this value
-    uint        balanced_cuts;        // -- #cuts to compute between "best area" and "best delay"
-    float       delta_delay;          // -- minimum delay improvement to consider when computing balanced cuts.
-    Vec<float>  lut_cost;
-
-    Params_TechMap() :
-        cut_size      (6),
-        n_iters       (4),
-        cuts_per_node (10),
-        delay_fraction(1.0),
-        balanced_cuts (2),
-        delta_delay   (1)
-    {
-        for (uint i = 0; i <= cut_size; i++)        // -- default LUT cost is "number of inputs"
-            lut_cost.push(i);
-    }
-};
 
 
 class TechMap {
@@ -567,6 +622,7 @@ void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
 
         costs[i].area  += P.lut_cost[dcuts[i].size()];
         costs[i].delay += 1.0;
+        costs[i].inputs = dcuts[i].size();
     }
 
     // Iteration specific cut sorting and cut implementations:
@@ -592,6 +648,7 @@ void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
 
             costs[i].area += P.lut_cost[dcuts[i].size()];
             costs[i].delay += 1.0f;
+            costs[i].inputs = dcuts[i].size();
         }
 
         swp(costs[0], costs[best_delay_idx]);
@@ -613,6 +670,15 @@ void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
         swp(list[i], list[w]);
         dcuts.swap(i, w);
     }
+#if 0   /*DEBUG*/
+    Write "cut delays:";
+    for (uint i = 0; i < dcuts.size(); i++){
+        float delay, area;
+        l_tuple(delay, area) = cutImpl_bestDelay(dcuts[i], impl);
+        Write " %_", delay;
+    }
+    NewLine;
+#endif  /*END DEBUG*/
 
     // Store implementations:
     impl[0](w).idx      = 0;
@@ -742,7 +808,7 @@ void TechMap::generateCuts(Wire w)
         md.idx = CutImpl::TRIV_CUT;
         l_tuple(md.arrival, md.area_est) = cutImpl_bestDelay(w, impl);
 
-        if (impl.size() >= 1){
+        if (impl.size() > 1){
             CutImpl& ma = impl[1](w);
             ma.idx = CutImpl::TRIV_CUT;
             bool late;
@@ -778,8 +844,6 @@ void TechMap::generateCuts(Wire w)
     case gate_Lut4:
         // Logic:
   //      if (!cutmap[w]){    // -- else reuse cuts from previous iteration
-
-#if 1
             if (winner[w]){
                 assert(dcuts.inputs.size() == 0);
                 for (uint i = 0; i < winner[w].size(); i++)
@@ -788,7 +852,6 @@ void TechMap::generateCuts(Wire w)
                     dcuts.ftb.push(winner[w].ftb(i));
                 dcuts.next();
             }
-#endif
 
             generateCuts_LogicGate(w, dcuts);
             cuts_enumerated += dcuts.size();    // -- for statistics
@@ -838,7 +901,7 @@ void TechMap::updateTargetArrival()
         if (isCO(w))
             newMax(target_arrival, impl[0][w[0]].arrival);
 
-    target_arrival *= 1.0;      // <<== parameter
+    target_arrival *= P.delay_factor;
 }
 
 
@@ -847,18 +910,6 @@ void TechMap::induceMapping(bool instantiate)
     active.clear();
     depart.clear();
     fanouts.clear();
-
-  #if 0   /*DEBUG*/
-    float max_arrival = 0;
-    For_Gates(N, w)
-        newMax(max_arrival, impl[0][w].arrival);
-
-    if (max_arrival > target_arrival){
-        WriteLn "WARNING: target_arrival exceeded. %_ -> %_", target_arrival, max_arrival;
-        target_arrival = max_arrival;
-            // <<== händer det här bara för icke-COs? har det med redundans att göra? (märkligt isf. eftersom unmap borde vara ganska bra)
-    }
-  #endif  /*END DEBUG*/
 
     For_All_Gates_Rev(N, w){
         if (isCO(w))
@@ -965,9 +1016,15 @@ void TechMap::induceMapping(bool instantiate)
 void TechMap::updateEstimates()
 {
     // Fanout est. (temporary)
+#if 0
     uint  r = iter + 1;
     float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 2.0f);
     float beta  = 1.0f - alpha;
+#else
+    uint  r = iter + 1;
+    float alpha = 1.0f - 1.0f / (float)(r*r + 1.0f);
+    float beta  = 1.0f - alpha;
+#endif
 
     For_Gates(N, w){
         if (isLogic(w)){
@@ -1031,15 +1088,13 @@ void TechMap::printProgress()
 
     WriteLn "Delay: %_   (target: %_)    Area: %,d    LUTs: %,d   [%t]", mapped_delay, target_arrival, (uint64)total_area, (uint64)total_luts, cpuTime();
 
-#if 0   // -- for tabulation
-    if (iter == P.n_iters - 1){
+    if (P.batch_output && iter == P.n_iters - 1){
         Write "%>11%,d    ", (uint64)total_luts;
         Write "%>11%,d    ", (uint64)total_area;
         Write "%>6%d    "  , (uint64)mapped_delay;
         Write "%>10%t"     , cpuTime();
         NewLine;
     }
-#endif
 }
 
 
@@ -1126,231 +1181,52 @@ void TechMap::run()
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Testing:
+// Main:
 
 
-}
-#include "ZZ_CmdLine.hh"
-#include "ZZ_Gig.IO.hh"
-#include "GigReader.hh"
-namespace ZZ {
-
-
-static
-void removeInverters(Gig& N)
+void techMap(Gig& N, const Vec<Params_TechMap>& Ps)
 {
-    // Categorize fanout-inverter situation, considering only non-LUT fanouts:
-    WSeen pos, neg;
-    For_Gates(N, w){
-        if (w == gate_Lut6) continue;
-
-        For_Inputs(w, v){
-            if (v.sign){
-                if (v == gate_Lut6){
-                    // LUT has a signed fanout:
-                    neg.add(v);
-                }else{
-                    // Non-LUT to non-LUT connection with inverters -- need to insert a inverter:
-                    Wire u = N.add(gate_Lut6).init(+v);
-                    ftb(u) = 0x5555555555555555ull;
-                    w.set(Input_Pin(v), u);
-                }
-            }else if (v == gate_Lut6)
-                // LUT has a non-signed fanout:
-                pos.add(v);
+    // Techmap:
+    assert(Ps.size() >= 1);
+    for (uint round = 0; round < Ps.size(); round++){
+        if (round > 0){
+            unmap(N);
+            expandXigGates(N);      // <<== remember to remove this when mapper can handle these gates natively
+            N.unstrash();
+            N.compact();
+            WriteLn "Unmap: %_", info(N);
         }
-    }
-
-    // Remove inverters between a non-LUT fed by a LUT:
-    WSeen flipped;
-    WSeen added;
-    WMap<GLit> neg_copy;
-    For_Gates(N, w){
-        if (added.has(w)) continue;
-
-        For_Inputs(w, v){
-            if (!neg.has(v)) continue;
-
-            if (!pos.has(v)){
-                // Only negated fanouts; invert FTB:
-                if (!flipped.has(v)){
-                    ftb(v) = ~ftb(v);
-                    flipped.add(v);
-                }
-                w.set(Input_Pin(v), ~v);
-
-            }else{
-                // Both negated and non-negated fanouts, duplicate gate:
-                if (!neg_copy[v]){
-                    Wire u = N.add(gate_Lut6);
-                    added.add(u);
-                    for (uint i = 0; i < 6; i++)
-                        u.set(i, v[i]);
-                    ftb(u) = ~ftb(v);
-                    neg_copy(v) = u;
-                }
-
-                if (v.sign)
-                    w.set(Input_Pin(v), neg_copy[v]);
-            }
-        }
-    }
-
-    // Remove inverters on the input side of a LUT:
-    For_Gates(N, w){
-        if (w != gate_Lut6) continue;
-
-        For_Inputs(w, v){
-            if (v.sign){
-                w.set(Input_Pin(v), +v);
-                ftb(w) = ftb6_neg(ftb(w), Input_Pin(v));
-            }
-        }
-    }
-}
-
-
-void test(int argc, char** argv)
-{
-#if 0
-    uint64 ftb = 0x8888888888888888ull;
-    WriteLn "ftb: %.16x", ftb;
-    ftb = ftb6_swap(ftb, 1, 0);
-    WriteLn "ftb: %.16x", ftb;
-    ftb = ftb6_swap(ftb, 2, 1);
-    WriteLn "ftb: %.16x", ftb;
-
-#else
-
-    cli.add("input", "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
-    cli.add("batch", "bool"  , "no"        , "Print batch friendly output at the last line.");
-    cli.parseCmdLine(argc, argv);
-    String input = cli.get("input").string_val;
-
-    Gig N;
-
-#if 0   /*DEBUG*/
-    {
-        Wire x = N.add(gate_PI);
-        Wire y = N.add(gate_PI);
-        Wire f = N.add(gate_And).init(x, ~y);
-        Wire t = N.add(gate_PO).init(~f);
-        writeAigerFile("dummy.aig", N);
-        exit(0);
-    }
-#endif  /*END DEBUG*/
-
-
-    try{
-        if (hasExtension(input, "aig"))
-            readAigerFile(input, N, false);
-        else if (hasExtension(input, "gnl"))
-            N.load(input);
-        else if (hasExtension(input, "gig"))
-            readGigForTechmap(input, N);
-        else{
-            ShoutLn "ERROR! Unknown file extension: %_", input;
-            exit(1);
-        }
-    }catch (const Excp_Msg& err){
-        ShoutLn "PARSE ERROR! %_", err.msg;
-        exit(1);
-    }
-    WriteLn "Parsed: %_", info(N);
-
-#if 0   /*DEBUG*/
-    //  LO=190605 HI=190608 r tmp.gnl; ./cec.sh
-    WZet keep;
-    uint lo = atoi(getenv("LO"));
-    uint hi = atoi(getenv("HI"));
-    for (uint i = lo; i < hi; i++)
-        keep.add(N(gate_PO, i));
-    For_Gatetype(N, gate_PO, w)
-        if (!keep.has(w)){
-            remove(w); }
-    N.compact();
-
-    {
-        Auto_Gob(N, FanoutCount);
-        For_Gatetype(N, gate_PI, w)
-            if (nFanouts(w) == 0)
-                remove(w);
-        N.compact();
-    }
-    writeAigerFile("small.aig", N);
-    N.save("small.gnl");
-
-    {
-        OutFile out("small.gig");
-        For_Gates(N, w){
-            if      (w == gate_PI)  FWriteLn(out) "%_ = PI [%_]", w.lit(), w.num();
-            else if (w == gate_PO)  FWriteLn(out) "%_ = PO(%_) [%_]", w.lit(), w[0].lit(), w.num();
-            else if (w == gate_And) FWriteLn(out) "%_ = And(%_, %_)", w.lit(), w[0].lit(), w[1].lit();
-            else assert(false);
-        }
-    }
-
-    WriteLn "Pruned: %_", info(N);
-#endif  /*END DEBUG*/
-
-    // For verification
-    writeBlifFile("src.blif", N);
-    WriteLn "Wrote: \a*src.blif\a*";
-
-    // Map round 1:
-    Params_TechMap P;
-    {
-        TechMap map(N, P);
+        TechMap map(N, Ps[0]);
         map.run();
     }
 
-#if 1
-    // Map round 2:
-    unmap(N);
-    expandXigGates(N);      // <<== remember to remove this when mapper can handle these gates natively
-    N.unstrash();
-    N.compact();
-    WriteLn "Unmap: %_", info(N);
-    //putIntoLut4(N);
-    //**/N.save("tmp.gnl"); WriteLn "Wrote: tmp.gnl";
-    {
-        TechMap map(N, P);
-        map.run();
-    }
-
-    // Map round 3:
-    unmap(N);
-    expandXigGates(N);      // <<== remember to remove this when mapper can handle these gates natively
-    N.unstrash();
-    N.compact();
-    WriteLn "Unmap: %_", info(N);
-    //putIntoLut4(N);
-    {
-        TechMap map(N, P);
-        map.run();
-    }
-#endif
-
-    // Temporary fixup:
+    // Remove inverters:
     {
         uint n_luts = N.typeCount(gate_Lut6);
         removeInverters(N);
-        if (N.typeCount(gate_Lut6) > n_luts)
+        if (N.typeCount(gate_Lut6) > n_luts && !Ps.last().batch_output)
             WriteLn "%_ LUTs added due to inverter removal.", N.typeCount(gate_Lut6) - n_luts;
     }
+}
 
-    // For verification:
-    writeBlifFile("dst.blif", N);
-    WriteLn "Wrote: \a*dst.blif\a*";
 
-    N.save("dst.gnl");
-    WriteLn "Wrote: \a*dst.gnl\a*";
-
-    //WriteLn "CPU time: %t", cpuTime();
-
-#endif
+void techMap(Gig& N, const Params_TechMap& P, uint n_rounds)
+{
+    assert(n_rounds >= 1);
+    Vec<Params_TechMap> Ps;
+    for (uind i = 0; i < n_rounds; i++)
+        Ps.push(P);
+    techMap(N, Ps);
 }
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
+
+
+/*
+TODO:
+
+  - Duplicate cost of nodes which are needed in both polarities of COs. 
+  - Delay factor in terms of levels (optionally)?
+*/

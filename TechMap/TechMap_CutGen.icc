@@ -62,7 +62,7 @@ bool applySubsumption(DynCutSet& out)
 // Returns FALSE if it is time to abort cut enumeration (because buffer/inverter or constant was 
 // detected).
 static
-bool combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size, DynCutSet& out)
+bool combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size, DynCutSet& out, bool struct_mapping)
 {
     assert_debug(cut_size <= 6);  // -- larger cuts not yet supported
     assert_debug(out.inputs.size() == 0);
@@ -70,14 +70,8 @@ bool combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size
     if (moreThanKBitsSet(cut1.sig() | cut2.sig(), cut_size))
         return true;
 
-    //**/bool watch = (cut1.size() == 2 && cut1[0] == 10 && cut1[1] == 11 && cut2.size() == 1 && cut2[0] == 9);
-
     uint64 ftb1 = cut1.ftb();
     uint64 ftb2 = cut2.ftb();
-    //**/if (watch) WriteLn "========================================[BEGIN]";
-    //**/if (watch) WriteLn "cut1 = %_", cut1;
-    //**/if (watch) WriteLn "cut2 = %_", cut2;
-    //**/if (watch) WriteLn "[BEFORE] ftb1=%:.16x  ftb2=%:.16x", ftb1, ftb2;
     uint   i = 0;
     uint   j = 0;
     uchar  loc1[6] = { 0, 1, 2, 3, 4, 5 };
@@ -88,18 +82,14 @@ bool combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size
         uint k = out.inputs.size();
         if (k == cut_size){ out.inputs.clear(); return true; }
         if (cut1[i] < cut2[j]){
-            //**/if (watch) WriteLn "  ftb1 swap(%_, %_)", k, (uint)loc1[i];
             ftb1 = ftb6_swap(ftb1, k, loc1[i]); loc1[k] = loc1[i];
             out.inputs.push(cut1[i]), i++;
             if (i >= cut1.size()) goto FlushCut2;
         }else if (cut1[i] > cut2[j]){
-            //**/if (watch) WriteLn "  ftb2 swap(%_, %_)", k, (uint)loc2[j];
             ftb2 = ftb6_swap(ftb2, k, loc2[j]); loc2[k] = loc2[j];
             out.inputs.push(cut2[j]), j++;
             if (j >= cut2.size()) goto FlushCut1;
         }else{
-            //**/if (watch) Write   "  ftb1 swap(%_, %_)", k, (uint)loc1[i];
-            //**/if (watch) WriteLn "  ftb2 swap(%_, %_)", k, (uint)loc2[j];
             ftb1 = ftb6_swap(ftb1, k, loc1[i]); loc1[k] = loc1[i];
             ftb2 = ftb6_swap(ftb2, k, loc2[j]); loc2[k] = loc2[j];
             out.inputs.push(cut1[i]), i++, j++;
@@ -111,7 +101,6 @@ bool combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size
   FlushCut1:
     if (out.inputs.size() + cut1.size() - i > cut_size){ out.inputs.clear(); return true; }
     while (i < cut1.size()){
-        //**/if (watch) WriteLn "  ftb1' swap(%_, %_)", out.inputs.size(), (uint)loc1[i];
         uint k = out.inputs.size();
         ftb1 = ftb6_swap(ftb1, k, loc1[i]); loc1[k] = loc1[i];
         out.inputs.push(cut1[i]), i++; }
@@ -120,7 +109,6 @@ bool combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size
   FlushCut2:
     if (out.inputs.size() + cut2.size() - j > cut_size){ out.inputs.clear(); return true; }
     while (j < cut2.size()){
-        //**/if (watch) WriteLn "  ftb2' swap(%_, %_)", out.inputs.size(), (uint)loc2[j];
         uint k = out.inputs.size();
         ftb2 = ftb6_swap(ftb2, k, loc2[j]); loc2[k] = loc2[j];
         out.inputs.push(cut2[j]), j++; }
@@ -129,8 +117,6 @@ bool combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size
   Done:
     // Compute FTB:
     uint64 new_ftb = 0;
-    //**/if (watch) WriteLn "[AFTER]  ftb1=%:.16x  ftb2=%:.16x", ftb1, ftb2;
-    //**/if (watch) WriteLn "ftb: %_", ftb & 15;
     switch (ftb & 15){
     case  0: assert(false);
     case  1: new_ftb = ~ftb1 & ~ftb2; break;
@@ -149,12 +135,9 @@ bool combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size
     case 14: new_ftb =  ftb1 |  ftb2; break;
     case 15: assert(false);
     }
-    //**/if (watch) WriteLn "new_ftb =%:.16x", new_ftb;
 
-  #if !defined(STRUCTURAL_MAPPING)
-    // Trim support:
-    {
-        //**/WriteLn "BEFORE: out: %_   ftb=%.16x", out.inputs, new_ftb;
+    if (!struct_mapping){
+        // Trim support:
         uint j = 0;
         for (uint i = 0; i < out.inputs.size(); i++){
             if (ftb6_inSup(new_ftb, i)){
@@ -165,19 +148,11 @@ bool combineCuts_Bin(const Cut& cut1, const Cut& cut2, ushort ftb, uint cut_size
             }
         }
         out.inputs.shrinkTo(j);
-        //**/WriteLn "AFTER : out: %_   ftb=%.16x", out.inputs, new_ftb;
     }
-  #endif
-    //**/if (watch) WriteLn "new_ftb'=%:.16x", new_ftb;
 
     out.ftb.push(new_ftb);
     out.next();
-    return applySubsumption(out);  // <<== if returns FALSE, we should stop cut-enumeration for this node
-
-    //**/if (watch){ WriteLn "State of 'out':";
-    //**/for (uint i = 0; i < out.size(); i++) WriteLn "  %_", out[i]; }
-
-    //**/if (watch) WriteLn "========================================[END]";
+    return applySubsumption(out);
 }
 
 
@@ -251,7 +226,7 @@ void TechMap::generateCuts_LogicGate(Wire w, DynCutSet& out)
 
         for (int i0 = -1; i0 < lim[0]; i0++){ const Cut& c0 = (i0 == -1) ? triv[0] : cs[0][i0];
         for (int i1 = -1; i1 < lim[1]; i1++){ const Cut& c1 = (i1 == -1) ? triv[1] : cs[1][i1];
-            if (!combineCuts_Bin(c0, c1, ftb, P.cut_size, out))
+            if (!combineCuts_Bin(c0, c1, ftb, P.cut_size, out, P.struct_mapping))
                 goto Done;
         }}
       Done:
