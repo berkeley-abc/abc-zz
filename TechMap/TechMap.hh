@@ -32,6 +32,7 @@ struct Params_TechMap {
     uint        balanced_cuts;      // -- #cuts to compute between "best area" and "best delay"
     float       delta_delay;        // -- minimum delay improvement to consider when computing balanced cuts.
     bool        struct_mapping;     // -- if TRUE, FTBs are not used to reduce cuts (= mapping with structural cuts)
+    bool        unmap_to_ands;      // -- if TRUE, XIG gates (XOR, MUX etc.) are turned into ANDs after unmapping.
     bool        batch_output;       // -- print a one-line summary at the end of techmapping which can be used to produce tables
     Vec<float>  lut_cost;
 
@@ -44,6 +45,7 @@ struct Params_TechMap {
         balanced_cuts (2),
         delta_delay   (1),
         struct_mapping(false),
+        unmap_to_ands (false),
         batch_output  (false)
     {
         for (uint i = 0; i <= cut_size; i++)        // -- default LUT cost is "number of inputs"

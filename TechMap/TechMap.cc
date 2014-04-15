@@ -74,7 +74,15 @@ Example circuit:
 
 
 macro bool isLogic(Wire w) {
-    return w == gate_And || w == gate_Lut4; }
+    return w == gate_And
+        || w == gate_Xor
+        || w == gate_Mux
+        || w == gate_Maj
+        || w == gate_One
+        || w == gate_Gamb
+        || w == gate_Dot
+        || w == gate_Lut4;
+}
 
 
 macro uint countInputs(Wire w) {
@@ -444,6 +452,20 @@ template<> fts_macro void write_(Out& out, const CutImpl& v)
 template<class CUT>
 inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& impl, float req_time, uchar* sel = NULL)
 {
+#if 0   // EXPERIMENTAL; old mapper style, just pick best cut (which is area)
+if (impl.size() > 1)
+{
+    float arrival = 0;
+    float area = 0;
+    for (uint i = 0; i < cut.size(); i++){
+        GLit p = GLit(cut[i]);
+        newMax(arrival, impl[1][p].arrival);
+        area += impl[1][p].area_est;
+    }
+    return tuple(arrival, area, req_time != -FLT_MAX && arrival > req_time);
+}
+#endif
+
     // Find best arrival:
     float arrival = 0;
     for (uint i = 0; i < cut.size(); i++)
@@ -589,7 +611,7 @@ class TechMap {
     void induceMapping(bool instantiate);
     void updateEstimates();
     void copyWinners();
-    void printProgress();
+    void printProgress(double T0);
 
 public:
     TechMap(Gig& N_, const Params_TechMap& P_) : N(N_), P(P_) {}
@@ -841,6 +863,12 @@ void TechMap::generateCuts(Wire w)
         break;}
 
     case gate_And:
+    case gate_Xor:
+    case gate_Mux:
+    case gate_Maj:
+    case gate_One:
+    case gate_Gamb:
+    case gate_Dot:
     case gate_Lut4:
         // Logic:
   //      if (!cutmap[w]){    // -- else reuse cuts from previous iteration
@@ -1003,7 +1031,7 @@ void TechMap::induceMapping(bool instantiate)
 
     if (instantiate){
         For_Gates_Rev(N, w)
-            if (w == gate_And)
+            if (isLogic(w))
                 remove(w);
         N.compact();
     }
@@ -1067,7 +1095,8 @@ void TechMap::copyWinners()
 // -- Main:
 
 
-void TechMap::printProgress()
+// 'T0' is the CPU time for the beginning of the current iteration.
+void TechMap::printProgress(double T0)
 {
     float mapped_delay = 0.0f;
     For_Gates(N, w)
@@ -1086,7 +1115,8 @@ void TechMap::printProgress()
         }
     }
 
-    WriteLn "Delay: %_   (target: %_)    Area: %,d    LUTs: %,d   [%t]", mapped_delay, target_arrival, (uint64)total_area, (uint64)total_luts, cpuTime();
+    double T = cpuTime();
+    WriteLn "Delay: %_   (target: %_)    Area: %,d    LUTs: %,d   [iter=%t  total=%t]", mapped_delay, target_arrival, (uint64)total_area, (uint64)total_luts, T - T0, T;
 
     if (P.batch_output && iter == P.n_iters - 1){
         Write "%>11%,d    ", (uint64)total_luts;
@@ -1141,6 +1171,7 @@ void TechMap::run()
 
     // Map:     <<== use Iter_Params here.... (how to score cuts, how to update target delay, whether to recycle cuts...)
     for (iter = 0; iter < P.n_iters; iter++){
+        double T0 = cpuTime();
         if (iter == 1){
             impl.push();
             impl[1].reserve(N.size());
@@ -1151,10 +1182,8 @@ void TechMap::run()
         }
 
         // Generate cuts:
-        double T0 ___unused = cpuTime();
         For_All_Gates(N, w)
             generateCuts(w);
-        double T1 ___unused = cpuTime();
 
         // <<== eliminate buffers/constants feeding COs
 
@@ -1171,7 +1200,7 @@ void TechMap::run()
             updateEstimates();
             copyWinners();
         }
-        printProgress();
+        printProgress(T0);
 
         mem.clear();
     }
@@ -1191,7 +1220,8 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps)
     for (uint round = 0; round < Ps.size(); round++){
         if (round > 0){
             unmap(N);
-            expandXigGates(N);      // <<== remember to remove this when mapper can handle these gates natively
+            if (Ps[round].unmap_to_ands)
+                expandXigGates(N);
             N.unstrash();
             N.compact();
             WriteLn "Unmap: %_", info(N);
@@ -1227,6 +1257,6 @@ void techMap(Gig& N, const Params_TechMap& P, uint n_rounds)
 /*
 TODO:
 
-  - Duplicate cost of nodes which are needed in both polarities of COs. 
+  - Duplicate cost of nodes which are needed in both polarities of COs.
   - Delay factor in terms of levels (optionally)?
 */
