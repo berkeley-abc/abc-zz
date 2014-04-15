@@ -107,6 +107,13 @@ void removeInverters(Gig& N)
                 if (v == gate_Lut6){
                     // LUT has a signed fanout:
                     neg.add(v);
+                }else if (v == gate_Const){
+                    if (v == ~N.True())
+                        w.set(Input_Pin(v), N.False());
+                    else if (v == ~N.False())
+                        w.set(Input_Pin(v), N.True());
+                    else
+                        assert(false);
                 }else{
                     // Non-LUT to non-LUT connection with inverters -- need to insert a inverter:
                     Wire u = N.add(gate_Lut6).init(+v);
@@ -318,6 +325,7 @@ public:
     Cut operator[](uint i) const { return Cut(&data[off(i)]); }
 
     void swap(uint i, uint j) { swp(off_(i), off_(j)); }
+    void shrinkTo(uint new_size)  { assert(new_size >= size()); }   // -- just to allow for template code
 };
 
 
@@ -541,11 +549,15 @@ struct Area_lt {
         if (!x.late){
             if (x.area < y.area) return true;
             if (x.area > y.area) return false;
+            /**/if (x.inputs < y.inputs) return true;
+            /**/if (x.inputs > y.inputs) return false;
             if (x.delay < y.delay) return true;
             if (x.delay > y.delay) return false;
         }else{
             if (x.delay < y.delay) return true;
             if (x.delay > y.delay) return false;
+            /**/if (x.inputs < y.inputs) return true;
+            /**/if (x.inputs > y.inputs) return false;
             if (x.area < y.area) return true;
             if (x.area > y.area) return false;
         }
@@ -606,7 +618,8 @@ class TechMap {
     void bypassTrivialCutsets(Wire w);
     void generateCuts(Wire w);
     void generateCuts_LogicGate(Wire w, DynCutSet& out_dcuts);
-    void prioritizeCuts(Wire w, DynCutSet& dcuts);
+    template<class CUTSET>
+    void prioritizeCuts(Wire w, CUTSET& dcuts);
     void updateTargetArrival();
     void induceMapping(bool instantiate);
     void updateEstimates();
@@ -624,7 +637,8 @@ public:
 
 
 // <<== 60% of runtime; need to speed this up
-void TechMap::prioritizeCuts(Wire w, DynCutSet& dcuts)
+template<class CUTSET>
+void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
 {
 //    uchar* sel = (uchar*)alloca(P.cut_size);
 
@@ -871,7 +885,7 @@ void TechMap::generateCuts(Wire w)
     case gate_Dot:
     case gate_Lut4:
         // Logic:
-  //      if (!cutmap[w]){    // -- else reuse cuts from previous iteration
+        if (iter < P.recycle_iter){
             if (winner[w]){
                 assert(dcuts.inputs.size() == 0);
                 for (uint i = 0; i < winner[w].size(); i++)
@@ -895,8 +909,10 @@ void TechMap::generateCuts(Wire w)
             //    cuts.shrinkTo(2 * P.cuts_per_node);
             //}
 
-//        }else
-//            prioritizeCuts(w, cutmap[w]);   // <<== need to be able to update a static cut-set!
+        }else{
+            prioritizeCuts(w, cutmap(w));   // <<== need to be able to update a static cut-set!
+            skip = true;
+        }
         break;
 
     case gate_PO:
@@ -910,11 +926,8 @@ void TechMap::generateCuts(Wire w)
         assert(false);
     }
 
-    if (!skip){
+    if (!skip)
         cutmap(w) = dcuts.done(mem);
-        //**/WriteLn "cutmap[%_]:  arrival=%_  area_est=%_", w, arrival[w], area_est[w];
-        //**/for (uint i = 0; i < cutmap[w].size(); i++) WriteLn "  %_", cutmap[w][i];
-    }
 }
 
 
@@ -994,7 +1007,9 @@ void TechMap::induceMapping(bool instantiate)
 
                 assert(best_i != UINT_MAX);
 
-                uint j = impl[best_i][w].idx; assert(j < cutmap[w].size());
+                uint j = impl[best_i][w].idx;
+                /**/if (j >= cutmap[w].size()){ Dump(w, j, cutmap[w].size()); }
+                assert(j < cutmap[w].size());
                 Cut cut = cutmap[w][j];
 
                 assert(j < 254);
@@ -1044,15 +1059,10 @@ void TechMap::induceMapping(bool instantiate)
 void TechMap::updateEstimates()
 {
     // Fanout est. (temporary)
-#if 0
-    uint  r = iter + 1;
-    float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 2.0f);
-    float beta  = 1.0f - alpha;
-#else
     uint  r = iter + 1;
     float alpha = 1.0f - 1.0f / (float)(r*r + 1.0f);
+    //float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 2.0f);
     float beta  = 1.0f - alpha;
-#endif
 
     For_Gates(N, w){
         if (isLogic(w)){
@@ -1077,20 +1087,6 @@ void TechMap::copyWinners()
 }
 
 
-/*
-- Area recovery (reprioritization? maybe not needed anymore)
-+ Figure out how to embedd +1.0f in cut impl.
-
-- handle Xig gates and/or Lut4s
-- make Unmap depth aware
-- signal trackig?? (ouch); esp. across unmap
-
-- experiment with number of cut implementations. Does it really help?
-
-- check memory behavior
-*/
-
-
 //=================================================================================================
 // -- Main:
 
@@ -1103,24 +1099,24 @@ void TechMap::printProgress(double T0)
         if (isCI(w) && active[w])
             newMax(mapped_delay, depart[w]);
 
-    double total_area = 0;
-    double total_luts = 0;
+    double total_wires = 0;
+    double total_luts  = 0;
     For_Gates(N, w){
         if (w == gate_Lut6){
-            total_area += P.lut_cost[countInputs(w)];
-            total_luts += 1;
+            total_wires += countInputs(w);
+            total_luts  += 1;
         }else if (active[w] && isLogic(w)){
-            total_area += cutmap[w][active[w] - 2].size();
-            total_luts += 1;
+            total_wires += cutmap[w][active[w] - 2].size();
+            total_luts  += 1;
         }
     }
 
     double T = cpuTime();
-    WriteLn "Delay: %_   (target: %_)    Area: %,d    LUTs: %,d   [iter=%t  total=%t]", mapped_delay, target_arrival, (uint64)total_area, (uint64)total_luts, T - T0, T;
+    WriteLn "Delay: %_    Wires: %,d    LUTs: %,d   [iter=%t  total=%t]", mapped_delay, (uint64)total_wires, (uint64)total_luts, T - T0, T;
 
     if (P.batch_output && iter == P.n_iters - 1){
         Write "%>11%,d    ", (uint64)total_luts;
-        Write "%>11%,d    ", (uint64)total_area;
+        Write "%>11%,d    ", (uint64)total_wires;
         Write "%>6%d    "  , (uint64)mapped_delay;
         Write "%>10%t"     , cpuTime();
         NewLine;
@@ -1142,8 +1138,6 @@ void TechMap::run()
     }
 
     normalizeLut4s(N);
-    //**/writeDot("N.dot", N); WriteLn "Wrote: N.dot";
-
 
     // Prepare for mapping:
     target_arrival = 0;
@@ -1171,6 +1165,9 @@ void TechMap::run()
 
     // Map:     <<== use Iter_Params here.... (how to score cuts, how to update target delay, whether to recycle cuts...)
     for (iter = 0; iter < P.n_iters; iter++){
+        if (iter < P.recycle_iter)
+            mem.clear();
+
         double T0 = cpuTime();
         if (iter == 1){
             impl.push();
@@ -1185,27 +1182,21 @@ void TechMap::run()
         For_All_Gates(N, w)
             generateCuts(w);
 
-        // <<== eliminate buffers/constants feeding COs
-
-        // Finalize mapping:
-        //<<== set target delay (at least if iter 0)
-
         // Computer estimations:
         if (iter == 0)
             updateTargetArrival();
 
         bool instantiate = (iter == P.n_iters - 1);
         induceMapping(instantiate);
+        //<<== ELA, reprio?
         if (!instantiate){
             updateEstimates();
-            copyWinners();
-        }
+            copyWinners(); }
+
         printProgress(T0);
 
-        mem.clear();
     }
-
-    // Cleanup:
+    mem.clear();
 }
 
 
@@ -1224,7 +1215,10 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps)
                 expandXigGates(N);
             N.unstrash();
             N.compact();
+
+            NewLine;
             WriteLn "Unmap: %_", info(N);
+            NewLine;
         }
         TechMap map(N, Ps[0]);
         map.run();
@@ -1257,6 +1251,16 @@ void techMap(Gig& N, const Params_TechMap& P, uint n_rounds)
 /*
 TODO:
 
-  - Duplicate cost of nodes which are needed in both polarities of COs.
+  - Duplicate cost of nodes which are needed in both polarities of COs?
   - Delay factor in terms of levels (optionally)?
+
+- Area recovery (reprioritization? maybe not needed anymore)
+
+- make Unmap depth aware
+- signal tracking?? (ouch); esp. across unmap
+
+- experiment with number of cut implementations. Does it really help?
+
+- check memory behavior
+
 */

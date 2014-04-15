@@ -4,11 +4,11 @@
 //| Author(s)   : Niklas Een
 //| Module      : TechMap
 //| Description : Stand alone binary for calling technology mapper.
-//| 
+//|
 //| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -84,14 +84,6 @@ void readInput(String input, Gig& N)
             readAigerFile(input, N, false);
         else if (hasExtension(input, "gnl")){
             N.load(input);
-            if (cli.get("keep").string_val != ""){
-                Str text = readFile(cli.get("keep").string_val);
-                Vec<Str> fs;
-                splitArray(text, " \n", fs);
-                for (uint i = 0; i < fs.size(); i++)
-                    if (!keep.add(N[stringToUInt64(fs[i])]))
-                        keep_sz++;
-            }
         }else if (hasExtension(input, "gig"))
             readGigForTechmap(input, N);
         else{
@@ -142,11 +134,13 @@ int main(int argc, char** argv)
     cli.add("input", "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
     cli.add("cec"  , "bool"  , "no"        , "Output files for equivalence checking.");
 
+    cli.add("cost"   , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
     cli.add("rounds" , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
-    cli.add("N"      , "uint"  , "10"        , "Cuts to keep per node.");
-    cli.add("iters"  , "uint"  , "4"         , "Phases in each mapping.");
+    cli.add("N"      , "uint"  , "6"         , "Cuts to keep per node.");
+    cli.add("iters"  , "uint"  , "5"         , "Phases in each mapping.");
+    cli.add("rc-iter", "int"   , "3"         , "Recycle cuts from this iteration (-1 = no recycling).");
     cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
-    cli.add("bal"    , "uint"  , "2"         , "Number of balanced implementations (between delay and area optimal).");
+    cli.add("bal"    , "uint"  , "0"         , "Number of balanced implementations (between delay and area optimal).");
     cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (default is area).");
     cli.add("struct" , "bool"  , "no"        , "Use structural mapping (mostly for debugging/comparison).");
     cli.add("un-and" , "bool"  , "no"        , "Unmap to AND gates instead of richer set of gates.");
@@ -159,12 +153,21 @@ int main(int argc, char** argv)
     Params_TechMap P;
     P.cuts_per_node  = cli.get("N").int_val;
     P.n_iters        = cli.get("iters").int_val;
+    P.recycle_iter   = (uint)cli.get("rc-iter").int_val;
     P.delay_factor   = cli.get("df").float_val;
     P.balanced_cuts  = cli.get("bal").int_val;
     P.struct_mapping = cli.get("struct").bool_val;
     P.unmap_to_ands  = cli.get("un-and").bool_val;
     //P.map_for_delay  = cli.get("dopt").bool_val;
     P.batch_output   = cli.get("batch").bool_val;
+
+    if (cli.get("cost").enum_val == 0){
+        for (uint i = 0; i <= 6; i++)
+            P.lut_cost[i] = 1;
+    }else{
+        for (uint i = 0; i <= 6; i++)
+            P.lut_cost[i] = i;
+    }
 
     // Read input:
     Gig N;

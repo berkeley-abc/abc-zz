@@ -4,7 +4,7 @@
 //| Author(s)   : Niklas Een
 //| Module      : TechMap
 //| Description : Second generation technology mapper.
-//| 
+//|
 //| (C) Copyright 2010-2014, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
@@ -26,6 +26,7 @@ using namespace std;
 struct Params_TechMap {
     uint        cut_size;           // -- maximum cut size
     uint        n_iters;            // -- refinement iterations
+    uint        recycle_iter;       // -- start recycling cuts from this iteration (faster, but worse quality)
     uint        cuts_per_node;      // -- how many cuts to store for each node in the subject graph
     float       delay_factor;       // -- how far from delay optimal are we willing to go for saving area? (1.0 = delay optimal)
     float       delay_fraction;     // -- delay value in 'gate_Delay' are multiplied by this value
@@ -39,6 +40,7 @@ struct Params_TechMap {
     Params_TechMap() :
         cut_size      (6),
         n_iters       (4),
+        recycle_iter  (UINT_MAX),
         cuts_per_node (10),
         delay_factor  (1.0),
         delay_fraction(1.0),

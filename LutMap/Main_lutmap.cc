@@ -425,6 +425,7 @@ int main(int argc, char** argv)
     cli.add("keep"   , "string", ""          , "List of forcable gates (only for GNL input).");
     cli.add("blif"   , "string", ""          , "Save original input in BLIF format (for debugging only). Add '@' as last character to skip mapping.");
     cli.add("pnl"    , "string", ""          , "Save original input in PNL format (for debugging only). Add '@' as last character to skip mapping.");
+    cli.add("gnl"    , "string", ""          , "Save original input in GNL format (for debugging only). Add '@' as last character to skip mapping.");
     cli.add("prot"   , "bool"  , "no"        , "Protect fanout-free gates by adding a PO to each one.");
     cli.add("strash" , "bool"  , "no"        , "Apply structural hashing before mapping.");
     cli.add("melt"   , "bool"  , "no"        , "Undo the 3-input LUT mapping of HDL-ICE.");
@@ -454,6 +455,7 @@ int main(int argc, char** argv)
     String output = cli.get("output").string_val;
     String blif   = cli.get("blif").string_val;
     String pnl    = cli.get("pnl").string_val;
+    String gnl    = cli.get("gnl").string_val;
     Params_LutMap P;
     P.cuts_per_node  = cli.get("N").int_val;
     P.n_rounds       = cli.get("iters").int_val;
@@ -615,6 +617,18 @@ int main(int argc, char** argv)
 
         writePnlFile(pnl, N);
         WriteLn "Wrote: \a*%_\a*", pnl;
+
+        if (quit) return 0;
+    }
+
+    if (gnl != ""){
+        bool quit = false;
+        if (gnl.last() == '@'){
+            quit = true;
+            gnl.pop(); }
+
+        N.save(gnl);
+        WriteLn "Wrote: \a*%_\a*", gnl;
 
         if (quit) return 0;
     }
