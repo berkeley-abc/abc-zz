@@ -12,7 +12,26 @@
 //|________________________________________________________________________________________________
 
 
-//#define STRUCTURAL_MAPPING
+// Check if the support of 'c' is a subset of the support of 'd'. Does NOT assume cuts to be
+// sorted. The FTB is not used.
+macro bool subsumes(const Cut& c, const Cut& d)
+{
+    assert_debug(c);
+    assert_debug(d);
+
+    if (d.size() < c.size())
+        return false;
+
+    if (c.sig() & ~d.sig())
+        return false;
+
+    for (uint i = 0; i < c.size(); i++){
+        if (!has(d, c[i]))
+            return false;
+    }
+
+    return true;
+}
 
 
 // Perform subsumption tests on the last cut in 'out' against all other cuts (in both diretcions).

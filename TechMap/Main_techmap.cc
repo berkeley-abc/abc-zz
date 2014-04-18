@@ -56,7 +56,6 @@ String infoLut4(const Gig& N)
 }
 
 
-#if 0
 static
 uint supSize(uint64 ftb)
 {
@@ -66,7 +65,6 @@ uint supSize(uint64 ftb)
             sz++;
     return sz;
 }
-#endif
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -126,13 +124,57 @@ void readInput(String input, Gig& N)
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
+void printStats(const Gig& N)
+{
+    Vec<uint> sizeC(7, 0);
+    WMap<uint> depth;
+    uint max_delay = 0;
+    For_UpOrder(N, w){
+        if (w == gate_Lut6)
+            sizeC[supSize(ftb(w))]++;
+
+        if (isCI(w))
+            depth(w) = 0;
+        else{
+            uint d = 0;
+            For_Inputs(w, v)
+                newMax(d, depth[v]);
+            if (isLogicGate(w)){
+                if (w == gate_Mux)
+                    depth(w) = d;
+                else
+                    depth(w) = d + 1;
+            }else if (w == gate_Delay)
+                depth(w) = d + w.arg();     // -- should use DELAY_FRACTION here
+            else
+                depth(w) = d;
+        }
+        newMax(max_delay, depth[w]);
+    }
+
+    NewLine;
+    WriteLn "Statistics:";
+    for (uint i = 0; i <= 6; i++)
+        if (sizeC[i] > 0)
+            WriteLn "    LUT %_: %>11%,d  (%.1f %%)", i, sizeC[i], double(sizeC[i]) / N.typeCount(gate_Lut6) * 100;
+    NewLine;
+    WriteLn "    LUTs : %>11%,d", N.typeCount(gate_Lut6);
+    if (N.typeCount(gate_Mux) > 0)
+        WriteLn "    MUXs : %>11%,d", N.typeCount(gate_Mux);
+    WriteLn "    Edges: %>11%,d", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6] + N.typeCount(gate_Mux);
+    WriteLn "    Delay: %>11%,d", max_delay;
+    NewLine;
+}
+
+
 int main(int argc, char** argv)
 {
     ZZ_Init;
 
     // Setup commandline:
-    cli.add("input", "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
-    cli.add("cec"  , "bool"  , "no"        , "Output files for equivalence checking.");
+    cli.add("input" , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
+    cli.add("output", "string", "",           "Output GNL.", 1);
+    cli.add("cec"   , "bool"  , "no"        , "Output files for equivalence checking.");
 
     cli.add("cost"   , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
     cli.add("rounds" , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
@@ -181,14 +223,21 @@ int main(int argc, char** argv)
     // Map:
     double T0 = cpuTime();
     techMap(N, P, n_rounds);
-    if (!P.batch_output)
-        WriteLn "Mapper CPU time: %t", cpuTime() - T0;
+    if (!P.batch_output){
+        printStats(N);
+        WriteLn "CPU time: %t", cpuTime() - T0;
+    }
 
     if (cli.get("cec").bool_val){
         writeBlifFile("dst.blif", N);
         WriteLn "Wrote: \a*dst.blif\a*";
         N.save("dst.gnl");
         WriteLn "Wrote: \a*dst.gnl\a*";
+    }
+
+    if (cli.get("output").string_val != ""){
+        N.save(cli.get("output").string_val);
+        WriteLn "Wrote: \a*%_\a*", cli.get("output").string_val;
     }
 
     return 0;

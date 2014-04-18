@@ -520,11 +520,6 @@ void LutMap::generateCuts(Wire w)
 // Exact local area:
 
 
-// <<== need cut-off
-// <<== need to make it delay aware (at least optionally)
-// <<== can we speed up 'try'?
-
-
 struct RefDerefCut {
     const Gig&               N;
     const WMap<Array<Cut> >& cutmap;
@@ -676,7 +671,8 @@ void LutMap::exactLocalArea(WMap<uint>& fanouts)
                 for (uint j = 0; j < cut.size(); j++)
                     newMax(arr, arrival[cut[j] + N] + 1.0f);
 
-                if (arr > arrival[w] && arr + depart[w] > target_arrival + /*FUDGE*/2)
+//                if (arr > arrival[w] && arr + depart[w] > target_arrival + /*FUDGE*/2)
+                if (arr > arrival[w] && arr + depart[w] > target_arrival + /*NO FUDGE*/0)
                     continue;
               #endif
 

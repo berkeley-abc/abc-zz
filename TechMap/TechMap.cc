@@ -94,9 +94,14 @@ macro uint countInputs(Wire w) {
 }
 
 
+// <<== note! could provide slack here and use inverters rather than duplicating gates if timing allows it
 static
-void removeInverters(Gig& N)
+void removeInverters(Gig& N, bool quiet)
 {
+    uint  luts_added  = 0;
+    uint  wires_added = 0;
+    uint  invs_added  = 0;
+
     // Categorize fanout-inverter situation, considering only non-LUT fanouts:
     WSeen pos, neg;
     For_Gates(N, w){
@@ -119,6 +124,7 @@ void removeInverters(Gig& N)
                     Wire u = N.add(gate_Lut6).init(+v);
                     ftb(u) = 0x5555555555555555ull;
                     w.set(Input_Pin(v), u);
+                    invs_added++;
                 }
             }else if (v == gate_Lut6)
                 // LUT has a non-signed fanout:
@@ -147,10 +153,13 @@ void removeInverters(Gig& N)
             }else{
                 // Both negated and non-negated fanouts, duplicate gate:
                 if (!neg_copy[v]){
+                    luts_added++;
                     Wire u = N.add(gate_Lut6);
                     added.add(u);
-                    for (uint i = 0; i < 6; i++)
+                    for (uint i = 0; i < 6; i++){
                         u.set(i, v[i]);
+                        if (v[i] != Wire_NULL) wires_added++;
+                    }
                     ftb(u) = ~ftb(v);
                     neg_copy(v) = u;
                 }
@@ -172,6 +181,11 @@ void removeInverters(Gig& N)
             }
         }
     }
+
+    if (luts_added > 0 && !quiet)
+        WriteLn "%_/%_ LUTs/wires added due to inverter removal.", luts_added, wires_added;
+    if (invs_added > 0 && !quiet)
+        WriteLn "%_ irremovable inverters between non-logic gates.", invs_added;
 }
 
 
@@ -402,32 +416,6 @@ CutSet DynCutSet::done(ALLOC& allocator)
 }
 
 
-//=================================================================================================
-// -- Helpers:
-
-
-// Check if the support of 'c' is a subset of the support of 'd'. Does NOT assume cuts to be
-// sorted. The FTB is not used.
-macro bool subsumes(const Cut& c, const Cut& d)
-{
-    assert_debug(c);
-    assert_debug(d);
-
-    if (d.size() < c.size())
-        return false;
-
-    if (c.sig() & ~d.sig())
-        return false;
-
-    for (uint i = 0; i < c.size(); i++){
-        if (!has(d, c[i]))
-            return false;
-    }
-
-    return true;
-}
-
-
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Cut implementation:
 
@@ -549,14 +537,14 @@ struct Area_lt {
         if (!x.late){
             if (x.area < y.area) return true;
             if (x.area > y.area) return false;
-            /**/if (x.inputs < y.inputs) return true;
+            /**/if (x.inputs < y.inputs) return true;       // <<== evaluate this
             /**/if (x.inputs > y.inputs) return false;
             if (x.delay < y.delay) return true;
             if (x.delay > y.delay) return false;
         }else{
             if (x.delay < y.delay) return true;
             if (x.delay > y.delay) return false;
-            /**/if (x.inputs < y.inputs) return true;
+            /**/if (x.inputs < y.inputs) return true;       // <<== evaluate this
             /**/if (x.inputs > y.inputs) return false;
             if (x.area < y.area) return true;
             if (x.area > y.area) return false;
@@ -584,6 +572,8 @@ struct Delay_lt {
 
 
 class TechMap {
+    enum { INACTIVE, ACTIVE, FIRST_CUT };   // -- use with 'active'
+
     // Input:
     Gig&                  N;
     const Params_TechMap& P;
@@ -597,7 +587,8 @@ class TechMap {
 
     WMap<float>         fanout_est;
     WMap<float>         depart;
-    WMap<uchar>         active; // <<== change to 'current choice' or 'sel'_
+    WMap<uchar>         active;     // -- for non-logic: ACTIVE/INACTIVE. For logic: 'INACTIVE' or 'FIRST_CUT + choice#'
+    WSeen               dual_phase; // -- these gates feed COs both positively and negatively
 
     uint                iter;
     float               target_arrival;
@@ -613,9 +604,11 @@ class TechMap {
     uint64              cuts_enumerated;
 
     // Helper methods:
+    float lutCost(GLit w, Cut c);
 
     // Major internal methods:
     void bypassTrivialCutsets(Wire w);
+    void findDualPhaseGates();
     void generateCuts(Wire w);
     void generateCuts_LogicGate(Wire w, DynCutSet& out_dcuts);
     template<class CUTSET>
@@ -627,21 +620,30 @@ class TechMap {
     void printProgress(double T0);
 
 public:
-    TechMap(Gig& N_, const Params_TechMap& P_) : N(N_), P(P_) {}
+    TechMap(Gig& N_, const Params_TechMap& P_) : N(N_), P(P_), active(INACTIVE) {}
     void run();
 };
 
 
+
 //=================================================================================================
-// == Cut prioritization:
+// -- Helpers:
 
 
-// <<== 60% of runtime; need to speed this up
+inline float TechMap::lutCost(GLit w, Cut c)
+{
+    float v = P.lut_cost[c.size()];
+    return !dual_phase.has(w) ? v : 2*v;
+}
+
+
+//=================================================================================================
+// -- Cut prioritization:
+
+
 template<class CUTSET>
 void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
 {
-//    uchar* sel = (uchar*)alloca(P.cut_size);
-
     Vec<Cost>& costs = tmp_costs;
     costs.setSize(dcuts.size());
 
@@ -656,7 +658,7 @@ void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
         if (newMin(best_delay, costs[i].delay))
             best_delay_idx = i;
 
-        costs[i].area  += P.lut_cost[dcuts[i].size()];
+        costs[i].area += lutCost(w, dcuts[i]);
         costs[i].delay += 1.0;
         costs[i].inputs = dcuts[i].size();
     }
@@ -682,7 +684,7 @@ void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
             l_tuple(costs[i].delay, costs[i].area, costs[i].late) = cutImpl_bestArea(dcuts[i], impl, req_time);
             assert(costs[i].delay >= best_delay);
 
-            costs[i].area += P.lut_cost[dcuts[i].size()];
+            costs[i].area += lutCost(w, dcuts[i]);
             costs[i].delay += 1.0f;
             costs[i].inputs = dcuts[i].size();
         }
@@ -706,15 +708,6 @@ void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
         swp(list[i], list[w]);
         dcuts.swap(i, w);
     }
-#if 0   /*DEBUG*/
-    Write "cut delays:";
-    for (uint i = 0; i < dcuts.size(); i++){
-        float delay, area;
-        l_tuple(delay, area) = cutImpl_bestDelay(dcuts[i], impl);
-        Write " %_", delay;
-    }
-    NewLine;
-#endif  /*END DEBUG*/
 
     // Store implementations:
     impl[0](w).idx      = 0;
@@ -792,6 +785,25 @@ void TechMap::bypassTrivialCutsets(Wire w)
                 w.set(Input_Pin(v), N[cutmap[v][0][0]] ^ sign(v));
             else
                 assert(false);
+        }
+    }
+}
+
+
+void TechMap::findDualPhaseGates()
+{
+    dual_phase.clear();
+    WSeen occur_pos;
+    WSeen occur_neg;
+    For_Gates(N, w){
+        if (isLogic(w)) continue;
+        For_Inputs(w, v){
+            if (!isLogic(v)) continue;
+
+            if (v.sign) occur_neg.add(v);
+            else        occur_pos.add(v);
+            if (occur_neg.has(v) && occur_pos.has(v))
+                dual_phase.add(v);
         }
     }
 }
@@ -942,7 +954,10 @@ void TechMap::updateTargetArrival()
         if (isCO(w))
             newMax(target_arrival, impl[0][w[0]].arrival);
 
-    target_arrival *= P.delay_factor;
+    if (P.delay_factor > 0)
+        target_arrival *= P.delay_factor;
+    else
+        target_arrival -= P.delay_factor;
 }
 
 
@@ -954,7 +969,7 @@ void TechMap::induceMapping(bool instantiate)
 
     For_All_Gates_Rev(N, w){
         if (isCO(w))
-            active(w) = true;
+            active(w) = ACTIVE;
 
         if (!active[w]){
             depart(w) = FLT_MAX;    // <<== for now, give a well defined value to inactive nodes
@@ -986,7 +1001,7 @@ void TechMap::induceMapping(bool instantiate)
                     float area_est;
                     bool  late;
                     l_tuple(arrival, area_est, late) = cutImpl_bestArea(cut, impl, req_time - 1.0f);    // <<== 1.0f
-                    area_est += P.lut_cost[cut.size()];
+                    area_est += lutCost(w, cut);
 
                     if (!late)
                         if (newMin(best_area, area_est))
@@ -1007,17 +1022,15 @@ void TechMap::induceMapping(bool instantiate)
 
                 assert(best_i != UINT_MAX);
 
-                uint j = impl[best_i][w].idx;
-                /**/if (j >= cutmap[w].size()){ Dump(w, j, cutmap[w].size()); }
-                assert(j < cutmap[w].size());
+                uint j = impl[best_i][w].idx; assert(j < cutmap[w].size());
                 Cut cut = cutmap[w][j];
 
                 assert(j < 254);
-                active(w) = j + 2;
+                active(w) = j + FIRST_CUT;
 
                 for (uint k = 0; k < cut.size(); k++){
                     Wire v = cut[k] + N;
-                    active(v) = true;
+                    active(v) = ACTIVE;
                     fanouts(v)++;
                     newMax(depart(v), depart[w] + 1.0f);                // <<== 1.0f should not be used for F7 and F8 etc
                 }
@@ -1035,7 +1048,7 @@ void TechMap::induceMapping(bool instantiate)
                 if (!isCI(w)){
                     float delay = (w != gate_Delay) ? 0.0f : w.arg() * P.delay_fraction;
                     For_Inputs(w, v){
-                        active(v) = true;
+                        active(v) = ACTIVE;
                         fanouts(v)++;
                         newMax(depart(v), depart[w] + delay);
                     }
@@ -1077,10 +1090,10 @@ void TechMap::copyWinners()
 {
     mem_win.clear();
     For_Gates(N, w){
-        if (active[w] < 2)
+        if (active[w] < FIRST_CUT)
             winner(w) = Cut_NULL;
         else{
-            Cut cut = cutmap[w][active[w] - 2];
+            Cut cut = cutmap[w][active[w] - FIRST_CUT];
             winner(w) = cut.dup(mem_win);
         }
     }
@@ -1106,7 +1119,7 @@ void TechMap::printProgress(double T0)
             total_wires += countInputs(w);
             total_luts  += 1;
         }else if (active[w] && isLogic(w)){
-            total_wires += cutmap[w][active[w] - 2].size();
+            total_wires += cutmap[w][active[w] - FIRST_CUT].size();
             total_luts  += 1;
         }
     }
@@ -1157,10 +1170,9 @@ void TechMap::run()
         For_Gates(N, w){
             fanout_est(w) = nFanouts(w);
             depart    (w) = FLT_MAX;
-            active    (w) = true;
+            active    (w) = ACTIVE;
         }
     }
-
     cuts_enumerated = 0;
 
     // Map:     <<== use Iter_Params here.... (how to score cuts, how to update target delay, whether to recycle cuts...)
@@ -1179,6 +1191,7 @@ void TechMap::run()
         }
 
         // Generate cuts:
+        findDualPhaseGates();       // -- may change during mapping due to 'bypassTrivialCutsets()' which rewires the circuit.
         For_All_Gates(N, w)
             generateCuts(w);
 
@@ -1224,13 +1237,10 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps)
         map.run();
     }
 
-    // Remove inverters:
-    {
-        uint n_luts = N.typeCount(gate_Lut6);
-        removeInverters(N);
-        if (N.typeCount(gate_Lut6) > n_luts && !Ps.last().batch_output)
-            WriteLn "%_ LUTs added due to inverter removal.", N.typeCount(gate_Lut6) - n_luts;
-    }
+    NewLine;
+    WriteLn "Legalization...";
+    removeInverters(N, Ps.last().batch_output);
+    //<<==legalize FMUXes
 }
 
 
@@ -1251,16 +1261,12 @@ void techMap(Gig& N, const Params_TechMap& P, uint n_rounds)
 /*
 TODO:
 
-  - Duplicate cost of nodes which are needed in both polarities of COs?
-  - Delay factor in terms of levels (optionally)?
-
-- Area recovery (reprioritization? maybe not needed anymore)
-
-- make Unmap depth aware
-- signal tracking?? (ouch); esp. across unmap
-
-- experiment with number of cut implementations. Does it really help?
-
-- check memory behavior
+ - double polarity nodes (double costs of luts, don't allow for F7/F8)
+ - FMUX fanout est. If >1, add cost of input LUT times this value minus one to area.
+ - legalization phase: duplicate LUTs feeding 2 or more FMUXes. Remove negations (done already).
+ - Area recovery (reprioritization? maybe not needed anymore)
+ - make Unmap depth aware
+ - signal tracking?? (ouch); esp. across unmap
+ - check memory behavior
 
 */
