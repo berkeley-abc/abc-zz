@@ -161,7 +161,7 @@ void printStats(const Gig& N)
     WriteLn "    LUTs : %>11%,d", N.typeCount(gate_Lut6);
     if (N.typeCount(gate_Mux) > 0)
         WriteLn "    MUXs : %>11%,d", N.typeCount(gate_Mux);
-    WriteLn "    Edges: %>11%,d", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6] + N.typeCount(gate_Mux);
+    WriteLn "    Wires: %>11%,d", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6] + N.typeCount(gate_Mux);
     WriteLn "    Delay: %>11%,d", max_delay;
     NewLine;
 }
@@ -183,9 +183,11 @@ int main(int argc, char** argv)
     cli.add("rc-iter", "int"   , "3"         , "Recycle cuts from this iteration (-1 = no recycling).");
     cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
     cli.add("bal"    , "uint"  , "0"         , "Number of balanced implementations (between delay and area optimal).");
+    cli.add("delta"  , "float" , "1.0"       , "Delta-delay for balanced cuts.");
     cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (default is area).");
     cli.add("struct" , "bool"  , "no"        , "Use structural mapping (mostly for debugging/comparison).");
     cli.add("un-and" , "bool"  , "no"        , "Unmap to AND gates instead of richer set of gates.");
+    cli.add("fmux"   , "bool"  , "no"        , "Use F7/F8 MUXes.");
     cli.add("batch"  , "bool"  , "no"        , "Output summary line at the end (for tabulation).");
 
     cli.parseCmdLine(argc, argv);
@@ -198,8 +200,10 @@ int main(int argc, char** argv)
     P.recycle_iter   = (uint)cli.get("rc-iter").int_val;
     P.delay_factor   = cli.get("df").float_val;
     P.balanced_cuts  = cli.get("bal").int_val;
+    P.delta_delay    = cli.get("delta").float_val;
     P.struct_mapping = cli.get("struct").bool_val;
     P.unmap_to_ands  = cli.get("un-and").bool_val;
+    P.use_fmux       = cli.get("fmux").bool_val;
     //P.map_for_delay  = cli.get("dopt").bool_val;
     P.batch_output   = cli.get("batch").bool_val;
 

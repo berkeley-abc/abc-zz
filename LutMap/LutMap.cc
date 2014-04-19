@@ -20,7 +20,8 @@
 #include "ZZ/Generics/Heap.hh"
 #include "Cut.hh"
 #include "Unmap.hh"
-/**/#include "ZZ_Dsd.hh"
+#include "PostProcess.hh"
+//**/#include "ZZ_Dsd.hh"
 
 #define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
 #define ELA_GLOBAL_LIM 500      // -- if more nodes than this is dereferenced, MFFC is too big to consider
@@ -55,22 +56,6 @@ void checkFmuxes(Gig& N)
         }
     }
 
-#if 0
-    // Count potential violations (assuming selector signal is NOT independent):
-    {
-        uint total = 0;
-        uint failC = 0;
-        For_Gates(N, w){
-            if (w == gate_Mux && w[0] == gate_Lut6 && w[1] == gate_Lut6){
-                total++;
-                if (w[0][5] && w[1][5])
-                    failC++;
-            }
-        }
-
-        WriteLn "Potential MUX routing violations: %_ / %_  (= %.2f %%)", failC, total, double(failC) / total * 100;
-    }
-#endif
     {
         WMap<uint> mux_fanouts(0);
 
@@ -110,8 +95,6 @@ void checkFmuxes(Gig& N)
         WriteLn "Actual MUX fanout violations: %_ / %_  (= %.2f %%)", out_failC, total, double(out_failC) / total * 100;
         WriteLn "Non-LUT feeding MUX: %_ / %_  (= %.2f %%)", inp_failC, total, double(inp_failC) / total * 100;
     }
-
-    // Check how many MUXes feed from non-
 }
 
 
@@ -274,6 +257,8 @@ struct Area_lt {
     bool operator()(const LutMap_Cost& x, const LutMap_Cost& y) const {
         if (x.area < y.area) return true;
         if (x.area > y.area) return false;
+        /**/if (x.cut_size < y.cut_size) return true;
+        /**/if (x.cut_size > y.cut_size) return false;
         if (x.delay < y.delay) return true;
         if (x.delay > y.delay) return false;
         if (x.avg_fanout > y.avg_fanout) return true;
@@ -916,6 +901,11 @@ void LutMap::updateFanoutEst(bool instantiate)
         N.compact(m);
         if (remap)
             m.applyTo(remap->base());
+
+        uint n_luts  = N.typeCount(gate_Lut6);
+        uint n_muxes = N.typeCount(gate_Mux);
+        removeMuxViolations(N);
+        WriteLn "Legalizing MUXes by duplication, adding:  #Mux=%_   #Lut6=%_", N.typeCount(gate_Mux) - n_muxes, N.typeCount(gate_Lut6) - n_luts;
 
 #if 1   /*DEBUG*/
         if (P.use_fmux && !P.quiet){

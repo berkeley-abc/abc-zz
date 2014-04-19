@@ -20,6 +20,10 @@
 #include "ZZ/Generics/Sort.hh"
 #include "Unmap.hh"
 
+
+//#define PRINT_IMPL_STATS
+
+
 namespace ZZ {
 using namespace std;
 
@@ -445,23 +449,10 @@ template<> fts_macro void write_(Out& out, const CutImpl& v)
 // Returns '(arrival, area_est, late)'; arrival and area for an area optimal selection UNDER
 // the assumption that 'req_time' is not exceeded. If no such cut exists,
 // '(FLT_MAX, FLT_MAX)' is returned.  If 'sel' is non-null, cut selection is recorded there.
+// NOTE! Setting 'req_time = -FLT_MAX' is equivalent of calling 'cutImpl_bestDelay()'.
 template<class CUT>
-inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& impl, float req_time, uchar* sel = NULL)
+inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& impl, float req_time)
 {
-#if 0   // EXPERIMENTAL; old mapper style, just pick best cut (which is area)
-if (impl.size() > 1)
-{
-    float arrival = 0;
-    float area = 0;
-    for (uint i = 0; i < cut.size(); i++){
-        GLit p = GLit(cut[i]);
-        newMax(arrival, impl[1][p].arrival);
-        area += impl[1][p].area_est;
-    }
-    return tuple(arrival, area, req_time != -FLT_MAX && arrival > req_time);
-}
-#endif
-
     // Find best arrival:
     float arrival = 0;
     for (uint i = 0; i < cut.size(); i++)
@@ -491,9 +482,6 @@ if (impl.size() > 1)
 
         newMax(arrival, impl[best_j][p].arrival);
         total_area_est += area_est;
-
-        if (sel)
-            sel[i] = best_j;
     }
 
     return tuple(arrival, total_area_est, late);
@@ -503,9 +491,9 @@ if (impl.size() > 1)
 // Returns '(arrival, area_est)'; arrival and area of a delay optimal selection for 'cut'.
 // If 'sel' is non-null, cut selection is recorded there.
 template<class CUT>
-inline Pair<float,float> cutImpl_bestDelay(CUT cut, const Vec<WMap<CutImpl> >& impl, uchar* sel = NULL)
+inline Pair<float,float> cutImpl_bestDelay(CUT cut, const Vec<WMap<CutImpl> >& impl)
 {
-    Trip<float,float,bool> t = cutImpl_bestArea(cut, impl, -FLT_MAX, sel);
+    Trip<float,float,bool> t = cutImpl_bestArea(cut, impl, -FLT_MAX);
     assert(!t.trd);
     return tuple(t.fst, t.snd);
 }
@@ -605,6 +593,7 @@ class TechMap {
 
     // Helper methods:
     float lutCost(GLit w, Cut c);
+    void  reserveImpls(uint n);
 
     // Major internal methods:
     void bypassTrivialCutsets(Wire w);
@@ -634,6 +623,14 @@ inline float TechMap::lutCost(GLit w, Cut c)
 {
     float v = P.lut_cost[c.size()];
     return !dual_phase.has(w) ? v : 2*v;
+}
+
+
+void TechMap::reserveImpls(uint n)
+{
+    impl.setSize(n);
+    for (uint i = 0; i < n; i++)
+        impl[i].reserve(N.size());
 }
 
 
@@ -669,15 +666,16 @@ void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
         sobSort(sob(costs, Delay_lt()));
 
     }else{
-        float req_time = active[w] ? target_arrival - depart[w] -1.0f : best_delay;
+        float req_time = active[w] ? target_arrival - depart[w] - 1.0f : best_delay;
 #if 1
         /**/if (!active[w]){
         /**/    For_Inputs(w, v)
         /**/        if (active[v]) newMax(req_time, target_arrival - depart[v]);
+            req_time += 1.0;
         /**/}
+#endif
         if (req_time < best_delay)
             req_time = best_delay;   // -- if we change heuristics so we cannot always meet timing, at least do the best we can
-#endif
 
         for (uint i = 0; i < dcuts.size(); i++){
             costs[i].idx = i;
@@ -709,23 +707,27 @@ void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
         dcuts.swap(i, w);
     }
 
-    // Store implementations:
+    // Store delay optimal implementation:
     impl[0](w).idx      = 0;
     impl[0](w).area_est = costs[0].area / fanout_est[w];
     impl[0](w).arrival  = costs[0].delay;
 
+    // Clear all other implementations:
     for (uint n = 1; n < impl.size(); n++)
         impl[n](w).idx = CutImpl::NO_CUT;
 
-    if (impl.size() > 1){
-        uint idx = (costs.size() == 1 || costs[0].area < costs[1].area) ? 0 : 1;
+    float req_time = -FLT_MAX;
+    if (iter > 0){
+        // Store area optimal implementations:
+        uint idx = (costs.size() == 1 || costs[0].area <= costs[1].area) ? 0 : 1;
         impl[1](w).idx      = idx;
         impl[1](w).area_est = costs[idx].area / fanout_est[w];
         impl[1](w).arrival  = costs[idx].delay;
+        /*test*/if (idx == 0) impl[1](w).idx = CutImpl::NO_CUT;
 
-        // Compute and store balanced cuts:
-        uint  next_i = P.cuts_per_node - 1;
-        float req_time = costs[0].delay - 1.0 - P.delta_delay;
+        // Compute and store balanced implementations:
+        uint  next_i = P.cuts_per_node - 1 - P.use_fmux;
+        req_time = costs[0].delay - 1.0 - P.delta_delay;
         for (uint n = 2; n < impl.size() && next_i >= 2; n++){
             uint  best_i    = UINT_MAX;
             float best_area = FLT_MAX;
@@ -755,6 +757,25 @@ void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
             }
         }
     }
+
+#if 0
+    if (P.use_fmux){
+        // Compute and store F7 implementation:
+        for (uint i = 0; i < dcuts.size(); i++){
+            Cut c = dcuts[i];
+            if (c.size() == 3){
+                // Possibly a MUX:
+                Npn4Norm n = npn4_norm[c.ftb()];
+                if (n.eq_class == npn4_cl_MUX){  // -- pin order: (pin0 ? pin2 : pin1)
+                    float arrival;
+                    float area_est;
+                    bool  late;
+                    l_tuple(arrival, area_est, late) = cutImpl_bestAreaMux(dcuts[i], impl, req_time);
+                }
+            }
+        }
+    }
+#endif
 
     dcuts.shrinkTo(P.cuts_per_node);
 }
@@ -947,6 +968,30 @@ void TechMap::generateCuts(Wire w)
 // -- Update estimates:
 
 
+/*statistics*/
+uint impl_selected[100];
+uint64 n_impl_selections;
+
+void clearImplStats()
+{
+    for (uint i = 0; i < elemsof(impl_selected); i++)
+        impl_selected[i] = 0;
+    n_impl_selections = 0;
+}
+
+void printImplStats()
+{
+  #if defined(PRINT_IMPL_STATS)
+    WriteLn "   -- implementation selections:";
+    for (uint i = 0; i < elemsof(impl_selected); i++){
+        if (impl_selected[i] != 0)
+            WriteLn "      %>2%_: %>10%,d  (%.2f %%)", i, impl_selected[i], double(impl_selected[i]) / n_impl_selections * 100;
+    }
+  #endif
+}
+/*end statistics*/
+
+
 void TechMap::updateTargetArrival()
 {
     target_arrival = 0;
@@ -1027,6 +1072,14 @@ void TechMap::induceMapping(bool instantiate)
 
                 assert(j < 254);
                 active(w) = j + FIRST_CUT;
+
+                /*statistics*/
+                if (impl.size() > 1 && impl[1][w].idx == CutImpl::NO_CUT && best_i == 0)
+                    impl_selected[elemsof(impl_selected)-1]++;      // -- area and delay implementations are the same
+                else
+                    impl_selected[best_i]++;
+                n_impl_selections++;
+                /*end statistics*/
 
                 for (uint k = 0; k < cut.size(); k++){
                     Wire v = cut[k] + N;
@@ -1162,8 +1215,7 @@ void TechMap::run()
     active    .reserve(N.size());
     fanouts   .reserve(N.size());
 
-    impl.push();
-    impl[0].reserve(N.size());
+    reserveImpls(1 + P.use_fmux);
 
     {
         Auto_Gob(N, FanoutCount);
@@ -1181,14 +1233,8 @@ void TechMap::run()
             mem.clear();
 
         double T0 = cpuTime();
-        if (iter == 1){
-            impl.push();
-            impl[1].reserve(N.size());
-
-            for (uint n = 0; n < P.balanced_cuts; n++){
-                impl.push();
-                impl[2 + n].reserve(N.size()); }
-        }
+        if (iter == 1)
+            reserveImpls(2 + P.balanced_cuts + P.use_fmux);
 
         // Generate cuts:
         findDualPhaseGates();       // -- may change during mapping due to 'bypassTrivialCutsets()' which rewires the circuit.
@@ -1196,6 +1242,7 @@ void TechMap::run()
             generateCuts(w);
 
         // Computer estimations:
+        /*stat*/clearImplStats();
         if (iter == 0)
             updateTargetArrival();
 
@@ -1207,7 +1254,7 @@ void TechMap::run()
             copyWinners(); }
 
         printProgress(T0);
-
+        /*stat*/printImplStats();
     }
     mem.clear();
 }
@@ -1237,8 +1284,9 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps)
         map.run();
     }
 
-    NewLine;
-    WriteLn "Legalization...";
+    if (!Ps.last().batch_output){
+        NewLine;
+        WriteLn "Legalization..."; }
     removeInverters(N, Ps.last().batch_output);
     //<<==legalize FMUXes
 }

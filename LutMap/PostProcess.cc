@@ -89,8 +89,8 @@ void removeInverters(Gig& N, WMapX<GLit>* remap)
 
     // Remove inverters between a non-LUT fed by a LUT:
     WSeen flipped;
-    WSeen added;
     WMap<GLit> neg_copy;
+    WSeen added;
     For_Gates(N, w){
         if (added.has(w)) continue;
 
@@ -144,9 +144,66 @@ void removeInverters(Gig& N, WMapX<GLit>* remap)
 }
 
 
-//void pushNegsDownMuxes(Gig& N, WMapX<GLit>* remap)
-//{
-//}
+void removeMuxViolations(Gig& N)
+{
+    WMap<uchar> mux_fanouts(0);
+    mux_fanouts.reserve(N.size());
+
+    // Resolve incomplete F8s:
+    For_Gates(N, w){
+        if (w == gate_Mux){
+            uint pin = 0;
+            if (w[2] == gate_Mux && w[1] != gate_Mux)
+                pin = 1;
+            else if (w[1] == gate_Mux && w[2] != gate_Mux)
+                pin = 2;
+
+            if (pin != 0){
+                // Add dummy F7:
+                Wire u = N.add(gate_Mux).init(N.True(), w[pin], N.True());
+                w.set(pin, u);
+            }
+        }
+    }
+
+    // Resolve F8 input violations:
+    For_Gates(N, w){
+        if (w == gate_Mux){
+            for (uint i = 1; i <= 2; i++){
+                if (w[i] == gate_Mux){
+                    if (mux_fanouts[w[i]] == 0)
+                        mux_fanouts(w[i]) = 1;
+                    else{
+                        // Duplicate input MUX:
+                        Wire u = N.add(gate_Mux).init(w[0], w[1], w[2]);
+                        w.set(i, u);
+                    }
+                }
+            }
+        }
+    }
+
+    // Resolve F7 input violations:
+    For_Gates(N, w){
+        if (w == gate_Mux){
+            for (uint i = 1; i <= 2; i++){
+                if (w[i] != gate_Mux){
+                    assert(w[i] == gate_Lut6 || w[i] == gate_Const);
+                    if (mux_fanouts[w[i]] == 0)
+                        mux_fanouts(w[i]) = 1;
+                    else{
+                        // Duplicate input LUT:
+                        Wire u = N.add(gate_Lut6);
+                        for (uint j = 0; j < 6; j++)
+                            w.set(j, w[j]);
+                        w.set(i, u);
+                    }
+                }
+            }
+        }
+    }
+
+}
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
