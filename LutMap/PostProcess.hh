@@ -25,7 +25,7 @@ using namespace std;
 
 void removeRemapSigns(Gig& N, WMapX<GLit>& remap);
 void removeInverters(Gig& N, WMapX<GLit>* remap = NULL);
-void removeMuxViolations(Gig& N);
+void removeMuxViolations(Gig& N, const WMap<float>& arrival, float target_arrival, WMapX<GLit>* remap);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

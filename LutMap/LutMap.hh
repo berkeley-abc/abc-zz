@@ -16,6 +16,8 @@
 
 #include "ZZ_Gig.hh"
 
+#define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
+
 namespace ZZ {
 using namespace std;
 

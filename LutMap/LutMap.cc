@@ -23,7 +23,6 @@
 #include "PostProcess.hh"
 //**/#include "ZZ_Dsd.hh"
 
-#define DELAY_FRACTION 1.0      // -- 'arg' value of 'Delay' gates is divided by this value
 #define ELA_GLOBAL_LIM 500      // -- if more nodes than this is dereferenced, MFFC is too big to consider
 #define ELA_TIMING
 
@@ -35,6 +34,7 @@ using namespace std;
 // Helpers:
 
 
+// For debugging
 void checkFmuxes(Gig& N)
 {
     // Max two levels of MUXes:
@@ -91,9 +91,12 @@ void checkFmuxes(Gig& N)
             if (w[2] != gate_Lut6 && w[2] != gate_Mux) inp_failC++;
         }
 
-        WriteLn "Non-trivial MUX inverter violations: %_ / %_  (= %.2f %%)", inv_failC, total, double(inv_failC) / total * 100;
-        WriteLn "Actual MUX fanout violations: %_ / %_  (= %.2f %%)", out_failC, total, double(out_failC) / total * 100;
-        WriteLn "Non-LUT feeding MUX: %_ / %_  (= %.2f %%)", inp_failC, total, double(inp_failC) / total * 100;
+        if (inv_failC > 0)
+            WriteLn "WARNING! Non-trivial MUX inverter violations: %_ / %_  (= %.2f %%)", inv_failC, total, double(inv_failC) / total * 100;
+        if (out_failC > 0)
+            WriteLn "WARNING! Actual MUX fanout violations: %_ / %_  (= %.2f %%)", out_failC, total, double(out_failC) / total * 100;
+        if (inp_failC > 0)
+            WriteLn "WARNING! Non-LUT feeding MUX: %_ / %_  (= %.2f %%)", inp_failC, total, double(inp_failC) / total * 100;
     }
 }
 
@@ -296,7 +299,7 @@ void LutMap::prioritizeCuts(Wire w, Array<Cut> cuts)
             costs[i].area += P.lut_cost[cuts[i].size()];
             costs[i].delay += 1.0f;
         }else{
-            costs[i].area += P.mux_cost;
+            costs[i].area += P.mux_cost * cuts[i].mux_depth;
             /**/costs[i].area *= fanout_est[w];
             // <<==FT do something about delay for selector here?
         }
@@ -392,7 +395,7 @@ void LutMap::reprioritizeCuts(Wire w, Array<Cut> cuts)
             this_area += P.lut_cost[cuts[i].size()];
             this_delay += 1.0f;
         }else{
-            this_area += P.mux_cost;
+            this_area += P.mux_cost * cuts[i].mux_depth;
             /**/this_area *= fanout_est[w];
         }
 
@@ -547,7 +550,7 @@ private:
 
 bool RefDerefCut::deref(const Cut& cut)
 {
-    acc += cut.mux_depth ? P.mux_cost : P.lut_cost[cut.size()];
+    acc += cut.mux_depth ? P.mux_cost * cut.mux_depth : P.lut_cost[cut.size()];
     if (acc > lim) return false;
 
     for (uint i = 0; i < cut.size(); i++){
@@ -569,7 +572,7 @@ bool RefDerefCut::deref(const Cut& cut)
 
 bool RefDerefCut::ref(const Cut& cut)
 {
-    acc += cut.mux_depth ? P.mux_cost : P.lut_cost[cut.size()];
+    acc += cut.mux_depth ? P.mux_cost * cut.mux_depth : P.lut_cost[cut.size()];
     if (acc > lim) return false;
 
     for (uint i = 0; i < cut.size(); i++){
@@ -773,8 +776,15 @@ void LutMap::updateFanoutEst(bool instantiate)
                 for (uint i = 0; i < cut.size(); i++){
                     Wire v = cut[i] + N;
                     fanouts(v)++;
-                    newMax(depart(v), depart[w] + ((cut.mux_depth == 0) ? 1.0f : 0.0f));
-//                    newMax(depart(v), depart[w] + 1.0f);
+                    float delay = 1.0f;
+                    if (cut.mux_depth > 0){
+                        Npn4Norm n = npn4_norm[w.arg()]; assert(n.eq_class == npn4_cl_MUX);
+                        pseq4_t seq = perm4_to_pseq4[n.perm];
+                        Wire w_sel = w[pseq4Get(seq, 0)];
+                        if (w_sel.id != cut[i])
+                            delay = 0.0f;
+                    }
+                    newMax(depart(v), depart[w] + delay);
                 }
             }else
                 depart(w) = FLT_MAX;    // -- marks deactivated node
@@ -820,7 +830,7 @@ void LutMap::updateFanoutEst(bool instantiate)
     mapped_area = 0;
     For_Gates(N, w){
         if (active[w] && isLogic(w))
-            mapped_area += cutmap[w][0].mux_depth ? P.mux_cost : P.lut_cost[cutmap[w][0].size()];
+            mapped_area += cutmap[w][0].mux_depth ? P.mux_cost * cutmap[w][0].mux_depth : P.lut_cost[cutmap[w][0].size()];
     }
 
     if (!instantiate){
@@ -904,8 +914,15 @@ void LutMap::updateFanoutEst(bool instantiate)
 
         uint n_luts  = N.typeCount(gate_Lut6);
         uint n_muxes = N.typeCount(gate_Mux);
-        removeMuxViolations(N);
-        WriteLn "Legalizing MUXes by duplication, adding:  #Mux=%_   #Lut6=%_", N.typeCount(gate_Mux) - n_muxes, N.typeCount(gate_Lut6) - n_luts;
+        if (n_muxes > 0){
+            removeMuxViolations(N, arrival, target_arrival, remap);
+            WriteLn "  -- Legalizing MUXes by duplication, adding:  #Mux=%_   #Lut6=%_", N.typeCount(gate_Mux) - n_muxes, N.typeCount(gate_Lut6) - n_luts;
+
+            GigRemap m;
+            N.compact(m);
+            if (remap)
+                m.applyTo(remap->base());
+        }
 
 #if 1   /*DEBUG*/
         if (P.use_fmux && !P.quiet){

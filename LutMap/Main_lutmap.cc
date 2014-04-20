@@ -420,35 +420,36 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
-    cli.add("input"  , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
-    cli.add("output" , "string", ""          , "Output GNL, GIG or BLIF file (optional).", 1);
-    cli.add("keep"   , "string", ""          , "List of forcable gates (only for GNL input).");
-    cli.add("blif"   , "string", ""          , "Save original input in BLIF format (for debugging only). Add '@' as last character to skip mapping.");
-    cli.add("pnl"    , "string", ""          , "Save original input in PNL format (for debugging only). Add '@' as last character to skip mapping.");
-    cli.add("gnl"    , "string", ""          , "Save original input in GNL format (for debugging only). Add '@' as last character to skip mapping.");
-    cli.add("prot"   , "bool"  , "no"        , "Protect fanout-free gates by adding a PO to each one.");
-    cli.add("strash" , "bool"  , "no"        , "Apply structural hashing before mapping.");
-    cli.add("melt"   , "bool"  , "no"        , "Undo the 3-input LUT mapping of HDL-ICE.");
-    cli.add("comb"   , "bool"  , "no"        , "Remove white/black boxes and sequential elements (may change delay profile).");
-    cli.add("mux"    , "bool"  , "no"        , "Do MUX and XOR extraction first.");
-    cli.add("compact", "bool"  , "yes"       , "Compact netlist at end of pre-processing.");
-    cli.add("ftbs"   , "string", ""          , "Write all FTBs to a file (for analysis).");
-    cli.add("rounds" , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
-    cli.add("N"      , "uint"  , "10"        , "Cuts to keep per node.");
-    cli.add("iters"  , "uint"  , "4"         , "Phases in each mapping.");
-    cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
-    cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (default is area).");
-    cli.add("recycle", "bool"  , "yes"       , "Recycle cuts for faster iterations.");
-    cli.add("ela"    , "bool"  , "yes"       , "Use exact-local-area post-processing after each mapping phase.");
-    cli.add("reprio" , "bool"  , "yes"       , "Use reprioritization during induce-phase.");
-    cli.add("fmux"   , "bool"  , "no"        , "Use special F7MUX and F8MUX in Xilinx series 7.");
-    cli.add("cost"   , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
-    cli.add("params" , "string", ""          , "A file containing options '-N' through '-cost'; one line per round (so number of lines sets '-rounds'). Omitted options will take values set by command line (use \"-\" for empty lines = all options are default)");
-    cli.add("batch"  , "bool"  , "no"        , "Add last line summary for batch jobs.");
-    cli.add("sig"    , "{off,full,pos}","off", "Map with signal tracking? (\"full\" includes negative literals).");
-    cli.add("remap"  , "string", ""          , "Write signal mapping to this file (requires 'sig' to be set).");
-    cli.add("verif"  , "bool"  , "no"        , "Signal tracking verification -- output files for equivalence checking.");
-    cli.add("unmap"  , "bool"  , "no"        , "Unmap final mapped design.");
+    cli.add("input"   , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
+    cli.add("output"  , "string", ""          , "Output GNL, GIG or BLIF file (optional).", 1);
+    cli.add("keep"    , "string", ""          , "List of forcable gates (only for GNL input).");
+    cli.add("blif"    , "string", ""          , "Save original input in BLIF format (for debugging only). Add '@' as last character to skip mapping.");
+    cli.add("pnl"     , "string", ""          , "Save original input in PNL format (for debugging only). Add '@' as last character to skip mapping.");
+    cli.add("gnl"     , "string", ""          , "Save original input in GNL format (for debugging only). Add '@' as last character to skip mapping.");
+    cli.add("prot"    , "bool"  , "no"        , "Protect fanout-free gates by adding a PO to each one.");
+    cli.add("strash"  , "bool"  , "no"        , "Apply structural hashing before mapping.");
+    cli.add("melt"    , "bool"  , "no"        , "Undo the 3-input LUT mapping of HDL-ICE.");
+    cli.add("comb"    , "bool"  , "no"        , "Remove white/black boxes and sequential elements (may change delay profile).");
+    cli.add("mux"     , "bool"  , "no"        , "Do MUX and XOR extraction first.");
+    cli.add("compact" , "bool"  , "yes"       , "Compact netlist at end of pre-processing.");
+    cli.add("ftbs"    , "string", ""          , "Write all FTBs to a file (for analysis).");
+    cli.add("rounds"  , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
+    cli.add("N"       , "uint"  , "10"        , "Cuts to keep per node.");
+    cli.add("iters"   , "uint"  , "4"         , "Phases in each mapping.");
+    cli.add("df"      , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
+    cli.add("dopt"    , "bool"  , "no"        , "Delay optimize (default is area).");
+    cli.add("recycle" , "bool"  , "yes"       , "Recycle cuts for faster iterations.");
+    cli.add("ela"     , "bool"  , "yes"       , "Use exact-local-area post-processing after each mapping phase.");
+    cli.add("reprio"  , "bool"  , "yes"       , "Use reprioritization during induce-phase.");
+    cli.add("fmux"    , "bool"  , "no"        , "Use special F7MUX and F8MUX in Xilinx series 7.");
+    cli.add("cost"    , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
+    cli.add("mux-cost", "int", "-1"           , "Cost of a F7 MUX (-1 encodes 1 or 0 depending on 'cost').");
+    cli.add("params"  , "string", ""          , "A file containing options '-N' through '-cost'; one line per round (so number of lines sets '-rounds'). Omitted options will take values set by command line (use \"-\" for empty lines = all options are default)");
+    cli.add("batch"   , "bool"  , "no"        , "Add last line summary for batch jobs.");
+    cli.add("sig"     , "{off,full,pos}","off", "Map with signal tracking? (\"full\" includes negative literals).");
+    cli.add("remap"   , "string", ""          , "Write signal mapping to this file (requires 'sig' to be set).");
+    cli.add("verif"   , "bool"  , "no"        , "Signal tracking verification -- output files for equivalence checking.");
+    cli.add("unmap"   , "bool"  , "no"        , "Unmap final mapped design.");
     cli.parseCmdLine(argc, argv);
 
     String input  = cli.get("input").string_val;
@@ -476,9 +477,11 @@ int main(int argc, char** argv)
             P.lut_cost[i] = i;
         P.mux_cost = 1;
     }
+    if (cli.get("mux-cost").int_val != -1)
+        P.mux_cost = cli.get("mux-cost").int_val;
 
     // Read input file:
-    double  T0 = cpuTime();
+    double T0 = cpuTime();
     Gig N;
     WSeen keep;
     uint keep_sz = 0;
@@ -827,18 +830,19 @@ int main(int argc, char** argv)
         if (isCI(w))
             depth(w) = 0;
         else{
-            uint d = 0;
-            For_Inputs(w, v)
-                newMax(d, depth[v]);
-            if (isLogicGate(w)){
-                if (w == gate_Mux)
-                    depth(w) = d;
-                else
+            if (w == gate_Mux){
+                depth(w) = max_(depth[w[0]] + 1, max_(depth[w[1]], depth[w[2]]));
+            }else{
+                uint d = 0;
+                For_Inputs(w, v)
+                    newMax(d, depth[v]);
+                if (isLogicGate(w))
                     depth(w) = d + 1;
-            }else if (w == gate_Delay)
-                depth(w) = d + w.arg();     // -- should use DELAY_FRACTION here
-            else
-                depth(w) = d;
+                else if (w == gate_Delay)
+                    depth(w) = d + w.arg() * DELAY_FRACTION;
+                else
+                    depth(w) = d;
+            }
         }
         newMax(max_delay, depth[w]);
     }
