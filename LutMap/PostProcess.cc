@@ -249,27 +249,31 @@ void removeMuxViolations(Gig& N, const WMap<float>& arrival, float target_arriva
     }
 
     // Remove inverters (except on input side of F7s, which will be handled later):
+    For_Gates(N, w){
+        if (w == gate_Mux && w[0].sign){
+            // Swap inputs:
+            w.set(0, +w[0]);
+            Wire w1 = w[1];
+            w.set(1, w[2]);
+            w.set(2, w1);
+            //**/putchar('='), fflush(stdout);
+        }
+    }
+
+    Auto_Gob(N, FanoutCount);
     WSeen flipped;
     For_Gates(N, w){
-        if (w == gate_Mux){
-            if (w[0].sign){
-                // Swap inputs:
-                w.set(0, +w[0]);
-                Wire w1 = w[1];
-                w.set(1, w[2]);
-                w.set(2, w1);
-                //**/putchar('='), fflush(stdout);
-            }
-
-            for (uint i = 1; i <= 2; i++){
-                if (w[i] == gate_Mux && w[i].sign){
+        For_Inputs(w, v){
+            if (v == gate_Mux && v.sign){
+                if (nFanouts(v) == 1){  // <<== if we have more fanouts, we could in principle push negations around to other fanouts
                     // Negate inputs of feeding mux:
-                    w.set(i, +w[i]);
-                    w[i].set(1, ~w[i][1]);
-                    w[i].set(2, ~w[i][2]);
-                    flipped.add(w[i]);
-                    //**/putchar('0' + i), fflush(stdout);
+                    w.set(Input_Pin(v), +v);
+                    v.set(1, ~v[1]);
+                    v.set(2, ~v[2]);
+                    flipped.add(v);
+                    //**/putchar('0' + Input_Pin(v)), fflush(stdout);
                 }
+                //**/else putchar('e'), fflush(stdout);
             }
         }
     }
