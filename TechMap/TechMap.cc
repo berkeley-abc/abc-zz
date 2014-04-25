@@ -939,7 +939,7 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps)
             WriteLn "Unmap: %_", info(N);
             NewLine;
         }
-        TechMap map(N, Ps[0]);
+        TechMap map(N, Ps[round]);
         map.run();
     }
 
