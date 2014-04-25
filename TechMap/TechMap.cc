@@ -357,7 +357,7 @@ class TechMap {
     StackAlloc<uint64>  mem;
     StackAlloc<uint64>  mem_win;
     WMap<CutSet>        cutmap;
-    WMap<uchar>         done;
+    volatile uchar*     done;
     WMap<Cut>           winner;
     Vec<WMap<CutImpl> > impl;
 
@@ -375,9 +375,11 @@ class TechMap {
     volatile gate_id    task;
     Vec<Tmp>            tmps;
     pthread_mutex_t     mutex;
-    pthread_cond_t      cond;
+    pthread_cond_t      cond_empty;
+    pthread_cond_t      cond_full;
     pthread_mutex_t     done_mutex;
     pthread_cond_t      done_cond;
+    pthread_mutex_t     mem_mutex;
 
     // Statistics:
     uint64              cuts_enumerated;
@@ -552,8 +554,10 @@ void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts, uint tn)
 inline void TechMap::waitFor(GLit w)
 {
   #if defined(ZZ_PTHREADS)
+    //while (!done[w.id]); return;
+
     pthread_mutex_lock(&done_mutex);
-    while (!done[w]){
+    while (!done[w.id]){
         //*t*/WriteLn "Waiting for: %_", w+N;
         pthread_cond_wait(&done_cond, &done_mutex); }
     pthread_mutex_unlock(&done_mutex);
@@ -564,8 +568,10 @@ inline void TechMap::waitFor(GLit w)
 inline void TechMap::markDone(GLit w)
 {
   #if defined(ZZ_PTHREADS)
+    //done[w.id] = 1; return;
+
     pthread_mutex_lock(&done_mutex);
-    done(w) = 1;
+    done[w.id] = 1;
     //*t*/WriteLn "Marking done: %_", w+N;
     pthread_cond_signal(&done_cond);
     pthread_mutex_unlock(&done_mutex);
@@ -589,8 +595,9 @@ void* genCutThread(void* data)
     for(;;){
         pthread_mutex_lock(&t.map->mutex);
         while ((my_task = t.map->task) == gid_NULL)
-            pthread_cond_wait(&t.map->cond, &t.map->mutex);
+            pthread_cond_wait(&t.map->cond_empty, &t.map->mutex);
         t.map->task = gid_NULL;
+        pthread_cond_signal(&t.map->cond_full);
         pthread_mutex_unlock(&t.map->mutex);
 
         if (my_task == gid_ERROR){ // -- signals "end-of-mapping"
@@ -680,7 +687,13 @@ void TechMap::generateCuts_helper(Wire w, uint tn)
         cuts_enumerated += dcuts.size();    // -- for statistics
         prioritizeCuts(w, dcuts, tn);
 
+      #if defined(ZZ_PTHREADS)
+        pthread_mutex_lock(&mem_mutex);
+      #endif
         cutmap(w) = dcuts.done(mem);
+      #if defined(ZZ_PTHREADS)
+        pthread_mutex_unlock(&mem_mutex);
+      #endif
 
     }else
         prioritizeCuts(w, cutmap(w), tn);
@@ -692,7 +705,7 @@ void TechMap::generateCuts(Wire w)
     assert(!w.sign);
 
     if (!isSeqElem(w))
-        bypassTrivialCutsets(w);
+        ;//bypassTrivialCutsets(w);
 
     switch (w.type()){
     case gate_Const:
@@ -707,7 +720,13 @@ void TechMap::generateCuts(Wire w)
             m.area_est = 0;
             m.arrival = 0;
         }
+      #if defined(ZZ_PTHREADS)
+        pthread_mutex_lock(&mem_mutex);
+      #endif
         cutmap(w) = noCuts(mem);
+      #if defined(ZZ_PTHREADS)
+        pthread_mutex_unlock(&mem_mutex);
+      #endif
         markDone(w);
         break;}
 
@@ -725,7 +744,13 @@ void TechMap::generateCuts(Wire w)
                 m.arrival = n.arrival;
             }
         }
+      #if defined(ZZ_PTHREADS)
+        pthread_mutex_lock(&mem_mutex);
+      #endif
         cutmap(w) = noCuts(mem);
+      #if defined(ZZ_PTHREADS)
+        pthread_mutex_unlock(&mem_mutex);
+      #endif
         markDone(w);
         break;
 
@@ -747,7 +772,13 @@ void TechMap::generateCuts(Wire w)
         for (uint i = 0; i < impl.size(); i++)
             impl[i](w).arrival += w.arg() * P.delay_fraction;
 
+      #if defined(ZZ_PTHREADS)
+        pthread_mutex_lock(&mem_mutex);
+      #endif
         cutmap(w) = noCuts(mem);
+      #if defined(ZZ_PTHREADS)
+        pthread_mutex_unlock(&mem_mutex);
+      #endif
         markDone(w);
         break;}
 
@@ -764,13 +795,12 @@ void TechMap::generateCuts(Wire w)
       #else
         //*t*/WriteLn "Setting task to: %_", w.id;
 
-        //pthread_mutex_lock(&mutex);
+        pthread_mutex_lock(&mutex);
         while (task != gid_NULL)
-            ;
-        //    pthread_cond_wait(&cond, &mutex);
+            pthread_cond_wait(&cond_full, &mutex);
         task = w.id;
-        pthread_cond_signal(&cond);
-        //pthread_mutex_unlock(&mutex);
+        pthread_cond_signal(&cond_empty);
+        pthread_mutex_unlock(&mutex);
 
 //        pthread_mutex_lock(&mutex);
 //        task = w.id;
@@ -972,14 +1002,14 @@ void TechMap::printProgress(double T0)
         }
     }
 
-    double T = cpuTime();
+    double T = realTime();
     WriteLn "Delay: %_    Wires: %,d    LUTs: %,d   [iter=%t  total=%t]", mapped_delay, (uint64)total_wires, (uint64)total_luts, T - T0, T;
 
     if (P.batch_output && iter == P.n_iters - 1){
         Write "%>11%,d    ", (uint64)total_luts;
         Write "%>11%,d    ", (uint64)total_wires;
         Write "%>6%d    "  , (uint64)mapped_delay;
-        Write "%>10%t"     , cpuTime();
+        Write "%>10%t"     , realTime();
         NewLine;
     }
 }
@@ -1004,12 +1034,12 @@ void TechMap::run()
     target_arrival = 0;
 
     cutmap    .reserve(N.size());
-    done      .reserve(N.size());
     winner    .reserve(N.size());
     fanout_est.reserve(N.size());
     depart    .reserve(N.size());
     active    .reserve(N.size());
     fanouts   .reserve(N.size());
+    done = xmalloc<uchar>(N.size());
 
     reserveImpls(1 + P.use_fmux);
 
@@ -1019,12 +1049,12 @@ void TechMap::run()
             fanout_est(w) = nFanouts(w);
             depart    (w) = FLT_MAX;
             active    (w) = ACTIVE;
-            done      (w) = 0;
+            done[w.id]    = 0;
         }
     }
     cuts_enumerated = 0;
 
-    n_threads = 1;      // <<== parameter/probe #cpus
+    n_threads = 8;      // <<== parameter/probe #cpus
     tmps.growTo(n_threads);
 
     // Map:   
@@ -1035,7 +1065,7 @@ void TechMap::run()
         if (iter < P.recycle_iter)
             mem.clear();
 
-        double T0 = cpuTime();
+        double T0 = realTime();
         if (iter == 1)
             reserveImpls(2 + P.use_fmux);
 
@@ -1043,9 +1073,11 @@ void TechMap::run()
         // Startup multi-threading:
         task = gid_NULL;
         pthread_mutex_init(&mutex, NULL);
-        pthread_cond_init(&cond, NULL);
+        pthread_cond_init(&cond_empty, NULL);
+        pthread_cond_init(&cond_full, NULL);
         pthread_mutex_init(&done_mutex, NULL);
         pthread_cond_init(&done_cond, NULL);
+        pthread_mutex_init(&mem_mutex, NULL);
 
         Vec<GenCut_Thread> tdata(n_threads);
         Vec<pthread_t>     tid  (n_threads, 0);
@@ -1065,17 +1097,22 @@ void TechMap::run()
       #if defined(ZZ_PTHREADS)
         //*t*/WriteLn "About to join threads";
         for (uint i = 0; i < n_threads; i++){
-            while (task != gid_NULL);
+            pthread_mutex_lock(&mutex);
+            while (task != gid_NULL)
+                pthread_cond_wait(&cond_full, &mutex);
             task = gid_ERROR;
-            pthread_cond_signal(&cond);
+            pthread_cond_signal(&cond_empty);
+            pthread_mutex_unlock(&mutex);
         }
         //*t*/WriteLn "Joining threads";
         for (uint i = 0; i < n_threads; i++)
             pthread_join(tid[i], NULL);
         pthread_mutex_destroy(&mutex);
-        pthread_cond_destroy(&cond);
+        pthread_cond_destroy(&cond_empty);
+        pthread_cond_destroy(&cond_full);
         pthread_mutex_destroy(&done_mutex);
         pthread_cond_destroy(&done_cond);
+        pthread_mutex_destroy(&mem_mutex);
       #endif
 
         // Computer estimations:
@@ -1092,6 +1129,7 @@ void TechMap::run()
         printProgress(T0);
     }
     mem.clear();
+    xfree(done);
 }
 
 
