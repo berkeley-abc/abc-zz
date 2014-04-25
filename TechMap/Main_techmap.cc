@@ -16,6 +16,7 @@
 #include "ZZ_Gig.IO.hh"
 #include "ZZ_Npn4.hh"
 #include "ZZ_BFunc.hh"
+#include "ZZ_Unix.hh"
 #include "TechMap.hh"
 #include "GigReader.hh"
 
@@ -78,13 +79,28 @@ void readInput(String input, Gig& N)
     WSeen keep;
     uint keep_sz = 0;
     try{
-        if (hasExtension(input, "aig"))
+        if (hasExtension(input, "aig")){
             readAigerFile(input, N, false);
-        else if (hasExtension(input, "gnl")){
+        }else if (hasExtension(input, "aig.gpg")){
+            // Start GPG process:
+            int pid;
+            int io[3];
+            Vec<String> args;
+            args += "--batch", "--no-use-agent", "--passphrase-file", homeDir() + "/.gnupg/key.txt", "-d", input;
+            startProcess("*gpg", args, pid, io);
+
+            // Read file:
+            File file(io[1], READ, false);
+            In   in(file);
+            readAiger(in, N, false);
+            closeChildIo(io);
+            waitpid(pid, NULL, 0);
+
+        }else if (hasExtension(input, "gnl")){
             N.load(input);
-        }else if (hasExtension(input, "gig"))
+        }else if (hasExtension(input, "gig")){
             readGigForTechmap(input, N);
-        else{
+        }else{
             ShoutLn "ERROR! Unknown file extension: %_", input;
             exit(1);
         }
