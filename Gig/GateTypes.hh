@@ -161,7 +161,7 @@ DEF( WLut     , INF  , Num  )   // FTB also stored in side-table
 
 // Black-boxes:
 DEF( Uif      , INF  , Arg  )   // Combinational box, arg should identify the logic inside the box
-DEF( Delay    , INF  , Arg  )   // Combinational box, logic is lost, arg gives delay of box 
+DEF( Delay    , INF  , Arg  )   // Combinational box, logic is lost, arg gives delay of box
 DEF( Box      , INF  , Arg  )   // Sequential box, all inputs should go to 'Seq' gates. Outputs may go to 'Sel' if more than one output pin.
 DEF( Bar      , 1    , NULL )   // Barrier gate; used to encircle logic that should not be mixed with other logic (strashing will treat Bar gates as PIs essentially)
 
@@ -225,14 +225,14 @@ macro bool isNumbered(GateType type) {
     ( GTM_(And) | GTM_(Xor) | GTM_(Mux) | GTM_(Maj) | GTM_(One) | GTM_(Gamb) | GTM_(Dot) | GTM_(Buf) | GTM_(Not) | GTM_(Or) \
     | GTM_(Equiv) | GTM_(Conj) | GTM_(Disj) | GTM_(Even) | GTM_(Odd) | GTM_(Lut4) | GTM_(Npn4) | GTM_(Lut6) | GTM_(WLut) )
 
-#define gtm_And GTM_(And)
+#define gtm_And  GTM_(And)
 #define gtm_Lut4 GTM_(Lut4)
 #define gtm_Npn4 GTM_(Npn4)
 #define gtm_Lut6 GTM_(Lut6)
 #define gtm_XigLogic (GTM_(And) | GTM_(Xor) | GTM_(Mux) | GTM_(Maj) | GTM_(One) | GTM_(Gamb) | GTM_(Dot))
 #define gtm_Strashed (GTM_(And) | GTM_(Xor) | GTM_(Mux) | GTM_(Maj) | GTM_(One) | GTM_(Gamb) | GTM_(Dot) | GTM_(Lut4))
 
-#define gtm_SI (GTM_(FF) | GTM_(PI) | GTM_(Clk) | GTM_(PPI))
+#define gtm_SI (GTM_(FF) | GTM_(PI) | GTM_(Clk) | GTM_(PPI) | GTM_(Const))
 #define gtm_SO (GTM_(PO) | GTM_(SafeProp) | GTM_(SafeCons) | GTM_(FairProp) | GTM_(FairCons))
     // primary inputs and outputs for SEQUENTIAL netlists
 
