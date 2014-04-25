@@ -370,11 +370,11 @@ void readParams(String filename, const Params_LutMap& P_default, /*out*/Vec<Para
                     if (eq(v, "unit")){
                         for (uint i = 0; i <= 6; i++)
                             P.lut_cost[i] = 1;
-                        P.mux_cost = 0;
+                        P.mux_cost = 1;
                     }else if (eq(v, "wire")){
                         for (uint i = 0; i <= 6; i++)
                             P.lut_cost[i] = i;
-                        P.mux_cost = 1;
+                        P.mux_cost = 2;
                     }else{
                         ShoutLn "ERROR! Invalid value given to parameter 'cost': %_", v;
                         exit(1); }
@@ -443,7 +443,7 @@ int main(int argc, char** argv)
     cli.add("reprio"  , "bool"  , "yes"       , "Use reprioritization during induce-phase.");
     cli.add("fmux"    , "bool"  , "no"        , "Use special F7MUX and F8MUX in Xilinx series 7.");
     cli.add("cost"    , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
-    cli.add("mux-cost", "int", "-1"           , "Cost of a F7 MUX (-1 encodes 1 or 0 depending on 'cost').");
+    cli.add("mux-cost", "int", "-1"           , "Cost of a F7 MUX (-1 encodes 2 or 1 depending on 'cost').");
     cli.add("params"  , "string", ""          , "A file containing options '-N' through '-cost'; one line per round (so number of lines sets '-rounds'). Omitted options will take values set by command line (use \"-\" for empty lines = all options are default)");
     cli.add("batch"   , "bool"  , "no"        , "Add last line summary for batch jobs.");
     cli.add("sig"     , "{off,full,pos}","off", "Map with signal tracking? (\"full\" includes negative literals).");
@@ -471,11 +471,11 @@ int main(int argc, char** argv)
     if (cli.get("cost").enum_val == 0){
         for (uint i = 0; i <= 6; i++)
             P.lut_cost[i] = 1;
-        P.mux_cost = 0;
+        P.mux_cost = 1;
     }else{
         for (uint i = 0; i <= 6; i++)
             P.lut_cost[i] = i;
-        P.mux_cost = 1;
+        P.mux_cost = 2;
     }
     if (cli.get("mux-cost").int_val != -1)
         P.mux_cost = cli.get("mux-cost").int_val;

@@ -178,12 +178,10 @@ int main(int argc, char** argv)
 
     cli.add("cost"   , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
     cli.add("rounds" , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
-    cli.add("N"      , "uint"  , "6"         , "Cuts to keep per node.");
+    cli.add("N"      , "uint"  , "8"         , "Cuts to keep per node.");
     cli.add("iters"  , "uint"  , "5"         , "Phases in each mapping.");
     cli.add("rc-iter", "int"   , "3"         , "Recycle cuts from this iteration (-1 = no recycling).");
     cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
-    cli.add("bal"    , "uint"  , "0"         , "Number of balanced implementations (between delay and area optimal).");
-    cli.add("delta"  , "float" , "1.0"       , "Delta-delay for balanced cuts.");
     cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (default is area).");
     cli.add("struct" , "bool"  , "no"        , "Use structural mapping (mostly for debugging/comparison).");
     cli.add("un-and" , "bool"  , "no"        , "Unmap to AND gates instead of richer set of gates.");
@@ -199,8 +197,6 @@ int main(int argc, char** argv)
     P.n_iters        = cli.get("iters").int_val;
     P.recycle_iter   = (uint)cli.get("rc-iter").int_val;
     P.delay_factor   = cli.get("df").float_val;
-    P.balanced_cuts  = cli.get("bal").int_val;
-    P.delta_delay    = cli.get("delta").float_val;
     P.struct_mapping = cli.get("struct").bool_val;
     P.unmap_to_ands  = cli.get("un-and").bool_val;
     P.use_fmux       = cli.get("fmux").bool_val;

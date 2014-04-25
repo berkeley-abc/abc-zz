@@ -21,9 +21,6 @@
 #include "Unmap.hh"
 
 
-//#define PRINT_IMPL_STATS
-
-
 namespace ZZ {
 using namespace std;
 
@@ -40,39 +37,9 @@ using namespace std;
 #define Cost TechMap_Cost
 #define Cost_NULL TechMap_Cost()
 
-
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-/*
+#include "TechMap_CutSets.icc"
 
 
-- Each node stores multiple types of cuts:
-  - Several cuts on a trade-off between area/delay
-  - Cuts that corresponds to different points in target architecture (FMUX7, inverted output in standard cell etc.)
-
-- FTB computation and semantic cuts/constant propagation.
-
-- Native BigAnd/BigXor with dynamic internal points discovery?
-
-- More compact cut-set representation
-
-
-Cut
-Organized CutSet
-
-CutMap
-
-struct CutSet
-F7s, F8s
-
-Example circuit:
-  #Seq=834,781
-  #Lut4=2,340,883
-  #Delay=455
-  #Box=374,355
-  #Sel=21,965
-
-
-*/
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Helpers:
 
@@ -194,240 +161,13 @@ void removeInverters(Gig& N, bool quiet)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// 'Cut' class:
-
-
-/*
-Cut layout:
-
-sig    : 1 uint
-sizes  : 4 uchars: #inputs, offset-ftb, unused, unused
-inputs : 'size' uints
-pad    : 0 or 1 uint (to get to 64-bit align)
-ftb    : '2^size / 64' uint64s, rounded up.
-*/
-
-class Cut {
-public:
-private:
-    uint64* base;
-
-    Cut&    me() const     { return *const_cast<Cut*>(this); }
-
-    uint&   sig_()         { return ((uint*)&base[0])[0]; }
-
-    uchar&  size_()        { return ((uchar*)&base[0])[4]; }    // -- 'size == n_inputs'
-    uchar&  offFtb_()      { return ((uchar*)&base[0])[5]; }
-    uchar&  reserved0_()   { return ((uchar*)&base[0])[6]; }
-    uchar&  reserved1_()   { return ((uchar*)&base[0])[7]; }
-
-    uint&   input_(uint i) { return ((uint*)&base[1])[i]; }
-    uint64& ftb_(uint i)   { return base[offFtb_() + i]; }
-
-    void init(Array<gate_id> inputs, uint64* ftb);
-
-public:
-    Cut() : base(NULL) {}
-    Cut(uint64* base_) : base(base_) {}
-
-    static uint allocSz(uint n_inputs);
-
-    Cut(uint64* base_, Array<gate_id> inputs, uint64* ftb) : base(base_) { init(inputs, ftb); }
-        // -- size of 'ftb' should be 'ceil(2^n / 64)' i.e. '(1 << inputs.size() + 63) >> 6'.
-
-    template<class ALLOC>   // -- NOTE! 'ALLOC' should allocate 'uint64's
-    Cut dup(ALLOC& allocator);
-
-    Null_Method(Cut) { return base == NULL; }
-
-    uint sig()                        const { return me().sig_(); }
-    uint size()                       const { return me().size_(); }
-    gate_id operator[](int input_num) const { return me().input_(input_num); }
-
-    uint64 ftb(uint word_num = 0)     const { return me().ftb_(word_num); }
-
-    uint ftbSz() const { return ((1ull << size()) + 63) >> 6; }
-};
-
-
-// Returns the number of 'uint64's to allocate for a cut of size 'n_inputs'.
-inline uint Cut::allocSz(uint n_inputs)
-{
-    uint ftb_words = ((1ull << n_inputs) + 63) >> 6;
-    uint alloc_sz = ((n_inputs + 3) >> 1) + ftb_words;
-    return alloc_sz;
-}
-
-
-// Duplicate cut
-template<class ALLOC>
-inline Cut Cut::dup(ALLOC& allocator)
-{
-    uint sz = allocSz(this->size());
-    uint64* new_base = allocator.alloc(sz);
-    for (uint i = 0; i < sz; i++)
-        new_base[i] = base[i];
-    return Cut(new_base);
-}
-
-
-inline void Cut::init(Array<gate_id> inputs, uint64* ftb)
-{
-    assert(inputs.size() <= 32);
-    uint ftb_words = ((1ull << inputs.size()) + 63) >> 6;
-    uint alloc_sz = ((inputs.size() + 3) >> 1) + ftb_words;
-
-    size_()      = inputs.size();
-    offFtb_()    = (inputs.size() + 3) >> 1;
-    reserved0_() = 0;
-    reserved1_() = 0;
-    assert(offFtb_() + ftb_words == alloc_sz);
-
-    uint sig_mask = 0;
-    for (uint i = 0; i < inputs.size(); i++)
-        sig_mask |= 1ull << (inputs[i] & 31);
-    sig_() = sig_mask;
-
-    for (uint i = 0; i < inputs.size(); i++)
-        input_(i) = inputs[i];
-    if ((inputs.size() & 1) == 1)
-        input_(inputs.size()) = 0;   // -- avoid uninitialized memory
-
-    for (uint i = 0; i < ftb_words; i++)
-        ftb_(i) = ftb[i];
-}
-
-
-template<> fts_macro void write_(Out& out, const Cut& v)
-{
-    FWrite(out) "Cut{";
-    for (uint i = 0; i < v.size(); i++){
-        if (i != 0) FWrite(out) ", ";
-        FWrite(out) "w%_", v[i]; }
-    FWrite(out) "}[";
-
-    for (uint i= 0; i < v.ftbSz(); i++){    // -- perhaps reverse order
-        if (i != 0) FWrite(out) ", ";
-        FWrite(out) "0x%.16X", v.ftb(i); }
-    FWrite(out) "]";
-}
-
-
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Static cut-set:
-
-
-/*
-Cutset layout:
-
-n_cuts  : 1 uint
-offsets : 'n_cuts' uints
-pad     : 0 or 1 uint (to get to 64-bit align)
-cuts    : several uint64s
-*/
-
-class CutSet {
-    uint64* data;
-
-    uint  off (uint i) const { return ((uint*)data)[i+1]; }
-    uint& off_(uint i)       { return ((uint*)data)[i+1]; }
-
-    friend class DynCutSet;
-    CutSet(uint64* data_) : data(data_) {}
-
-public:
-    CutSet() : data(NULL) {}
-    Null_Method(CutSet) { return data == NULL; }
-
-    uint size() const { return ((uint*)data)[0]; }
-    Cut operator[](uint i) const { return Cut(&data[off(i)]); }
-
-    void swap(uint i, uint j) { swp(off_(i), off_(j)); }
-    void shrinkTo(uint new_size)  { assert(new_size >= size()); }   // -- just to allow for template code
-};
-
-
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Dynamic cut-set:
-
-
-// Usage: call 'begin()', define cut by modifying public variables, call 'next()', repeat this
-// step, finally call 'done()' to get a static 'CutSet'. The dynamic cut set can then be reused.
-class DynCutSet {
-    Vec<uint64> mem;
-    Vec<uint>   off;
-
-    void clearCut() { inputs.clear(); ftb.clear(); }
-
-    void storeCut() {
-        off.push((uint)mem.size());
-        mem.growTo(mem.size() + Cut::allocSz(inputs.size()));
-        Cut(&mem[off[LAST]], inputs.slice(), ftb.base());
-    }
-
-public:
-  //________________________________________
-  //  Add a cut:
-
-    Vec<gate_id> inputs;    // }- these fields must be populated before calling 'next()'
-    Vec<uint64>  ftb;       // }
-
-    void begin()  { mem.clear(); off.clear(); clearCut(); }
-    void next ()  { storeCut(); clearCut(); }       // -- 'next()' must be called before the final 'done()'
-
-  //________________________________________
-  //  Manipulate cut set:
-
-    uint size() const      { return off.size(); }         // -- returns the number of cuts stored by 'next()' calls
-    Cut operator[](uint i) { return Cut(&mem[off[i]]); }  // -- cut is invalidated if cutset is changed (by calling 'next()')
-
-    void swap    (uint i, uint j) { swp(off[i], off[j]); }
-    void pop     ()               { assert(off.size() > 0); off.pop(); }
-    void shrinkTo(uint new_size)  { if (new_size <= off.size()) off.shrinkTo(new_size); }
-
-  //________________________________________
-  //  Finalize:
-
-    template<class ALLOC>   // -- NOTE! 'ALLOC' should allocate 'uint64's
-    CutSet done(ALLOC& allocator);
-};
-
-
-template<class ALLOC>
-CutSet DynCutSet::done(ALLOC& allocator)
-{
-    uint mem_needed = 0;
-    for (uint i = 0; i < off.size(); i++)
-        mem_needed += Cut::allocSz(Cut(&mem[off[i]]).size());
-
-    uint off_adj = (off.size() + 2) >> 1;
-    mem_needed += off_adj;
-    uint64* data = allocator.alloc(mem_needed);
-    uint*   tab = (uint*)data;
-    tab[0] = off.size();
-
-    for (uint i = 0; i < off.size(); i++){
-        tab[i+1] = off_adj;
-
-        uint sz = Cut::allocSz(Cut(&mem[off[i]]).size());
-        memcpy(&data[off_adj], &mem[off[i]], sz * sizeof(uint64));
-        off_adj += sz;
-    }
-    assert(off_adj == mem_needed);
-    if ((off.size() & 1) == 0) tab[off.size() + 1] = 0;    // -- avoid uninitialized memory
-
-    return CutSet(data);
-}
-
-
-//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Cut implementation:
 
 
+
 // NOTE! Through out the code, 'impl' is indexed 'impl[sel][wire]' where
-//   'sel == 0' is delay optimal
-//   'sel == 1' is area optimal
-//   'sel == 2..' are trade-off choices ("balanced" cuts)
+//   'sel == 0' LUT cut
+//   'sel == 1' F7 cut
 
 
 struct CutImpl {
@@ -473,7 +213,8 @@ inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> 
         float area_est = impl[0][p].area_est;
         uint best_j = 0;
         for (uint j = 1; j < impl.size(); j++){
-            if (impl[j][p].idx == CutImpl::NO_CUT) break;
+//          if (impl[j][p].idx == CutImpl::NO_CUT) break;
+            if (impl[j][p].idx == CutImpl::NO_CUT) continue;        // <<== see line 764 /*test*/
             if (impl[j][p].arrival <= req_time){
                 if (newMin(area_est, impl[j][p].area_est))
                     best_j = j;
@@ -614,7 +355,6 @@ public:
 };
 
 
-
 //=================================================================================================
 // -- Helpers:
 
@@ -661,18 +401,19 @@ void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
     }
 
     // Iteration specific cut sorting and cut implementations:
+    float req_time = FLT_MAX;
     if (iter == 0){
         assert(impl.size() == 1);
         sobSort(sob(costs, Delay_lt()));
 
     }else{
-        float req_time = active[w] ? target_arrival - depart[w] - 1.0f : best_delay;
+        req_time = active[w] ? target_arrival - depart[w] - 1.0f : best_delay;
 #if 1
-        /**/if (!active[w]){
-        /**/    For_Inputs(w, v)
-        /**/        if (active[v]) newMax(req_time, target_arrival - depart[v]);
+        if (!active[w] && iter >= 2){
+            For_Inputs(w, v)
+                if (active[v]) newMax(req_time, target_arrival - depart[v]);
             req_time += 1.0;
-        /**/}
+        }
 #endif
         if (req_time < best_delay)
             req_time = best_delay;   // -- if we change heuristics so we cannot always meet timing, at least do the best we can
@@ -716,45 +457,15 @@ void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
     for (uint n = 1; n < impl.size(); n++)
         impl[n](w).idx = CutImpl::NO_CUT;
 
-    float req_time = -FLT_MAX;
     if (iter > 0){
         // Store area optimal implementations:
-        uint idx = (costs.size() == 1 || costs[0].area <= costs[1].area) ? 0 : 1;
-        impl[1](w).idx      = idx;
-        impl[1](w).area_est = costs[idx].area / fanout_est[w];
-        impl[1](w).arrival  = costs[idx].delay;
-        /*test*/if (idx == 0) impl[1](w).idx = CutImpl::NO_CUT;
-
-        // Compute and store balanced implementations:
-        uint  next_i = P.cuts_per_node - 1 - P.use_fmux;
-        req_time = costs[0].delay - 1.0 - P.delta_delay;
-        for (uint n = 2; n < impl.size() && next_i >= 2; n++){
-            uint  best_i    = UINT_MAX;
-            float best_area = FLT_MAX;
-            float arrival_i = FLT_MAX;
-            for (uint i = 0; i < dcuts.size(); i++){
-                float arrival;
-                float area_est;
-                bool  late;
-                l_tuple(arrival, area_est, late) = cutImpl_bestArea(dcuts[i], impl, req_time);
-                if (!late && newMin(best_area, area_est)){
-                    best_i = i;
-                    arrival_i = arrival; }
-            }
-
-            if (best_i != UINT_MAX){
-                if (best_i >= P.cuts_per_node){
-                    dcuts.swap(best_i, next_i);
-                    best_i = next_i;
-                    next_i--;
-                }
-
-                impl[n](w).idx      = best_i;
-                impl[n](w).area_est = best_area + P.lut_cost[dcuts[best_i].size()];
-                impl[n](w).arrival  = arrival_i + 1.0;
-
-                req_time = arrival_i - P.delta_delay;
-            }
+        if (costs.size() > 1){
+            if (costs[0].area > costs[1].area){
+                impl[1](w).idx      = 1;
+                impl[1](w).area_est = costs[1].area / fanout_est[w];
+                impl[1](w).arrival  = costs[1].delay;
+            }else
+                impl[1](w).idx = CutImpl::NO_CUT;
         }
     }
 
@@ -883,24 +594,6 @@ void TechMap::generateCuts(Wire w)
             bool late;
             l_tuple(ma.arrival, ma.area_est, late) = cutImpl_bestArea(w, impl, FLT_MAX);
             assert(!late);
-
-            float prev_arrival = ma.arrival;
-            for (uint i = 2; i < impl.size(); i++){
-                CutImpl& ma = impl[i](w);
-                if (prev_arrival - P.delta_delay < md.arrival){
-                    ma.idx = CutImpl::NO_CUT;
-                    break; }
-
-                l_tuple(ma.arrival, ma.area_est, late) = cutImpl_bestArea(w, impl, prev_arrival - P.delta_delay);
-                if (late){
-                    ma.idx = CutImpl::NO_CUT;
-                    break;
-
-                }else{
-                    ma.idx = CutImpl::TRIV_CUT;
-                    prev_arrival = ma.arrival;
-                }
-            }
         }
 
         // Add box delay:
@@ -966,30 +659,6 @@ void TechMap::generateCuts(Wire w)
 
 //=================================================================================================
 // -- Update estimates:
-
-
-/*statistics*/
-uint impl_selected[100];
-uint64 n_impl_selections;
-
-void clearImplStats()
-{
-    for (uint i = 0; i < elemsof(impl_selected); i++)
-        impl_selected[i] = 0;
-    n_impl_selections = 0;
-}
-
-void printImplStats()
-{
-  #if defined(PRINT_IMPL_STATS)
-    WriteLn "   -- implementation selections:";
-    for (uint i = 0; i < elemsof(impl_selected); i++){
-        if (impl_selected[i] != 0)
-            WriteLn "      %>2%_: %>10%,d  (%.2f %%)", i, impl_selected[i], double(impl_selected[i]) / n_impl_selections * 100;
-    }
-  #endif
-}
-/*end statistics*/
 
 
 void TechMap::updateTargetArrival()
@@ -1072,14 +741,6 @@ void TechMap::induceMapping(bool instantiate)
 
                 assert(j < 254);
                 active(w) = j + FIRST_CUT;
-
-                /*statistics*/
-                if (impl.size() > 1 && impl[1][w].idx == CutImpl::NO_CUT && best_i == 0)
-                    impl_selected[elemsof(impl_selected)-1]++;      // -- area and delay implementations are the same
-                else
-                    impl_selected[best_i]++;
-                n_impl_selections++;
-                /*end statistics*/
 
                 for (uint k = 0; k < cut.size(); k++){
                     Wire v = cut[k] + N;
@@ -1234,7 +895,7 @@ void TechMap::run()
 
         double T0 = cpuTime();
         if (iter == 1)
-            reserveImpls(2 + P.balanced_cuts + P.use_fmux);
+            reserveImpls(2 + P.use_fmux);
 
         // Generate cuts:
         findDualPhaseGates();       // -- may change during mapping due to 'bypassTrivialCutsets()' which rewires the circuit.
@@ -1242,7 +903,6 @@ void TechMap::run()
             generateCuts(w);
 
         // Computer estimations:
-        /*stat*/clearImplStats();
         if (iter == 0)
             updateTargetArrival();
 
@@ -1254,7 +914,6 @@ void TechMap::run()
             copyWinners(); }
 
         printProgress(T0);
-        /*stat*/printImplStats();
     }
     mem.clear();
 }
@@ -1316,5 +975,40 @@ TODO:
  - make Unmap depth aware
  - signal tracking?? (ouch); esp. across unmap
  - check memory behavior
+
+ - ban F7/F8 fed by non-LUT
+ - ban F7/F8 feeding CO? (or subset of COs?)
+
+*/
+
+/*
+
+
+- Each node stores multiple types of cuts:
+  - Several cuts on a trade-off between area/delay
+  - Cuts that corresponds to different points in target architecture (FMUX7, inverted output in standard cell etc.)
+
+- FTB computation and semantic cuts/constant propagation.
+
+- Native BigAnd/BigXor with dynamic internal points discovery?
+
+- More compact cut-set representation
+
+
+Cut
+Organized CutSet
+
+CutMap
+
+struct CutSet
+F7s, F8s
+
+Example circuit:
+  #Seq=834,781
+  #Lut4=2,340,883
+  #Delay=455
+  #Box=374,355
+  #Sel=21,965
+
 
 */

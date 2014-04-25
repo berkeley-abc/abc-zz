@@ -30,8 +30,6 @@ struct Params_TechMap {
     uint        cuts_per_node;      // -- how many cuts to store for each node in the subject graph
     float       delay_factor;       // -- how far from delay optimal are we willing to go for saving area? (1.0 = delay optimal)
     float       delay_fraction;     // -- delay value in 'gate_Delay' are multiplied by this value
-    uint        balanced_cuts;      // -- #cuts to compute between "best area" and "best delay"
-    float       delta_delay;        // -- minimum delay improvement to consider when computing balanced cuts.
     bool        struct_mapping;     // -- if TRUE, FTBs are not used to reduce cuts (= mapping with structural cuts)
     bool        unmap_to_ands;      // -- if TRUE, XIG gates (XOR, MUX etc.) are turned into ANDs after unmapping.
     bool        use_fmux;           // -- enable F7/F8 MUXes for Xilinx series 7.
@@ -41,13 +39,11 @@ struct Params_TechMap {
 
     Params_TechMap() :
         cut_size      (6),
-        n_iters       (4),
+        n_iters       (5),
         recycle_iter  (UINT_MAX),
-        cuts_per_node (10),
+        cuts_per_node (8),
         delay_factor  (1.0),
         delay_fraction(1.0),
-        balanced_cuts (2),
-        delta_delay   (1),
         struct_mapping(false),
         unmap_to_ands (false),
         use_fmux      (false),

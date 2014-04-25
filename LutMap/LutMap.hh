@@ -52,8 +52,8 @@ struct Params_LutMap {
         quiet(false)
     {
         for (uint i = 0; i < elemsof(lut_cost); i++)
-            lut_cost[i] = 1;    // -- default is unit cost
-        mux_cost = 0;
+            lut_cost[i] = i;
+        mux_cost = 2;
     }
 };
 
