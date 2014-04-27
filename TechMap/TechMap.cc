@@ -145,7 +145,7 @@ template<> fts_macro void write_(Out& out, const CutImpl& v)
 // '(FLT_MAX, FLT_MAX)' is returned.  If 'sel' is non-null, cut selection is recorded there.
 // NOTE! Setting 'req_time = -FLT_MAX' is equivalent of calling 'cutImpl_bestDelay()'.
 template<class CUT>
-inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& impl, float req_time)
+inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> >& impl, float req_time, bool skip_last)
 {
     // Find best arrival:
     float arrival = 0;
@@ -153,9 +153,9 @@ inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> 
         newMax(arrival, impl[0][GLit(cut[i])].arrival);     // -- impl[0] is delay optimal
 
     bool late = false;
-    if (req_time == -FLT_MAX)            // -- special value => return delay optimal selection
+    if (req_time == -FLT_MAX){           // -- special value => return delay optimal selection
         req_time = arrival;
-    else if (arrival > req_time){
+    }else if (arrival > req_time){
         late = true;
         req_time = arrival;
     }
@@ -166,7 +166,7 @@ inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> 
         GLit p = GLit(cut[i]);
         float area_est = impl[0][p].area_est;
         uint best_j = 0;
-        for (uint j = 1; j < impl.size(); j++){
+        for (uint j = 1; j < impl.size() - skip_last; j++){
             if (impl[j][p].idx == CutImpl::NONE) continue;
             if (impl[j][p].arrival <= req_time){
                 if (newMin(area_est, impl[j][p].area_est))
@@ -182,13 +182,21 @@ inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> 
 }
 
 
-// Required time is for selector. Data inputs arrive one level earlier.
-inline Pair<float,float> cutImpl_bestAreaMux(Gig& N, Cut cut, const Vec<WMap<CutImpl> >& impl, float req_time)
+// Returns '(arrival, area_est)'; arrival and area of a delay optimal selection for 'cut'.
+// If 'sel' is non-null, cut selection is recorded there.
+template<class CUT>
+inline Pair<float,float> cutImpl_bestDelay(CUT cut, const Vec<WMap<CutImpl> >& impl, bool skip_last)
+{
+    Trip<float,float,bool> t = cutImpl_bestArea(cut, impl, -FLT_MAX, skip_last);
+    assert(!t.trd);
+    return tuple(t.fst, t.snd);
+}
+
+
+// Required time is for data. Data inputs are treated as arriving one level earlier.
+inline Pair<float,float> cutImpl_bestAreaMux(Gig& N, Cut cut, const Vec<WMap<CutImpl> >& impl, float req_time, Wire w0)
 {
     assert(req_time != -FLT_MAX);
-
-    Wire w0, w1, w2;
-    muxInputs(N, cut, w0, w1, w2, true);
 
     // Pick best area meeting that arrival:
     float arrival = -FLT_MAX;
@@ -197,10 +205,10 @@ inline Pair<float,float> cutImpl_bestAreaMux(Gig& N, Cut cut, const Vec<WMap<Cut
         GLit p = GLit(cut[i]);
         float area_est = impl[0][p].area_est;
         uint best_j = 0;
-        float d = (p == w0) ? 0.0f : -1.0f;
-        for (uint j = 1; j < impl.size() - 1; j++){     // -- "-1" to skip F7 implementation
+        float d = (p == +w0) ? 0.0f : -1.0f;
+        for (uint j = 1; j < impl.size() - (p != +w0); j++){     // -- "-(p != +w0)" to skip F7 implementation
             if (impl[j][p].idx == CutImpl::NONE) continue;
-            if (impl[j][p].arrival + d <= req_time){        // <<== hantera 'i==0' (selektor) annorlunda!
+            if (impl[j][p].arrival + d <= req_time){
                 if (newMin(area_est, impl[j][p].area_est))
                     best_j = j;
             }
@@ -212,17 +220,6 @@ inline Pair<float,float> cutImpl_bestAreaMux(Gig& N, Cut cut, const Vec<WMap<Cut
 
     if (arrival == -FLT_MAX) arrival = FLT_MAX;
     return tuple(arrival, total_area_est);
-}
-
-
-// Returns '(arrival, area_est)'; arrival and area of a delay optimal selection for 'cut'.
-// If 'sel' is non-null, cut selection is recorded there.
-template<class CUT>
-inline Pair<float,float> cutImpl_bestDelay(CUT cut, const Vec<WMap<CutImpl> >& impl)
-{
-    Trip<float,float,bool> t = cutImpl_bestArea(cut, impl, -FLT_MAX);
-    assert(!t.trd);
-    return tuple(t.fst, t.snd);
 }
 
 
@@ -384,7 +381,7 @@ void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
     for (uint i = 0; i < dcuts.size(); i++){
         costs[i].idx  = i;
         costs[i].late = false;
-        l_tuple(costs[i].delay, costs[i].area) = cutImpl_bestDelay(dcuts[i], impl);
+        l_tuple(costs[i].delay, costs[i].area) = cutImpl_bestDelay(dcuts[i], impl, P.use_fmux);
 
         if (newMin(best_delay, costs[i].delay))
             best_delay_idx = i;
@@ -410,12 +407,13 @@ void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
             req_time += 1.0;
         }
 
+        //**/Dump(w, req_time, best_delay, target_arrival, depart[w]);
         if (req_time < best_delay)
             req_time = best_delay;   // -- if we change heuristics so we cannot always meet timing, at least do the best we can
 
         for (uint i = 0; i < dcuts.size(); i++){
             costs[i].idx = i;
-            l_tuple(costs[i].delay, costs[i].area, costs[i].late) = cutImpl_bestArea(dcuts[i], impl, req_time);
+            l_tuple(costs[i].delay, costs[i].area, costs[i].late) = cutImpl_bestArea(dcuts[i], impl, req_time, false);
             assert(costs[i].delay >= best_delay);
 
             costs[i].area += lutCost(w, dcuts[i]);
@@ -469,24 +467,21 @@ void TechMap::prioritizeCuts(Wire w, CUTSET& dcuts)
             Cut c = dcuts[i];
             if (c.size() == 3){
                 // Possibly a MUX:
-                Npn4Norm n = npn4_norm[(ushort)c.ftb()];
-                if (n.eq_class == npn4_cl_MUX){  // -- pin order: (pin0 ? pin2 : pin1)
+                Wire w0, w1, w2;
+                if (muxInputs(N, c, w0, w1, w2)){
                     // Check that both data inputs are from logic:
-                    pseq4_t seq = perm4_to_pseq4[n.perm];
-                    Wire w1 = (c[pseq4Get(seq, 2)] + N) ^ bool(n.negs & (1 << pseq4Get(seq, 2)));
-                    Wire w2 = (c[pseq4Get(seq, 1)] + N) ^ bool(n.negs & (1 << pseq4Get(seq, 1)));
-
 //                  if (isLogic(w1) && isLogic(w2)){
                     if (isLogic(w1) && isLogic(w2) && (!mux_fanout[w1] || mux_fanout[w1] == w) && (!mux_fanout[w2] || mux_fanout[w2] == w)){
                         float arrival;
                         float area_est;
-                        l_tuple(arrival, area_est) = cutImpl_bestAreaMux(N, dcuts[i], impl, req_time);
+                        l_tuple(arrival, area_est) = cutImpl_bestAreaMux(N, dcuts[i], impl, req_time, w0);
                         area_est += P.mux_cost;
 
                         if (arrival <= req_time && newMin(best_area, area_est)){
                             impl[F7MUX](w).idx = i;
                             impl[F7MUX](w).area_est = area_est / fanout_est[w];
-                            impl[F7MUX](w).arrival = arrival + 1.0f;
+                            //impl[F7MUX](w).arrival = arrival + 1.0f;
+                            impl[F7MUX](w).arrival = max_(arrival + 1.0f, impl[DELAY][w].arrival);  // -- since not all F7s can be realized, don't give it better delay than the best LUT implementation
                         }
                     }
                 }
@@ -596,13 +591,13 @@ void TechMap::generateCuts(Wire w)
         // Treat delay gates as PIs except for delay:
         CutImpl& md = impl[0](w);
         md.idx = CutImpl::TRIV;
-        l_tuple(md.arrival, md.area_est) = cutImpl_bestDelay(w, impl);
+        l_tuple(md.arrival, md.area_est) = cutImpl_bestDelay(w, impl, P.use_fmux);
 
         if (impl.size() > 1){
             CutImpl& ma = impl[1](w);
             ma.idx = CutImpl::TRIV;
             bool late;
-            l_tuple(ma.arrival, ma.area_est, late) = cutImpl_bestArea(w, impl, FLT_MAX);
+            l_tuple(ma.arrival, ma.area_est, late) = cutImpl_bestArea(w, impl, FLT_MAX, false);
             assert(!late);
         }
 
@@ -675,12 +670,21 @@ void TechMap::updateTargetArrival()
 
 void TechMap::induceMapping(bool instantiate)
 {
+#if 1   /*DEBUG*/
+{
+    float target_arrival = 0;
+    For_Gates(N, w)
+        if (isCO(w))
+            newMax(target_arrival, impl[DELAY][w[0]].arrival);
+    WriteLn "-- recomputed target arrival: %_", target_arrival;
+}
+#endif  /*END DEBUG*/
+
     active.clear();
     depart.clear();
     fanouts.clear();
     mux_fanout.clear();
 
-    // <<== DFS i kritisk ordning (en kritisk nivå åt gången)
     For_All_Gates_Rev(N, w){
         if (isCO(w))
             active(w) = ACTIVE;
@@ -694,17 +698,30 @@ void TechMap::induceMapping(bool instantiate)
 
                 uint  best_i    = UINT_MAX;
                 float best_area = FLT_MAX;
-              #if 0
+                //<<== kan vi göra "reprioritize" här; låta fixerade grindar vara gratis?
+
+              #if 1
                 // Pick best implementation among current choices:
-                for (uint i = 0; i < impl.size() && impl[i][w].idx != CutImpl::NO_CUT; i++){
-                    if (impl[i][w].arrival <= req_time)
+                for (uint i = 0; i < impl.size(); i++){
+                    if (impl[i][w].idx == CutImpl::NONE) continue;
+                    //**/Dump(w, i, impl[i][w].arrival, req_time);
+                    //**/if (i == F7MUX){ int j = impl[F7MUX][w].idx; Cut cut = cutmap[w][j]; Wire w0, w1, w2; muxInputs(N, cut, w0, w1, w2, true); Dump(w0, w1, w2, impl[0][w0].arrival, impl[0][w1].arrival, impl[0][w2].arrival); }
+                    if (impl[i][w].arrival <= req_time){
+                        if (i == F7MUX){
+                            int j = impl[F7MUX][w].idx;
+                            Cut cut = cutmap[w][j];
+                            Wire w0, w1, w2;
+                            muxInputs(N, cut, w0, w1, w2, true);
+                            //**/Dump(w, mux_fanout[w], mux_fanout[w1], mux_fanout[w2]);
+                            if (mux_fanout[w] != GLit_NULL || mux_fanout[w1] != GLit_NULL || mux_fanout[w2] != GLit_NULL)
+                                continue;   // -- either feeding a F7 or fed by a LUT that feed a F7
+                        }
                         if (newMin(best_area, impl[i][w].area_est))
                             best_i = i;
+                    }
                 }
 
               #else
-                //<<== kan vi göra "reprioritize" här; låta fixerade grindar vara gratis?
-
                 // Pick best implementation among updated choices:
                 for (uint i = 0; i < impl.size(); i++){
                     int j = impl[i][w].idx;
@@ -737,8 +754,9 @@ void TechMap::induceMapping(bool instantiate)
               #endif
 
                 // For non-COs close to the outputs, required time may not be met:
-                if (best_i == UINT_MAX)
-                    best_i = DELAY;
+                if (best_i == UINT_MAX){
+                    //**/WriteLn ":: failed to meet timing for %_", w;
+                    best_i = DELAY; }
 
                 uint j = impl[best_i][w].idx; assert(j < cutmap[w].size());
                 Cut cut = cutmap[w][j];
@@ -802,10 +820,10 @@ void TechMap::induceMapping(bool instantiate)
                 remove(w);
         N.compact();
 
+#if 0   /*DEBUG*/
         uint n_luts  = N.typeCount(gate_Lut6);
         uint n_muxes = N.typeCount(gate_F7Mux);
-        if (n_muxes > 0){
-#if 1   /*DEBUG*/
+        if (true/*n_muxes > 0*/){
             WMap<float> arrival;
             /**/float max_arrival = 0;
             For_Gates(N, w){
@@ -825,11 +843,24 @@ void TechMap::induceMapping(bool instantiate)
                 newMax(max_arrival, arrival[w]);
             }
             /**/Dump(max_arrival);
+            /**/if (!(max_arrival <= target_arrival)){
+                N.save("tmp.gnl");
+                WZet region;
+                For_Gates(N, w)
+                    if (active[w] && arrival[w] + depart[w] > target_arrival){
+                        WriteLn "critical %_:  arrival=%_  delay=%_", w, arrival[w], impl[DELAY][w].arrival;
+                        region.add(w);
+                    }
+                writeDot("tmp.dot", N,  region);
+            }
+            /**/assert(max_arrival <= target_arrival);
 #endif  /*END DEBUG*/
+#if 0
             removeMuxViolations(N, arrival, target_arrival, P.delay_fraction);
             WriteLn "  -- Legalizing MUXes by duplication, adding:  #Mux=%_   #Lut6=%_", N.typeCount(gate_F7Mux) - n_muxes, N.typeCount(gate_Lut6) - n_luts;
             N.compact();
         }
+#endif
     }
 
     For_Gates(N, w)
@@ -861,7 +892,10 @@ void TechMap::copyWinners()
         if (active[w] < FIRST_CUT)
             winner(w) = Cut_NULL;
         else{
-            Cut cut = cutmap[w][impl[active[w] - FIRST_CUT][w].idx];
+//            Cut cut = cutmap[w][impl[active[w] - FIRST_CUT][w].idx];
+            uint j = active[w] - FIRST_CUT;
+            if (j == F7MUX) j = DELAY;
+            Cut cut = cutmap[w][impl[j][w].idx];
             winner(w) = cut.dup(mem_win);
         }
     }
@@ -1041,6 +1075,8 @@ TODO:
  - ban F7/F8 fed by non-LUT
  - ban F7/F8 feeding CO? (or subset of COs?)
 
+- try left->right shuffling of k-AND/XOR in unmapping, second time
+ 
 */
 
 /*
