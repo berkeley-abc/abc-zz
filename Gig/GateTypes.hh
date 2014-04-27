@@ -103,7 +103,9 @@ template<> fts_macro void write_(Out& out, const GateAttrType& v){
     Macro(MemW) \
     Macro(MMux) \
     Macro(Vec) \
-    Macro(Sel)
+    Macro(Sel) \
+    Macro(F7Mux) \
+    Macro(F8Mux) \
 
 
 // Built-ins:
@@ -133,7 +135,7 @@ DEF( And      , 2    , NULL )
 
 // Extended AIG:
 DEF( Xor      , 2    , NULL )
-DEF( Mux      , 3    , NULL )   // x ? y : z        (x = pin0, y = pin1, z = pin2)
+DEF( Mux      , 3    , NULL )   // x ? y : z        (x = pin0, y = pin1, z = pin2)  => FTB = 0xD8
 DEF( Maj      , 3    , NULL )   // x + y + z >= 2
 DEF( One      , 3    , NULL )   // x + y + z = 1
 DEF( Gamb     , 3    , NULL )   // x + y + z = 0 or 3
@@ -174,6 +176,11 @@ DEF( MMux     , 3    , Num  )
 // Bit-vectors:
 DEF( Vec      , INF  , NULL )
 DEF( Sel      , 1    , Arg  )
+
+// Xilinx:
+DEF( F7Mux    , 3    , NULL )   // x ? y : z        (x = pin0, y = pin1, z = pin2)
+DEF( F8Mux    , 3    , NULL )   // x ? y : z        (x = pin0, y = pin1, z = pin2)
+
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

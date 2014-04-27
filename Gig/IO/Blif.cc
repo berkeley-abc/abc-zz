@@ -148,6 +148,8 @@ void writeBlif(Out& out, Gig& N)
 
             break;}
 
+        case gate_F7Mux:
+        case gate_F8Mux:
         case gate_Mux:{
             FWriteLn(out) ".names %_ %_ %_ %_", nam[w[0]], nam[w[1]], nam[w[2]], nam[w];
             FWriteLn(out) "%_%_%_ 1", w[0].sign ? 1 : 0, w[1].sign ? 1 : 0, w[2].sign ? 0 : 1;

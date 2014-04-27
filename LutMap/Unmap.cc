@@ -211,13 +211,14 @@ void unmap(Gig& N, WMapX<GLit>* remap)
     Vec<GLit>   nodes;
     Vec<uchar>  prog;
     For_Gates(N, w){
-        if (w == gate_Lut6){
-            dsd6(ftb(w), prog, P);
+        if (w == gate_Lut6 || w == gate_F7Mux || w == gate_F8Mux){      // <<== or just simply replace F7/F8 with Mux?
+            uint64 ftb_ = (w == gate_Lut6) ? ftb(w) : 0xD8D8D8D8D8D8D8D8ull;
+            dsd6(ftb_, prog, P);
 
             // Replace LUT with 'prog':
             nodes.setSize(DSD6_FIRST_INTERNAL);
             for (uint i = 0; i < DSD6_FIRST_INTERNAL; i++)
-                nodes[i] = xlat[w[i]];
+                nodes[i] = (i < w.size()) ? xlat[w[i]] : GLit_NULL;
 
             xlat(w) = build(N, prog, nodes);
 

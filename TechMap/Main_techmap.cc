@@ -173,10 +173,12 @@ void printStats(const Gig& N)
     for (uint i = 0; i <= 6; i++)
         if (sizeC[i] > 0)
             WriteLn "    LUT %_: %>11%,d  (%.1f %%)", i, sizeC[i], double(sizeC[i]) / N.typeCount(gate_Lut6) * 100;
+    if (N.typeCount(gate_F7Mux) > 0)
+        WriteLn "\n    F7MUX: %>11%,d", N.typeCount(gate_F7Mux);
+    if (N.typeCount(gate_F8Mux) > 0)
+        WriteLn "    F8MUX: %>11%,d", N.typeCount(gate_F8Mux);
     NewLine;
     WriteLn "    LUTs : %>11%,d", N.typeCount(gate_Lut6);
-    if (N.typeCount(gate_Mux) > 0)
-        WriteLn "    MUXs : %>11%,d", N.typeCount(gate_Mux);
     WriteLn "    Wires: %>11%,d", sizeC[1] + 2*sizeC[2] + 3*sizeC[3] + 4*sizeC[4] + 5*sizeC[5] + 6*sizeC[6] + N.typeCount(gate_Mux);
     WriteLn "    Delay: %>11%,d", max_delay;
     NewLine;
@@ -188,21 +190,22 @@ int main(int argc, char** argv)
     ZZ_Init;
 
     // Setup commandline:
-    cli.add("input" , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
-    cli.add("output", "string", "",           "Output GNL.", 1);
-    cli.add("cec"   , "bool"  , "no"        , "Output files for equivalence checking.");
+    cli.add("input"   , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
+    cli.add("output"  , "string", "",           "Output GNL.", 1);
+    cli.add("cec"     , "bool"  , "no"        , "Output files for equivalence checking.");
 
-    cli.add("cost"   , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
-    cli.add("rounds" , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
-    cli.add("N"      , "uint"  , "8"         , "Cuts to keep per node.");
-    cli.add("iters"  , "uint"  , "5"         , "Phases in each mapping.");
-    cli.add("rc-iter", "int"   , "3"         , "Recycle cuts from this iteration (-1 = no recycling).");
-    cli.add("df"     , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
-    cli.add("dopt"   , "bool"  , "no"        , "Delay optimize (default is area).");
-    cli.add("struct" , "bool"  , "no"        , "Use structural mapping (mostly for debugging/comparison).");
-    cli.add("un-and" , "bool"  , "no"        , "Unmap to AND gates instead of richer set of gates.");
-    cli.add("fmux"   , "bool"  , "no"        , "Use F7/F8 MUXes.");
-    cli.add("batch"  , "bool"  , "no"        , "Output summary line at the end (for tabulation).");
+    cli.add("cost"    , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
+    cli.add("mux-cost", "float" , "-1",         "Cost of a mux; -1 means use default depending on 'cost'.");
+    cli.add("rounds"  , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
+    cli.add("N"       , "uint"  , "8"         , "Cuts to keep per node.");
+    cli.add("iters"   , "uint"  , "5"         , "Phases in each mapping.");
+    cli.add("rc-iter" , "int"   , "3"         , "Recycle cuts from this iteration (-1 = no recycling).");
+    cli.add("df"      , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
+    cli.add("dopt"    , "bool"  , "no"        , "Delay optimize (default is area).");
+    cli.add("struct"  , "bool"  , "no"        , "Use structural mapping (mostly for debugging/comparison).");
+    cli.add("un-and"  , "bool"  , "no"        , "Unmap to AND gates instead of richer set of gates.");
+    cli.add("fmux"    , "bool"  , "no"        , "Use F7/F8 MUXes.");
+    cli.add("batch"   , "bool"  , "no"        , "Output summary line at the end (for tabulation).");
 
     cli.parseCmdLine(argc, argv);
 
@@ -222,10 +225,15 @@ int main(int argc, char** argv)
     if (cli.get("cost").enum_val == 0){
         for (uint i = 0; i <= 6; i++)
             P.lut_cost[i] = 1;
+        P.mux_cost = 0;
     }else{
         for (uint i = 0; i <= 6; i++)
             P.lut_cost[i] = i;
+        P.mux_cost = 1;
     }
+    float mux_cost = cli.get("mux-cost").float_val;
+    if (mux_cost != -1)
+        P.mux_cost = mux_cost;
 
     // Read input:
     Gig N;
