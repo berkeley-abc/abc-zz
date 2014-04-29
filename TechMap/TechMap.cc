@@ -982,7 +982,7 @@ void TechMap::run()
     }
     cuts_enumerated = 0;
 
-    // Map:   
+    // Map:
     Vec<gate_id> order;
     upOrderBfs(N, order);
 
@@ -1025,6 +1025,7 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps)
     assert(Ps.size() >= 1);
     for (uint round = 0; round < Ps.size(); round++){
         if (round > 0){
+            //void unmap(Gig& N, WMapX<GLit>* remap)   -- store current LUTs as cuts in 'winner', then apply remap after unmapping.
             unmap(N);
             if (Ps[round].unmap_to_ands)
                 expandXigGates(N);
@@ -1076,7 +1077,7 @@ TODO:
  - ban F7/F8 feeding CO? (or subset of COs?)
 
 - try left->right shuffling of k-AND/XOR in unmapping, second time
- 
+
 */
 
 /*
