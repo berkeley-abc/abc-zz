@@ -1,3 +1,16 @@
+//_________________________________________________________________________________________________
+//|                                                                                      -- INFO --
+//| Name        : PostProcess.hh
+//| Author(s)   : Niklas Een
+//| Module      : TechMap
+//| Description : 
+//| 
+//| (C) Copyright 2010-2014, The Regents of the University of California
+//|________________________________________________________________________________________________
+//|                                                                                  -- COMMENTS --
+//| 
+//|________________________________________________________________________________________________
+
 #ifndef ZZ__TechMap__PostProcess_hh
 #define ZZ__TechMap__PostProcess_hh
 

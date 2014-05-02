@@ -193,9 +193,9 @@ int main(int argc, char** argv)
     cli.add("input"   , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
     cli.add("output"  , "string", "",           "Output GNL.", 1);
     cli.add("cec"     , "bool"  , "no"        , "Output files for equivalence checking.");
-
-    cli.add("cost"    , "{unit, wire}", "wire", "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
-    cli.add("mux-cost", "float" , "-1",         "Cost of a mux; -1 means use default depending on 'cost'.");
+    cli.add("cost"    , "{unit, wire, mix}", "wire",
+                                                "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
+    cli.add("mux-cost", "float" , "-1"        , "Cost of a mux; -1 means use default depending on 'cost'.");
     cli.add("rounds"  , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
     cli.add("N"       , "uint"  , "8"         , "Cuts to keep per node.");
     cli.add("iters"   , "uint"  , "5"         , "Phases in each mapping.");
@@ -226,9 +226,13 @@ int main(int argc, char** argv)
         for (uint i = 0; i <= 6; i++)
             P.lut_cost[i] = 1;
         P.mux_cost = 0;
-    }else{
+    }else if (cli.get("cost").enum_val == 1){
         for (uint i = 0; i <= 6; i++)
             P.lut_cost[i] = i;
+        P.mux_cost = 1;
+    }else{
+        for (uint i = 0; i <= 6; i++)
+            P.lut_cost[i] = i + 1;
         P.mux_cost = 1;
     }
     float mux_cost = cli.get("mux-cost").float_val;

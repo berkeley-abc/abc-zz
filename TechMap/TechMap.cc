@@ -21,7 +21,6 @@
 #include "Unmap.hh"
 #include "PostProcess.hh"
 
-
 namespace ZZ {
 using namespace std;
 
@@ -292,6 +291,7 @@ class TechMap {
         Vec<Cost> costs;
         Vec<uint> where;
         Vec<uint> list;
+        Vec<gate_id> inputs;
     };
 
     friend void* genCutThread(void* data);
@@ -670,7 +670,7 @@ void TechMap::updateTargetArrival()
 
 void TechMap::induceMapping(bool instantiate)
 {
-#if 1   /*DEBUG*/
+#if 0   /*DEBUG*/
 {
     float target_arrival = 0;
     For_Gates(N, w)
@@ -892,7 +892,6 @@ void TechMap::copyWinners()
         if (active[w] < FIRST_CUT)
             winner(w) = Cut_NULL;
         else{
-//            Cut cut = cutmap[w][impl[active[w] - FIRST_CUT][w].idx];
             uint j = active[w] - FIRST_CUT;
             if (j == F7MUX) j = DELAY;
             Cut cut = cutmap[w][impl[j][w].idx];
@@ -952,23 +951,19 @@ void TechMap::run()
     if (Has_Gob(N, Strash))
         Remove_Gob(N, Strash);
 
-    if (!isCanonical(N)){
-        WriteLn "Compacting... %_", info(N);
-        N.compact();       // <<== needs remap here
-    }
-
+    assert(isCanonical(N));
     normalizeLut4s(N);
 
     // Prepare for mapping:
-    target_arrival = 0;
-
     cutmap    .reserve(N.size());
-    winner    .reserve(N.size());
     fanout_est.reserve(N.size());
     depart    .reserve(N.size());
     active    .reserve(N.size());
     fanouts   .reserve(N.size());
     mux_fanout.reserve(N.size());
+    winner    .reserve(N.size());
+
+    target_arrival = 0;
 
     reserveImpls(2 + P.use_fmux);
 
@@ -1019,24 +1014,42 @@ void TechMap::run()
 // Main:
 
 
+static void compact(Gig& N, WMapX<GLit>& remap) ___unused;
+static void compact(Gig& N, WMapX<GLit>& remap)
+{
+    GigRemap m;
+    N.compact(m);
+    m.applyTo(remap.base());
+}
+
+
 void techMap(Gig& N, const Vec<Params_TechMap>& Ps)
 {
+#if 0   //<<== do compaction with signal tracking here, if necessary
+    if (!isCanonical(N)){
+        assert(!initial_winners);   // <<== after unmapping, netlist should be canonical; if not, there should be no initial winners
+        WriteLn "Compacting... %_", info(N);
+        N.compact();       // <<== needs remap here
+    }
+#endif
+
     // Techmap:
     assert(Ps.size() >= 1);
     for (uint round = 0; round < Ps.size(); round++){
         if (round > 0){
-            //void unmap(Gig& N, WMapX<GLit>* remap)   -- store current LUTs as cuts in 'winner', then apply remap after unmapping.
-            unmap(N);
+            WMapX<GLit> remap;
+            unmap(N, &remap);
             if (Ps[round].unmap_to_ands)
                 expandXigGates(N);
             N.unstrash();
-            N.compact();
+            compact(N, remap);
 
             NewLine;
             WriteLn "Unmap: %_", info(N);
             NewLine;
         }
         TechMap map(N, Ps[round]);
+
         map.run();
     }
 
@@ -1044,7 +1057,6 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps)
         NewLine;
         WriteLn "Legalization..."; }
     removeInverters(N, Ps.last().batch_output);
-    //<<==legalize FMUXes
 }
 
 
