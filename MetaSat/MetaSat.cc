@@ -402,7 +402,7 @@ MiniSat2s::~MiniSat2s()
 
 void MiniSat2s::clear(bool dealloc)
 {
-    S->~Solver();
+    S->~SimpSolver();
     new (S) MS::SimpSolver;
 
     Lit null_lit = addLit(); assert(null_lit.id == 0);
