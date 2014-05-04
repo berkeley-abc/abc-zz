@@ -1432,7 +1432,7 @@ bool Pdr::blockState(const Vec<GLit>& state, Cex* cex)
         // Incorporate other unreachable cubes sent through the PAR interface:
         if (par){
             Msg msg;
-            while (msg = pollMsg()){
+            while ((msg = pollMsg())){
                 if (msg.type == 104/*UCube*/){
                     uint      frame;
                     Vec<GLit> state;

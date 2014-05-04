@@ -399,7 +399,7 @@ lbool bmc_(NetlistRef N0, const Vec<Wire>& props, const Params_Bmc& P, Cex* cex,
                 T.addClause(f_inf[i], d);
 
             Msg msg;
-            while (msg = pollMsg()){
+            while ((msg = pollMsg())){
                 if (msg.type == 104/*UCube*/){
                     uint      frame;
                     Vec<GLit> state;
