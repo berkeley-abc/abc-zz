@@ -664,7 +664,7 @@ bool CLI::parseCmdLine(int argc, char** argv, String& error_msg, uint columns, b
 void CLI::parseCmdLine(String command_line, String prog_name, bool embed_cmd_cli)
 {
     String error_msg;
-    if (!parseCmdLine(command_line, error_msg, getConsoleWidth() - 1, prog_name), embed_cmd_cli){
+    if (!parseCmdLine(command_line, error_msg, getConsoleWidth() - 1, prog_name, embed_cmd_cli)){
         ShoutLn "%_", error_msg;
         if (error_msg[0] != '\a' || error_msg[1] != '/' || error_msg[2] != '\a' || error_msg[3] != '*' || error_msg[4] != '-')  // -- hack
             ShoutLn "Use '%_ -h' for command line help.", prog_name;
