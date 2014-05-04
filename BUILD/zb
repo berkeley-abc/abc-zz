@@ -400,7 +400,7 @@ def read_config_file(filename, valid_keys = None, subst = None):
                 line = line.partition('#')[0].strip()
                 if line == "": continue
 
-                try: [name, val] = line.split("=")
+                try: [name, val] = line.split("=", 1)
                 except: abort("Invalid line in config file '" + filename + "':\n => " + line)
                 name = name.strip()
                 val  = val.split()
@@ -432,7 +432,7 @@ def get_conf_bool(conf, field):
 ## Config file:
 
 
-valid_conf_vars = set(["MOD_DEPS", "SYS_LIBS", "SYS_PATH", "SYS_INCL", "DEFAULT_MODE", "PUBLISH_BIN", "QT_MODULE", "AUTO_HEADER", "NO_WARN"])
+valid_conf_vars = set(["MOD_DEPS", "SYS_LIBS", "SYS_PATH", "SYS_INCL", "SYS_CXXFLAGS", "DEFAULT_MODE", "PUBLISH_BIN", "QT_MODULE", "AUTO_HEADER", "NO_WARN"])
 
 
 def subst_conf_symbols(text):
@@ -525,11 +525,11 @@ def setup_lflags(pri, secs):
 BuildParams = collections.namedtuple('BuildParams', 'pri_type, sec_types, build_opt')
     # types: (pri_type : char) (sec_types : list<char>) (build_opt : list<char>)
 
-ModuleDeps = collections.namedtuple('ModuleDeps', 'mod_deps, sys_libs, sys_path, sys_incl')
-    # types: (mod_deps : list<str>) (sys_libs : list<str>) (sys_path : list<str>) (sys_incl : list<str>)
+ModuleDeps = collections.namedtuple('ModuleDeps', 'mod_deps, sys_libs, sys_path, sys_incl, sys_cxxflags')
+    # types: (mod_deps : list<str>) (sys_libs : list<str>) (sys_path : list<str>) (sys_incl : list<str>) (sys_cxxflags : list<str>)
 
 def mk_ModuleDeps():
-    return ModuleDeps([], [], [], [])
+    return ModuleDeps([], [], [], [], [])
 
 def ordered_merge(master_list, extra_elems):
     for x in extra_elems:
@@ -541,6 +541,7 @@ def combine_ModuleDeps(d0, d):
     ordered_merge(d0.sys_libs, d.sys_libs)
     ordered_merge(d0.sys_path, d.sys_path)
     ordered_merge(d0.sys_incl, d.sys_incl)
+    ordered_merge(d0.sys_cxxflags, d.sys_cxxflags)
 
 
 ##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
@@ -652,7 +653,7 @@ def call_makefile(mod, params, deps, conf):
     cmd.append("SYS_LIBS='"+ " ".join(deps.sys_libs) +"'")
     cmd.append("SYS_PATH='"+ " ".join(deps.sys_path) +"'")
     cmd.append("SYS_INCL='"+ " ".join(deps.sys_incl) +"'")
-    cmd.append("CXXFLAGS='"+ setup_cflags(params.pri_type, params.sec_types, True , no_warn) + "'")
+    cmd.append("CXXFLAGS='"+ setup_cflags(params.pri_type, params.sec_types, True , no_warn) + " " + " ".join(deps.sys_cxxflags) + "'")
     cmd.append("CFLAGS='"  + setup_cflags(params.pri_type, params.sec_types, False, no_warn) + "'")
     cmd.append("LFLAGS='"+ setup_lflags(params.pri_type, params.sec_types) + "'")
     if get_conf_bool(conf, "QT_MODULE"): cmd.append("QT_MODULE=1")
@@ -718,6 +719,8 @@ def build_module_rec(mod, params, memo, parents):
         ordered_merge(deps.sys_path, conf["SYS_PATH"])
     if "SYS_INCL" in conf:
         ordered_merge(deps.sys_incl, conf["SYS_INCL"])
+    if "SYS_CXXFLAGS" in conf:
+        ordered_merge(deps.sys_cxxflags, conf["SYS_CXXFLAGS"])
 
     # Build this module:
     if mod.startswith(module_pfx):
