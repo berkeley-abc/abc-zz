@@ -201,10 +201,10 @@ int main(int argc, char** argv)
     cli.add("iters"   , "uint"  , "5"         , "Phases in each mapping.");
     cli.add("rc-iter" , "int"   , "3"         , "Recycle cuts from this iteration (-1 = no recycling).");
     cli.add("df"      , "float" , "1.0"       , "Delay factor; optimal delay is multiplied by this factor to produce target delay.");
-    cli.add("dopt"    , "bool"  , "no"        , "Delay optimize (default is area).");
     cli.add("struct"  , "bool"  , "no"        , "Use structural mapping (mostly for debugging/comparison).");
     cli.add("un-and"  , "bool"  , "no"        , "Unmap to AND gates instead of richer set of gates.");
     cli.add("fmux"    , "bool"  , "no"        , "Use F7/F8 MUXes.");
+    cli.add("slack"   , "{max} | float", "max", "Slack utilization. Smaller values means better average slack (but worse area).");
     cli.add("batch"   , "bool"  , "no"        , "Output summary line at the end (for tabulation).");
 
     cli.parseCmdLine(argc, argv);
@@ -219,8 +219,9 @@ int main(int argc, char** argv)
     P.struct_mapping = cli.get("struct").bool_val;
     P.unmap_to_ands  = cli.get("un-and").bool_val;
     P.use_fmux       = cli.get("fmux").bool_val;
-    //P.map_for_delay  = cli.get("dopt").bool_val;
     P.batch_output   = cli.get("batch").bool_val;
+    if (cli.get("slack").choice == 1)
+        P.slack_util = cli.get("slack").float_val;
 
     if (cli.get("cost").enum_val == 0){
         for (uint i = 0; i <= 6; i++)

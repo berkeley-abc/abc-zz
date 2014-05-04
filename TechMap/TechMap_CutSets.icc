@@ -166,6 +166,14 @@ public:
 };
 
 
+template<> fts_macro void write_(Out& out, const CutSet& v){
+    FWrite(out) "CutSet{";
+    for (uint i = 0; i < v.size(); i++)
+        FWrite(out) " %_", v[i];
+    FWrite(out) " }";
+}
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Dynamic cut-set:
 

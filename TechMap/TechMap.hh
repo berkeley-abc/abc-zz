@@ -35,6 +35,7 @@ struct Params_TechMap {
     bool        use_fmux;           // -- enable F7/F8 MUXes for Xilinx series 7.
     Vec<float>  lut_cost;           // -- Cost of LUTs of different sizes.
     float       mux_cost;           // -- Cost of F7/F8 MUXes.
+    float       slack_util;         // -- How much slack to utilize in non-critical regions (small number means better average slack but worse area)
     bool        batch_output;       // -- print a one-line summary at the end of techmapping which can be used to produce tables
 
     Params_TechMap() :
@@ -48,6 +49,7 @@ struct Params_TechMap {
         unmap_to_ands (false),
         use_fmux      (false),
         mux_cost      (1),                          // -- selector signal costs one (wire mode)
+        slack_util    (FLT_MAX),
         batch_output  (false)
     {
         for (uint i = 0; i <= cut_size; i++)        // -- default LUT cost is "number of inputs" (wire mode)
