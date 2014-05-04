@@ -261,7 +261,7 @@ void Rec_ObjSet(Abc_ManRec_t* p, Rec_Obj_t* pRecObj, Abc_Obj_t* pObj, char* newD
   SeeAlso     []
 
 ***********************************************************************/
-inline int If_CutComputDelay(If_Man_t* p, Rec_Obj_t* entry, If_Cut_t* pCut, char* pCanonPerm , int nVars)
+static inline int If_CutComputDelay(If_Man_t* p, Rec_Obj_t* entry, If_Cut_t* pCut, char* pCanonPerm , int nVars)
 {
     If_Obj_t* pLeaf;
     int i, delayTemp, delayMax = -ABC_INFINITY;
