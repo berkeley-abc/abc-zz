@@ -24,8 +24,8 @@ namespace ZZ {
 };
 
 namespace Minisat {
-    struct Solver;
-    struct SimpSolver;
+    class Solver;
+    class SimpSolver;
 }
 
 namespace abc_sat {
@@ -35,15 +35,15 @@ namespace abc_sat {
 };
 
 namespace Glucose {
-    struct Solver;
+    class Solver;
 }
 
 namespace GlucoRed {
-    struct SolRed;
+    class SolRed;
 }
 
 namespace MiniRed {
-    struct SolRed;
+    class SolRed;
 }
 
 

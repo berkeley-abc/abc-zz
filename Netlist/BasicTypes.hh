@@ -52,7 +52,7 @@ template <bool sign_matters> struct MkIndex_GLit : MkIndex_Lit<sign_matters> {};
 // Forward declarations:
 
 
-struct Wire;
+class Wire;
 struct Netlist;
 struct Pec;
 struct NlLis;

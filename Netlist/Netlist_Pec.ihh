@@ -73,7 +73,7 @@ protected:
     virtual bool attrIsNull(Wire w) const { return false; } // -- INTERNAL! Only used by gate attributes.
 
 private:
-    friend class PecNull;
+    friend struct PecNull;
     friend class Wire;
     Pec() : Pec_base(nid_NULL, NULL, 0, "") {}
 };
