@@ -38,7 +38,7 @@ using namespace std;
 
 #define static_assert_(cond) \
    typedef ZZ::static_assert_test< sizeof(ZZ::STATIC_ASSERTION_FAILURE<(bool)(cond)>)> \
-   ZZ_Join(static_assert_typedef_, __LINE__)
+   ZZ_Join(static_assert_typedef_, __LINE__) ___unused
 
 template <bool> struct STATIC_ASSERTION_FAILURE;
 template <>     struct STATIC_ASSERTION_FAILURE<true> { enum { value = 1 }; };
