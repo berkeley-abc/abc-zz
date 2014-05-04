@@ -426,7 +426,7 @@ lbool bmc_(NetlistRef N0, const Vec<Wire>& props, const Params_Bmc& P, Cex* cex,
         Wire  w_bad  = T.insert(init_bad[1], d);
         uint  gates  = T.nGates() - gates0;
         if (cb){    // -- make at least one call-back for each depth (and let virtual time depend on number of gates processed)
-            cb->virt_time += uint64(gates + P.quiet ? 1 : 33) * SEC_TO_VIRT_TIME / 1000000;
+            cb->virt_time += uint64(gates + (P.quiet ? 1 : 33)) * SEC_TO_VIRT_TIME / 1000000;
             if (!(*cb)())
                 return l_Undef;
         }
