@@ -36,7 +36,7 @@ struct Params_Fixed {
 
 lbool fixed(NetlistRef N0, const Vec<Wire>& props,
             const Params_Fixed& P = Params_Fixed(),
-            Cex* cex = NULL, NetlistRef N_invar = NULL, int* bf_depth = NULL, EffortCB* cb = NULL);
+            Cex* cex = NULL, NetlistRef N_invar = nid_NULL, int* bf_depth = NULL, EffortCB* cb = NULL);
 
 void testQuantify();
 
