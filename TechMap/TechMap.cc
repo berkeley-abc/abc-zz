@@ -18,7 +18,7 @@
 #include "ZZ_BFunc.hh"
 #include "ZZ_Npn4.hh"
 #include "ZZ/Generics/Sort.hh"
-#include "ZZ/Generics/Heap.hh"
+#include "ZZ/Generics/IdHeap.hh"
 #include "Unmap.hh"
 #include "PostProcess.hh"
 
@@ -48,14 +48,8 @@ using namespace std;
 
 
 macro bool isLogic(Wire w) {
-    return w == gate_And
-        || w == gate_Xor
-        || w == gate_Mux
-        || w == gate_Maj
-        || w == gate_One
-        || w == gate_Gamb
-        || w == gate_Dot
-        || w == gate_Lut4;
+    uint64 mask = GTM_(And) | GTM_(Xor) | GTM_(Mux) | GTM_(Maj) | GTM_(One) | GTM_(Gamb) | GTM_(Dot) | GTM_(Lut4);
+    return (1ull << w.type()) & mask;
 }
 
 
@@ -354,11 +348,7 @@ class TechMap {
 
     float       acc_cost;
     float       acc_lim;
-
     Vec<GLit>   undo;
-    Vec<GLit>   undo_mfo;
-
-    // heap sorted on real arrival time
 
     bool deref(GLit w);
     void undoDeref();
@@ -706,8 +696,8 @@ bool TechMap::deref(GLit w)
 
         if (j == F7MUX && mux_fanout[v]){
             assert(mux_fanout[v] == +w);
+            undo.push(mux_fanout[v]);
             undo.push(~v);
-            undo_mfo.push(mux_fanout[v]);
             mux_fanout(v) = GLit_NULL;
         }else
             undo.push(v);
@@ -727,7 +717,7 @@ void TechMap::undoDeref()
     while (undo.size() > 0){
         GLit v = undo.popC();
         if (v.sign)
-            mux_fanout(v) = undo_mfo.popC();
+            mux_fanout(v) = undo.popC();
         fanouts(v)++;
     }
 }
@@ -735,22 +725,53 @@ void TechMap::undoDeref()
 
 
 
-//Heap : prefer late arrival time
-//Try set of options for unqueued element (recurse, increase cost; if above limit, abort)
 #if 0
-Heap<float,GLit> refQ;
 
-// Find best implementation for 'w'.
-bool TechMap::tryRef(GLit w, uint depth)
+WMap<float> arrival;
+IdHeap Q
+    IdHeap(T2Id i = T2Id())                    : get_id(i), prio(NULL) {}
+
+
+// Find best implementation for 'w'. 'acc_lim' will be set to best solution so far (initialized to
+// the size of the dereferenced logic).
+bool TechMap::tryRef(uint depth)
 {
+    Wire w = Q.pop().snd + N;
     const CutSet& cuts = cutmap[w];
-    acc_cost = 0;
-    acc_lim = UINT_MAX;
-    for (uint i = 0; i < cuts.size(); i++){
-        if (tryRef(w, depth, cuts[i]))
-            acc_lim = acc_cost;
+
+    // For now, try every combination always:
+    for (uint k = 0; k < cuts.size(); k++){
+        Cut c = cuts[k];
+        float cost = lutCost(w, c);
+        if (acc_cost + cost > lim)
+            continue;
+
+        acc_cost += cost;
+
+        for (uint i = 0; i < c.size(); i++){
+            Wire v = c[i] + N;
+            if (Q.has(if (fanouts[v] == 0)
+                Q.add(arrival[v], v.lit());     // <<== could add up conservative costs for inputs and abort earlier
+        }
+
+        if (tryRef(depth + 1)){
+            // New best implementation; store it:
+            ...
+        }
+
+        for (uint i = 0; i < c.size(); i++){
+            Wire v = c[i] + N;
+            if (fanouts[v] == 0) ...hmm, hur ta bort? IdHeap...
+            fanouts(v)--;
+        }
+
+        acc_cost -= cost;
     }
 }
+  #if 0
+                Wire w0, w1, w2;
+                if (muxInputs(N, c, w0, w1, w2)){
+  #endif
 #endif
 
 void TechMap::exactLocalArea()
@@ -790,7 +811,6 @@ void TechMap::exactLocalArea()
             newMax(ela_max_arrival, arrival[w]);
     //Dump(ela_max_arrival);
 
-/**/return;
     WMap<uint> fanouts_copy;
     WMap<GLit> mux_fanout_copy;
     fanouts.copyTo(fanouts_copy);
@@ -801,14 +821,13 @@ void TechMap::exactLocalArea()
             acc_cost = 0;
             acc_lim  = ELA_GLOBAL_LIM;
             if (deref(w))
-                printf(" %.0f", acc_cost);
+                ;//printf(" %.0f", acc_cost);
             else
-                putchar('.');
-            fflush(stdout);
+                ;//putchar('.');
+            //fflush(stdout);
 
             undoDeref();
             assert(undo.size() == 0);
-            assert(undo_mfo.size() == 0);
         }
     }
 
@@ -1087,7 +1106,7 @@ void TechMap::printProgress(double T0)
     WriteLn "Delay: %_    Wires: %,d    LUTs: %,d   [iter=%t  total=%t]", mapped_delay, (uint64)total_wires, (uint64)total_luts, T - T0, T;
 
     if (len_count > 0)
-        WriteLn "Average delay: %.2f", len_total / len_count;
+        WriteLn "Average path length: %.2f", len_total / len_count;
 
     if (P.batch_output && iter == P.n_iters - 1){
         Write "%>11%,d    ", (uint64)total_luts;
