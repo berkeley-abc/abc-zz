@@ -20,21 +20,21 @@
 // NOTE! 'netlist' is used as an expression, 'w' as a name
 //
 #define For_Gates(netlist, w)                                              \
-    if (NetlistRef N__##w = NetlistRef()); else                            \
+    if (::ZZ::NetlistRef N__##w = ::ZZ::NetlistRef()); else                            \
     if (N__##w = (netlist), false); else                                   \
     if (uind i__##w = 0); else                                             \
-    if (Wire w = Wire_NULL); else                                          \
-    for (i__##w = gid_FirstUser; i__##w < N__##w.size(); i__##w++)         \
+    if (::ZZ::Wire w = ::ZZ::Wire_NULL); else                                          \
+    for (i__##w = ::ZZ::gid_FirstUser; i__##w < N__##w.size(); i__##w++)         \
         if (N__##w.deleted(i__##w) || (w = N__##w[i__##w], false)); else
 
 // Same as 'For_Gates' but include constants:
 //
 #define For_All_Gates(netlist, w)                                          \
-    if (NetlistRef N__##w = NetlistRef()); else                            \
+    if (::ZZ::NetlistRef N__##w = ::ZZ::NetlistRef()); else                            \
     if (N__##w = (netlist), false); else                                   \
     if (uind i__##w = 0); else                                             \
-    if (Wire w = Wire_NULL); else                                          \
-    for (i__##w = gid_FirstLegal; i__##w < N__##w.size(); i__##w++)        \
+    if (::ZZ::Wire w = ::ZZ::Wire_NULL); else                                          \
+    for (i__##w = ::ZZ::gid_FirstLegal; i__##w < N__##w.size(); i__##w++)        \
         if (N__##w.deleted(i__##w) || (w = N__##w[i__##w], false)); else
 
 // Iterate over all gates of a given type.
@@ -57,9 +57,9 @@
 // NOTE 'wire' is an expression, but 'w' is a name.
 //
 #define For_Inputs(wire, w)                                                     \
-    if (Wire w0__##w = Wire_NULL); else                                         \
+    if (::ZZ::Wire w0__##w = ::ZZ::Wire_NULL); else                                         \
     if (w0__##w = (wire), false); else                                          \
-    if (Wire w = Wire_NULL); else                                               \
+    if (::ZZ::Wire w = ::ZZ::Wire_NULL); else                                               \
     for (uint i__##w = 0, size__##w = w0__##w.size(); i__##w < size__##w; i__##w++) \
         if (w = w0__##w[i__##w], !w); else
 
