@@ -755,7 +755,7 @@ void localAbstr(NetlistRef N0, Vec<Wire>& props, const Params_LocalAbstr& P, /*i
             if (par || dwr){
                 if (T.abstr().size() < sent_size){
                     if (par)
-                        sendMsg_Abstr(T.abstr(), T.design());
+                        sendMsg_Abstr(T.abstr(), T.design(), depth);
                     else assert(dwr),
                         writeAbstrModel(T.abstr(), T.design(), N0, P.dump_prefix, dwr_counter, P.renumber);
                     abstr_sent = true;

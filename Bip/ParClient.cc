@@ -920,7 +920,7 @@ void unpack_UCube(Pkg pkg, /*outputs:*/ uint& frame, Vec<GLit>& state)
 
 void sendMsg_Result_unknown(const Vec<uint>& props, uint prop_type)
 {
-  #if 0   // -- old format 
+  #if 0   // -- old format
     Vec<uchar> data;
     data.push(l_Undef.value);
     put_vec_uint(data, props);
@@ -943,7 +943,7 @@ void sendMsg_Result_unknown(const Vec<uint>& props, uint prop_type)
 // 'concrete' means flops are not abstracted => only the initial state will be included in the counterexample
 void sendMsg_Result_fails(const Vec<uint>& props, uint prop_type, const Vec<uint>& depths, const Cex& cex, NetlistRef N, bool concrete_cex, uint loop_frame)
 {
-  #if 0   // -- old format 
+  #if 0   // -- old format
     Vec<uchar> data;
     data.push(l_False.value);
     put_vec_uint(data, props);
@@ -993,10 +993,11 @@ void sendMsg_Result_holds(const Vec<uint>& props, uint prop_type, NetlistRef N_i
 }
 
 
-void sendMsg_Abstr(const WZetL& abstr, NetlistRef N)
+void sendMsg_Abstr(const WZetL& abstr, NetlistRef N, int depth)
 {
     Vec<uchar> data;
     put_Abstr(data, abstr, N);
+    putu32(data, (uint)depth);
     sendMsg(103/*Abstr*/, data.slice());
 }
 

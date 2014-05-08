@@ -70,7 +70,7 @@ void sendMsg_Result_fails  (const Vec<uint>& props, uint prop_type, const Vec<ui
 void sendMsg_Result_holds  (const Vec<uint>& props, uint prop_type, NetlistRef N_invar = Netlist_NULL);
     // -- unnumbered flops/PIs will be ignored when sending counterexample
 
-void sendMsg_Abstr(const WZetL& abstr, NetlistRef N);
+void sendMsg_Abstr(const WZetL& abstr, NetlistRef N, int depth);
 void sendMsg_AbstrBad();
 
 void sendMsg_Reparam(NetlistRef N);

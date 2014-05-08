@@ -751,7 +751,11 @@ void increaseStackSize()
             r.rlim_cur = stack_size;
             st = setrlimit(RLIMIT_STACK, &r);
             if (st != 0)
+#if defined __APPLE__
+                ;       // -- tedious to see this warning on Mac where this call never works
+#else
                 ShoutLn "WARNING! Stack size could not be changed.";
+#endif
         }
     }
 }

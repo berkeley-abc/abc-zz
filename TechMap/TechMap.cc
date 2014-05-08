@@ -671,7 +671,7 @@ void TechMap::generateCuts(Wire w)
 //  - Update 'fanouts' and 'mux_fanout' for removed cuts except for the top node.
 //  - Abort if 'acc_cost' exceeds 'acc_lim'.
 // Returns TRUE if dereference was successful, FALSE if exceeded 'acc_lim'.
-// NOTE! 'active' is not touched by this procedure, meaning incative nodes may still have 
+// NOTE! 'active' is not touched by this procedure, meaning incative nodes may still have
 // implementations (must be fixed afterwards).
 //
 bool TechMap::deref(GLit w)
@@ -721,8 +721,6 @@ void TechMap::undoDeref()
         fanouts(v)++;
     }
 }
-
-
 
 
 #if 0
