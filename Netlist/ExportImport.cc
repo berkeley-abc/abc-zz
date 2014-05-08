@@ -489,6 +489,65 @@ bool writeAigerFile(String filename, NetlistRef N, Array<uchar> comment)
     return true;
 }
 
+void sortPOS(NetlistRef N, Vec<Wire>& os, Vec<Wire>& bs, Vec<Wire>& cs, Vec<Vec<Wire> >& js, Vec<Wire>& fcs)
+{
+    WSeen propPOs;
+
+    if( Has_Pob(N, properties)) {
+        Get_Pob(N, properties);
+        for( uind i=0 ; i<properties.size() ; i++) {
+            Wire po = properties[i];
+            bs.push(po);
+            propPOs.add( po );
+        }
+    }
+
+    if( Has_Pob(N, constraints)) {
+        Get_Pob(N, constraints);
+        for( uind i=0 ; i<constraints.size() ; i++) {
+            Wire po = constraints[i];
+            cs.push( po );
+            propPOs.add( po );
+        }
+    }
+
+    if( Has_Pob(N, fair_properties)) {
+        Get_Pob(N, fair_properties);
+        for( uind i=0 ; i<fair_properties.size() ; i++) {
+            Vec<Wire>& fair_prop = fair_properties[i];
+            js.push();
+            Vec<Wire>& fp = js.last();
+            for( uind j=0 ; j<fair_prop.size() ; j++) {
+                Wire po = fair_prop[j];
+                fp.push( po );
+                propPOs.add( po );
+            }
+        }
+    }
+
+    if( Has_Pob(N, fair_constraints)) {
+        Get_Pob(N, fair_constraints);
+        for( uind i=0 ; i<fair_constraints.size() ; i++) {
+            Wire po = fair_constraints[i];
+            fcs.push( po );
+            propPOs.add( po );
+        }
+    }
+
+    For_Gatetype(N, gate_PO, po) {
+        if( ! propPOs.has(po) )
+            os.push( po );
+    }
+}
+
+void writePOs(Out& out, NetlistRef N, WMap<uind>& n2a, Vec<Wire>& pos, bool negate=false)
+{
+    for(uind i=0; i<pos.size() ; i++) {
+        Wire po = pos[i];
+        uind lit = n2a[+po[0]]^uind(sign(po))^uind(negate);
+        out += lit, "\n";
+    }
+}
 
 // Returns FALSE if file could not be created.
 // PRE-CONDITION: All PIs, POs, and Flops are uniquely numbered (with small numbers).
@@ -515,17 +574,21 @@ bool writeAiger(Out& out, NetlistRef N, Array<uchar> comment)
             upOrder(N, order, false, false);
     }
 
-    Vec<Wire> is, fs, os;
+    Vec<Wire> is, fs, os, bs, cs, fcs;
+    Vec<Vec<Wire> > js;
     Vec<Wire> as(reserve_, N.typeCount(gate_And));
+
     for (uind i = 0; i < order.size(); i++){
         Wire w = N[order[i]];
         switch (type(w)){
         case gate_PI  : is.push(w); break;
         case gate_Flop: fs.push(w); break;
-        case gate_PO  : os.push(w); break;
+        case gate_PO : break;
         case gate_And : as.push(w); break;
         default: assert(false); }
     }
+
+    sortPOS(N, os, bs, cs, js, fcs);
 
     // If numbering is compact, chose that order for the AIGER file:
     if (checkNumberingPIs  (N, true)) sobSort(sob(is, proj_lt(GetNum())));
@@ -539,27 +602,53 @@ bool writeAiger(Out& out, NetlistRef N, Array<uchar> comment)
     for (uind i = 0; i < fs.size(); i++) n2a(fs[i]) = 2 * flopC++;
     for (uind i = 0; i < as.size(); i++) n2a(as[i]) = 2 * andC++;
 
-
     // Write header, flops and POs:
-    out += "aig ", is.size() + fs.size() + as.size(), ' ', is.size(), ' ', fs.size(), ' ', os.size(), ' ', as.size(), '\n';
+    out += "aig ", is.size() + fs.size() + as.size(), ' ', is.size(), ' ', fs.size(), ' ', os.size(), ' ', as.size();
+
+    if( (bs.size()+cs.size()+js.size()+fcs.size()) > 0 )
+        out += ' ', bs.size();
+
+    if( (cs.size()+js.size()+fcs.size()) > 0 )
+        out += ' ', cs.size();
+
+    if( (js.size()+fcs.size()) > 0 )
+        out += ' ', js.size();
+
+    if( fcs.size() > 0 )
+        out += ' ', fcs.size();
+
+    out += '\n';
+
+    Get_Pob(N, flop_init);
 
     for (uind i = 0; i < fs.size(); i++){
         if (!fs[i])
             out += '0', '\n';       // -- missing flops are constant 0
         else{
             Wire w0 = fs[i][0];
-            out += n2a[w0] ^ uind(sign(w0)), '\n';
-        }
-    }
-    for (uind i = 0; i < os.size(); i++){
-        if (!os[i])
-            out += '0', '\n';
-        else{
-            Wire w0 = os[i][0];     // -- missing primary inputs are constant 0
-            out += n2a[w0] ^ uind(sign(w0)), '\n';
+            out += n2a[w0] ^ uind(sign(w0));
+
+            lbool init = flop_init[fs[i]];
+            if( init==l_True)
+                out += " 1\n";
+            else if ( init==l_Undef)
+                out += " ", n2a[fs[i]], "\n";
+            else
+                out += "\n";
         }
     }
 
+    // Wire POs by type
+    writePOs(out, N, n2a, os);
+    writePOs(out, N, n2a, bs, true);
+    writePOs(out, N, n2a, cs);
+    for(uind i =0; i<js.size(); i++)
+        out += js[i].size(), "\n";
+    for(uind i =0; i<js.size(); i++)
+        writePOs(out, N, n2a, js[i]);
+    writePOs(out, N, n2a, fcs);
+
+    // Write AND gates
     for (uind i = 0; i < as.size(); i++){
         Wire w = as[i];
         uind idx_w  = n2a[w];
@@ -575,6 +664,9 @@ bool writeAiger(Out& out, NetlistRef N, Array<uchar> comment)
     writeAigerNumbers<PI_  >(out, is, 'i');
     writeAigerNumbers<Flop_>(out, fs, 'l');
     writeAigerNumbers<PO_  >(out, os, 'o');
+    writeAigerNumbers<PO_  >(out, bs, 'b');
+    writeAigerNumbers<PO_  >(out, cs, 'c');
+    writeAigerNumbers<PO_  >(out, fcs, 'f');
 
     // Write comment:
     if (comment){
