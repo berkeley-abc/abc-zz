@@ -619,7 +619,9 @@ bool writeAiger(Out& out, NetlistRef N, Array<uchar> comment)
 
     out += '\n';
 
-    Get_Pob(N, flop_init);
+    bool had_flop_init = Has_Pob(N, flop_init);
+
+    Auto_Pob(N, flop_init);
 
     for (uind i = 0; i < fs.size(); i++){
         if (!fs[i])
@@ -629,9 +631,9 @@ bool writeAiger(Out& out, NetlistRef N, Array<uchar> comment)
             out += n2a[w0] ^ uind(sign(w0));
 
             lbool init = flop_init[fs[i]];
-            if( init==l_True)
+            if( had_flop_init && init==l_True)
                 out += " 1\n";
-            else if ( init==l_Undef)
+            else if ( had_flop_init && init==l_Undef)
                 out += " ", n2a[fs[i]], "\n";
             else
                 out += "\n";
