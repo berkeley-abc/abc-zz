@@ -57,6 +57,8 @@ macro void removeAllUnreach(NetlistRef N, Vec<GLit>* removed_gates = NULL) {
 void removeUnreach(NetlistRef N, Vec<GLit>& Q, bool keep_sources = true);
 void removeUnreach(Wire w, bool keep_sources = true);
 
+void computeReach(NetlistRef N, Vec<uchar>& seen);
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Topological orders:

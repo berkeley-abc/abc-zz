@@ -210,7 +210,15 @@ void Pec_Strash::strashNetlist()
     For_Gatetype(N, gate_Flop, w)
         w.set(0, repr[w[0]] ^ sign(w[0]));
 
-    removeUnreach(N);
+    Vec<uchar> seen(N.size(), false);
+    computeReach(N, seen);
+    For_Gates(N, w){
+        if (!seen[id(w)] && !isGlobalSource(w)){
+            if (type(w) == gate_And)
+                nodes.exclude(w);
+            w.remove();
+        }
+    }
 }
 
 

@@ -23,12 +23,9 @@ using namespace std;
 // Cleanup:
 
 
-// Removes any gate not in the transitive fanin of a sink. PIs (or more generally, global sources)
-// are kept unless 'keep_sources' is set to FALSE.
-void removeUnreach(NetlistRef N, Vec<GLit>* removed_gates, bool keep_sources)
+void computeReach(NetlistRef N, Vec<uchar>& seen)
 {
     Vec<Pair<Wire,uint> > Q;
-    Vec<uchar> seen(N.size(), false);
     Q.reserve(N.size());
 
     // Compute reachable set:
@@ -66,6 +63,15 @@ void removeUnreach(NetlistRef N, Vec<GLit>* removed_gates, bool keep_sources)
             }
         }
     }
+}
+
+
+// Removes any gate not in the transitive fanin of a sink. PIs (or more generally, global sources)
+// are kept unless 'keep_sources' is set to FALSE.
+void removeUnreach(NetlistRef N, Vec<GLit>* removed_gates, bool keep_sources)
+{
+    Vec<uchar> seen(N.size(), false);
+    computeReach(N, seen);
 
     // Delete gates:
     For_Gates(N, w){
