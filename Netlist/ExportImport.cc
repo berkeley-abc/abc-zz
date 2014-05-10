@@ -159,6 +159,7 @@ void readAiger_(In& in, NetlistRef N, bool store_comment)
     uind n_bad    = 0;  // (we don't keep track of var index for these; don't need it for POs either, strictly speaking)
     uind n_constr = 0;
     uind n_live   = 0;  // -- NOTE! List of lists (one per liveness property).
+    uind n_live_pos = 0;
     uind n_fair   = 0;
     bool new_aiger = fs.size() > 6;
     if (fs.size() > 6) n_bad    = (uind)stringToUInt64(fs[6]);
@@ -212,46 +213,41 @@ void readAiger_(In& in, NetlistRef N, bool store_comment)
     if (n_bad > 0){
         Add_Pob(N, properties);
         for (uind i = 0; i < n_bad; i++){
-            readLine(in, buf);
-            splitArray(buf.slice(), " ", fs);
-            if (fs.size() != 1) throw Excp_AigerParseError("Expected a single number on each line in the 'bad' section");
-            uind lit = (uind)stringToUInt64(fs[0]);
+            uind lit = (uind)parseUInt64(in); in++;
             Wire w_in = N[aig2nl[lit >> 1]] ^ (lit & 1);
-            properties.push(~N.add(PO_(N.typeCount(gate_PO)), w_in));
+            Wire w_po = N.add(PO_(N.typeCount(gate_PO)), w_in);
+            aig2nl.push(w_po);
+            properties.push(~w_po);
         }
     }
 
     if (n_constr > 0){
         Add_Pob(N, constraints);
         for (uind i = 0; i < n_constr; i++){
-            readLine(in, buf);
-            splitArray(buf.slice(), " ", fs);
-            if (fs.size() != 1) throw Excp_AigerParseError("Expected a single number on each line in the 'constraint' section");
-            uind lit = (uind)stringToUInt64(fs[0]);
+            uind lit = (uind)parseUInt64(in); in++;
             Wire w_in = N[aig2nl[lit >> 1]] ^ (lit & 1);
-            constraints.push(N.add(PO_(N.typeCount(gate_PO)), w_in));
+            Wire w_po = N.add(PO_(N.typeCount(gate_PO)), w_in);
+            aig2nl.push(w_po);
+            constraints.push(w_po);
         }
     }
 
     if (n_live > 0){
         Add_Pob(N, fair_properties);
         for (uind n = 0; n < n_live; n++){
-            readLine(in, buf);
-            splitArray(buf.slice(), " ", fs);
-            if (fs.size() != 1) throw Excp_AigerParseError("Expected a single number on each line in the 'liveness' section");
+            uint n_pos = (uint)parseUInt64(in); in++;
+            n_live_pos += n_pos;
             fair_properties.push();
-            fair_properties.last().setSize((uint)stringToUInt64(fs[0]));
+            fair_properties.last().setSize(n_pos);
         }
 
         for (uind n = 0; n < n_live; n++){
             for (uind i = 0; i < fair_properties[n].size(); i++){
-                readLine(in, buf);
-                splitArray(buf.slice(), " ", fs);
-                if (fs.size() != 1) throw Excp_AigerParseError("Expected a single number on each line in the 'liveness' section");
-
-                uind lit = (uind)stringToUInt64(fs[0]);
+                uind lit = (uind)parseUInt64(in); in++;
                 Wire w_in = N[aig2nl[lit >> 1]] ^ (lit & 1);
-                fair_properties[n][i] = N.add(PO_(N.typeCount(gate_PO)), w_in);
+                Wire w_po = N.add(PO_(N.typeCount(gate_PO)), w_in);
+                aig2nl.push(w_po);
+                fair_properties[n][i] = w_po;
             }
         }
     }
@@ -259,15 +255,13 @@ void readAiger_(In& in, NetlistRef N, bool store_comment)
     if (n_fair > 0){
         Add_Pob(N, fair_constraints);
         for (uind i = 0; i < n_fair; i++){
-            readLine(in, buf);
-            splitArray(buf.slice(), " ", fs);
-            if (fs.size() != 1) throw Excp_AigerParseError("Expected a single number on each line in the 'fairness' section");
-            uind lit = (uind)stringToUInt64(fs[0]);
+            uind lit = (uind)parseUInt64(in); in++;
             Wire w_in = N[aig2nl[lit >> 1]] ^ (lit & 1);
-            fair_constraints.push(N.add(PO_(N.typeCount(gate_PO)), w_in));
+            Wire w_po = N.add(PO_(N.typeCount(gate_PO)), w_in);
+            aig2nl.push(w_po);
+            fair_constraints.push(w_po);
         }
     }
-
 
     // Read ANDs:
     for (uind i = 0; i < n_Ands; i++){
@@ -302,7 +296,10 @@ void readAiger_(In& in, NetlistRef N, bool store_comment)
         if      (type == 'i') p = aig2nl[1 + index];
         else if (type == 'l') p = aig2nl[1 + n_PIs + index];
         else if (type == 'o') p = aig2nl[1 + n_PIs + n_Flops + n_Ands + index];
-        else if (type == 'b' || type == 'c' || type == 'j' || type == 'f') /*ignore*/;
+        else if (type == 'b') p = aig2nl[1 + n_PIs + n_Flops + n_Ands + n_POs + index];
+        else if (type == 'c') p = aig2nl[1 + n_PIs + n_Flops + n_Ands + n_POs + n_bad + index];
+        else if (type == 'f') p = aig2nl[1 + n_PIs + n_Flops + n_Ands + n_POs + n_bad + n_constr + n_live_pos + index];
+        else if (type == 'j') /*ignore*/;
         else throw Excp_AigerParseError("Expected symbol prefix: i l o b c j f");
 
         xnames.push(tuple(p, String(buf.base())));
