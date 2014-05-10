@@ -480,57 +480,60 @@ static void writeAigerNumbers(Out& out, NetlistRef N, char prefix)
 #endif
 
 
-bool writeAigerFile(String filename, NetlistRef N, Array<uchar> comment)
+bool writeAigerFile(String filename, NetlistRef N, Array<uchar> comment, bool aiger_1_9)
 {
     OutFile out(filename);
     if (out.null()) return false;
 
-    writeAiger(out, N, comment);
+    writeAiger(out, N, comment, aiger_1_9);
     return true;
 }
 
-void sortPOS(NetlistRef N, Vec<Wire>& os, Vec<Wire>& bs, Vec<Wire>& cs, Vec<Vec<Wire> >& js, Vec<Wire>& fcs)
+void sortPOS(NetlistRef N, Vec<Wire>& os, Vec<Wire>& bs, Vec<Wire>& cs, Vec<Vec<Wire> >& js, Vec<Wire>& fcs, bool aiger_1_9)
 {
     WSeen propPOs;
 
-    if( Has_Pob(N, properties)) {
-        Get_Pob(N, properties);
-        for( uind i=0 ; i<properties.size() ; i++) {
-            Wire po = properties[i];
-            bs.push(po);
-            propPOs.add( po );
-        }
-    }
+    if( aiger_1_9 ) {
 
-    if( Has_Pob(N, constraints)) {
-        Get_Pob(N, constraints);
-        for( uind i=0 ; i<constraints.size() ; i++) {
-            Wire po = constraints[i];
-            cs.push( po );
-            propPOs.add( po );
-        }
-    }
-
-    if( Has_Pob(N, fair_properties)) {
-        Get_Pob(N, fair_properties);
-        for( uind i=0 ; i<fair_properties.size() ; i++) {
-            Vec<Wire>& fair_prop = fair_properties[i];
-            js.push();
-            Vec<Wire>& fp = js.last();
-            for( uind j=0 ; j<fair_prop.size() ; j++) {
-                Wire po = fair_prop[j];
-                fp.push( po );
+        if( Has_Pob(N, properties)) {
+            Get_Pob(N, properties);
+            for( uind i=0 ; i<properties.size() ; i++) {
+                Wire po = properties[i];
+                bs.push(po);
                 propPOs.add( po );
             }
         }
-    }
 
-    if( Has_Pob(N, fair_constraints)) {
-        Get_Pob(N, fair_constraints);
-        for( uind i=0 ; i<fair_constraints.size() ; i++) {
-            Wire po = fair_constraints[i];
-            fcs.push( po );
-            propPOs.add( po );
+        if( Has_Pob(N, constraints)) {
+            Get_Pob(N, constraints);
+            for( uind i=0 ; i<constraints.size() ; i++) {
+                Wire po = constraints[i];
+                cs.push( po );
+                propPOs.add( po );
+            }
+        }
+
+        if( Has_Pob(N, fair_properties)) {
+            Get_Pob(N, fair_properties);
+            for( uind i=0 ; i<fair_properties.size() ; i++) {
+                Vec<Wire>& fair_prop = fair_properties[i];
+                js.push();
+                Vec<Wire>& fp = js.last();
+                for( uind j=0 ; j<fair_prop.size() ; j++) {
+                    Wire po = fair_prop[j];
+                    fp.push( po );
+                    propPOs.add( po );
+                }
+            }
+        }
+
+        if( Has_Pob(N, fair_constraints)) {
+            Get_Pob(N, fair_constraints);
+            for( uind i=0 ; i<fair_constraints.size() ; i++) {
+                Wire po = fair_constraints[i];
+                fcs.push( po );
+                propPOs.add( po );
+            }
         }
     }
 
@@ -551,7 +554,7 @@ void writePOs(Out& out, NetlistRef N, WMap<uind>& n2a, Vec<Wire>& pos, bool nega
 
 // Returns FALSE if file could not be created.
 // PRE-CONDITION: All PIs, POs, and Flops are uniquely numbered (with small numbers).
-bool writeAiger(Out& out, NetlistRef N, Array<uchar> comment)
+bool writeAiger(Out& out, NetlistRef N, Array<uchar> comment, bool aiger_1_9)
 {
     // Compute mapping:
     WMap<uind> n2a;     // -- map wire in 'N' to AIGER literal.
@@ -588,7 +591,7 @@ bool writeAiger(Out& out, NetlistRef N, Array<uchar> comment)
         default: assert(false); }
     }
 
-    sortPOS(N, os, bs, cs, js, fcs);
+    sortPOS(N, os, bs, cs, js, fcs, aiger_1_9);
 
     // If numbering is compact, chose that order for the AIGER file:
     if (checkNumberingPIs  (N, true)) sobSort(sob(is, proj_lt(GetNum())));

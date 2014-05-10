@@ -39,8 +39,8 @@ void readAigerFile(String filename, NetlistRef N, bool store_comment = true);
 void removeFlopInit(NetlistRef N);
     // -- helper function to prepare file for AIGER writing (removes 'flop_init')
 
-bool writeAiger(Out& out , NetlistRef N, Array<uchar> comment = Array<uchar>());
-bool writeAigerFile(String filename, NetlistRef N, Array<uchar> comment = Array<uchar>());
+bool writeAiger(Out& out , NetlistRef N, Array<uchar> comment = Array<uchar>(), bool aiger_1_9=false);
+bool writeAigerFile(String filename, NetlistRef N, Array<uchar> comment = Array<uchar>(), bool aiger_1_9=false);
     // -- returns FALSE if file could not be created. 
 
 void makeAllOutputsProperties(NetlistRef N);
