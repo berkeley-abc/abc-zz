@@ -153,12 +153,12 @@ struct PobCondDisposer {
 
 #define Scoped_Pob2(N, obj_name, var_name) \
     ::ZZ::PecType_of_object_##obj_name& var_name ___unused = ::ZZ::regpob_##obj_name.add(N); \
-    ::ZZ::PobDisposer regpob_disposer_##obj_name(obj_name);
+    ::ZZ::PobDisposer regpob_disposer__##obj_name##__##var_name(obj_name);
 
 #define Auto_Pob2(N, obj_name, var_name) \
-    bool regpob_existed_##obj_name; \
-    ::ZZ::PecType_of_object_##obj_name& var_name ___unused = ::ZZ::regpob_##obj_name.assure(N, regpob_existed_##obj_name); \
-    ::ZZ::PobCondDisposer regpob_disposer_##obj_name(var_name, regpob_existed_##obj_name);
+    bool regpob_existed__##obj_name##__##var_name; \
+    ::ZZ::PecType_of_object_##obj_name& var_name ___unused = ::ZZ::regpob_##obj_name.assure(N, regpob_existed__##obj_name##__##var_name); \
+    ::ZZ::PobCondDisposer regpob_disposer__##obj_name##__##var_name(var_name, regpob_existed__##obj_name##__##var_name);
 
 
 #define Get_Pob(   N, obj_name) Get_Pob2   (N, obj_name, obj_name)
