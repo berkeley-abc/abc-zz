@@ -544,8 +544,13 @@ void writePOs(Out& out, NetlistRef N, WMap<uind>& n2a, Vec<Wire>& pos, bool nega
 {
     for(uind i=0; i<pos.size() ; i++) {
         Wire po = pos[i];
-        uind lit = n2a[+po[0]]^uind(sign(po))^uind(negate);
-        out += lit, "\n";
+        if(!po) {
+            out += "0\n";
+        }
+        else {
+            uind lit = n2a[+po[0]]^uind(sign(po[0]))^uind(sign(po))^uind(negate);
+            out += lit, "\n";
+        }
     }
 }
 
