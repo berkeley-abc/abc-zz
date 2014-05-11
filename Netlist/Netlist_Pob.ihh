@@ -167,5 +167,5 @@ struct PobCondDisposer {
 #define Scoped_Pob(N, obj_name) Scoped_Pob2(N, obj_name, obj_name)
 #define Auto_Pob(  N, obj_name) Auto_Pob2  (N, obj_name, obj_name)
 
-#define Add_Pob0(   N, obj_name) regpob_##obj_name.add(N);
-#define Assure_Pob0(N, obj_name) regpob_##obj_name.assure(N);
+#define Add_Pob0(   N, obj_name) ::ZZ::regpob_##obj_name.add(N);
+#define Assure_Pob0(N, obj_name) ::ZZ::regpob_##obj_name.assure(N);
