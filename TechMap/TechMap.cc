@@ -344,17 +344,21 @@ class TechMap {
     void printProgress(double T0);
 
     // Exact local area:
-    void exactLocalArea();
-
     float       acc_cost;
     float       acc_lim;
     Vec<GLit>   undo;
 
+    WMap<float> arrival;            // -- only used during ELA; elsewhere 'impl' is used.
+    IdHeap<float> Q;
+
     bool deref(GLit w);
     void undoDeref();
+    void ref(GLit w);
+    bool tryRef(uint depth);
+    void exactLocalArea();
 
 public:
-    TechMap(Gig& N_, const Params_TechMap& P_) : N(N_), P(P_), active(INACTIVE) {}
+    TechMap(Gig& N_, const Params_TechMap& P_) : N(N_), P(P_), active(INACTIVE), Q(arrival.base()) {}
     void run();
 };
 
@@ -684,6 +688,10 @@ bool TechMap::deref(GLit w)
 
     acc_cost += (j == F7MUX) ? P.mux_cost : lutCost(w, cut);
 
+    //*E*/WriteLn "deref(%_) -- acc_cost=%_  acc_lim=%_", w, acc_cost, acc_lim;
+    //*E*/Write "  cut-inputs:";
+    //*E*/for (uint i = 0; i < cut.size(); i++) Write " %_", cut[i] + N;
+    //*E*/NewLine;
     if (acc_cost > acc_lim)
         return false;
 
@@ -702,6 +710,7 @@ bool TechMap::deref(GLit w)
         }else
             undo.push(v);
 
+        //*E*/WriteLn "deref:ing %_ (%_ fanouts)", v + N, fanouts[v];
         fanouts(v)--;
         if (fanouts[v] == 0){
             if (!deref(v))
@@ -716,6 +725,7 @@ void TechMap::undoDeref()
 {
     while (undo.size() > 0){
         GLit v = undo.popC();
+        //*E*/WriteLn "undo:ing %_", v + N;
         if (v.sign)
             mux_fanout(v) = undo.popC();
         fanouts(v)++;
@@ -723,59 +733,114 @@ void TechMap::undoDeref()
 }
 
 
-#if 0
+// Update fanout count for new selection.
+void TechMap::ref(GLit w)
+{
+    uint j   = active[w] - FIRST_CUT; assert(j != F7MUX); // <<== later
+    uint sel = impl[j][w].idx;
+    Cut  cut = cutmap[w][sel];
 
-WMap<float> arrival;
-IdHeap Q
-    IdHeap(T2Id i = T2Id())                    : get_id(i), prio(NULL) {}
+    //*E*/Write "ref(%_) cut:", w;
+    //*E*/for (uint i = 0; i < cut.size(); i++) Write " %_", cut[i] + N;
+    //*E*/NewLine;
+
+    // Recurse:
+    for (uint i = 0; i < cut.size(); i++){
+        Wire v = cut[i] + N;
+        if (!isLogic(v)) continue;
+
+        if (j == F7MUX && mux_fanout[v])
+            assert(false);
+
+        //*E*/WriteLn "ref:ing %_", v + N;
+        fanouts(v)++;
+        if (fanouts[v] == 1){
+            depart(v) = 0.0f;       // -- otherwise FLT_MAX for inactive nodes
+            ref(v);
+        }
+        /**/if (!(depart[w] != FLT_MAX)) Dump(w);
+        assert(depart[w] != FLT_MAX);
+        newMax(depart(v), depart[w] + 1.0f);    // <<== f7 here too
+    }
+}
 
 
 // Find best implementation for 'w'. 'acc_lim' will be set to best solution so far (initialized to
 // the size of the dereferenced logic).
 bool TechMap::tryRef(uint depth)
 {
-    Wire w = Q.pop().snd + N;
+    if (Q.size() == 0){
+        acc_lim = acc_cost;
+        return true; }
+
+    Wire w = Q.pop() + N;
     const CutSet& cuts = cutmap[w];
+    //*E*/WriteLn "tryRef(depth=%_) -- Q.size()=%_   w=%_", depth, Q.size(), w;
+
+    uint added[6];
+    uint added_sz;
 
     // For now, try every combination always:
+    bool success = false;
     for (uint k = 0; k < cuts.size(); k++){
-        Cut c = cuts[k];
+        /**/if (depth != 0){
+        /**/    if (k == 0) k = impl[DELAY][w].idx;
+        /**/    else break;
+        /**/}
+        Cut c = cuts[k]; assert(c.size() <= 6);
         float cost = lutCost(w, c);
-        if (acc_cost + cost > lim)
+        if (acc_cost + cost >= acc_lim)
             continue;
+
+        // <<== kolla timing här
 
         acc_cost += cost;
 
+        added_sz = 0;
         for (uint i = 0; i < c.size(); i++){
             Wire v = c[i] + N;
-            if (Q.has(if (fanouts[v] == 0)
-                Q.add(arrival[v], v.lit());     // <<== could add up conservative costs for inputs and abort earlier
+            //*E*/WriteLn "    <<working on cut #%_,  fanouts[%_]=%_  inQ=%_>>  for %_", k, v, fanouts[v], Q.has(v.id), w;
+            if (fanouts[v] == 0 && !Q.has(v.id)){
+                //<<== uppdatera departure här (och återställ efter rekursion nedan)
+                Q.add(v.id);     // <<== could add up conservative costs for inputs and abort earlier
+                added[added_sz++] = v.id;
+            }
         }
 
+        //*E*/Wire w_try = (Q.size() > 0) ? Q.peek() + N : Wire_NULL;
         if (tryRef(depth + 1)){
             // New best implementation; store it:
-            ...
+            impl[AREA](w).idx = k;
+            active(w) = AREA + FIRST_CUT;
+            //*E*/Write "  sel[%_] = %_  -- cut:", w, k;
+            //*E*/for (uint i = 0; i < c.size(); i++) Write " %_", c[i] + N; NewLine;
+            success = true;
+            //*E*/WriteLn "  success with: %_", w_try;
         }
+        //*E*/else WriteLn "  failure with: %_", w_try;
 
-        for (uint i = 0; i < c.size(); i++){
-            Wire v = c[i] + N;
-            if (fanouts[v] == 0) ...hmm, hur ta bort? IdHeap...
-            fanouts(v)--;
-        }
+        for (uint i = 0; i < added_sz; i++)
+            if (Q.has(added[i]))
+                Q.remove(added[i]);
 
         acc_cost -= cost;
     }
+
+    if (!success)
+        Q.weakAdd(w.id);
+
+    //*E*/WriteLn "triedRef(depth=%_) -- Q.size()=%_   w=%_  ==>>  success=%_", depth, Q.size(), w, success;
+    return success;
 }
-  #if 0
-                Wire w0, w1, w2;
-                if (muxInputs(N, c, w0, w1, w2)){
-  #endif
-#endif
+
 
 void TechMap::exactLocalArea()
 {
+    //*E*/N.save("ela.gnl");
+    //*E*/For_Gates(N, w) WriteLn "depart[%_] = %_    active[%_] = %d", w, depart[w], w, active[w];
+
     // Recompute arrival times on the now induced mapping (including non-mapped nodes):
-    WMap<float> arrival;
+    arrival.clear();
     For_Gates(N, w){
         if (isCI(w)) continue;
 
@@ -803,6 +868,9 @@ void TechMap::exactLocalArea()
         }
     }
 
+    if (!P.exact_local_area)
+        return;     // -- we still want to populate 'arrival', so exit here
+
     float ela_max_arrival = 0;
     For_Gates(N, w)
         if (isCO(w))
@@ -815,24 +883,44 @@ void TechMap::exactLocalArea()
     mux_fanout.copyTo(mux_fanout_copy);
 
     For_Gates_Rev(N, w){
-        if (active[w] && isLogic(w)){
+        if (fanouts[w] > 0 && isLogic(w)){
+            /**/putchar('.'), fflush(stdout);
             acc_cost = 0;
             acc_lim  = ELA_GLOBAL_LIM;
-            if (deref(w))
-                ;//printf(" %.0f", acc_cost);
-            else
-                ;//putchar('.');
-            //fflush(stdout);
-
-            undoDeref();
-            assert(undo.size() == 0);
+            //*E*/WriteLn "\a/--TRYING: \a*%_\a0", w;
+            //*E*/Write "\a/ACTIVE 1:"; For_Gates(N, w) Write " %_=%d(%d)", w.lit(), active[w], fanouts[w]; NewLine; Write "\a/";
+            if (deref(w)){
+                //*E*/Write "\a/ACTIVE 2:"; For_Gates(N, w) Write " %_=%d(%d)", w.lit(), active[w], fanouts[w]; NewLine; Write "\a/";
+                acc_lim = acc_cost;
+                acc_cost = 0;
+                //*E*/WriteLn "Trying to beat cost: %_", acc_lim;
+                Q.add(w.id);
+                if (!tryRef(0)){
+                    //*E*/WriteLn "[didn't find better solution]";
+                    undoDeref();
+                }else{
+                    //*E*/WriteLn "[Found better solution: %_]", acc_lim;
+                    undo.clear();
+                    ref(w);
+                }
+                Q.clear();
+            }else
+                undoDeref();
+            //*E*/Write "\a/ACTIVE 3:"; For_Gates(N, w) Write " %_=%d(%d)", w.lit(), active[w], fanouts[w]; NewLine; Write "\a/";
         }
     }
 
+    For_Gates(N, w)
+        if (isLogic(w) && fanouts[w] == 0)
+            active(w) = INACTIVE;
+
+    //*E*/For_Gates(N, w) WriteLn "depart[%_] = %_    active[%_] = %d", w, depart[w], w, active[w];
+#if 0
     For_Gates(N, w){
         if (fanouts[w] != fanouts_copy[w]){ Dump(w, fanouts[w], fanouts_copy[w]); assert(false); }
         if (mux_fanout[w] != mux_fanout_copy[w]){ Dump(w, mux_fanout[w], mux_fanout_copy[w]); assert(false); }
     }
+#endif
 }
 
 
@@ -918,7 +1006,7 @@ void TechMap::induceMapping(bool instantiate)
 
                 for (uint k = 0; k < cut.size(); k++){
                     Wire v = cut[k] + N;
-                    /**/if (v == gate_Lut4 && v.arg() == 0xAAAA) Dump(w, v);
+                    //**/if (v == gate_Lut4 && v.arg() == 0xAAAA) Dump(w, v);
                     active(v) = ACTIVE;
                     fanouts(v)++;
                 }
@@ -991,8 +1079,11 @@ void TechMap::induceMapping(bool instantiate)
 #endif
     }
 
-    For_Gates(N, w)
-        assert(!active[w] || depart[w] != FLT_MAX);
+    For_Gates(N, w){
+        /**/if (!(!active[w] || depart[w] != FLT_MAX)) Dump(w);
+        assert(!active[w] || depart[w] != FLT_MAX); }
+
+    // <<== verify that 'fanouts[]' is accurate!
 }
 
 

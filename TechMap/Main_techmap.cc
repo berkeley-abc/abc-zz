@@ -205,6 +205,7 @@ int main(int argc, char** argv)
     cli.add("un-and"  , "bool"  , "no"        , "Unmap to AND gates instead of richer set of gates.");
     cli.add("fmux"    , "bool"  , "no"        , "Use F7/F8 MUXes.");
     cli.add("slack"   , "{max} | float", "max", "Slack utilization. Smaller values means better average slack (but worse area).");
+    cli.add("ela"     , "bool"  , "no"        , "Exact local area.");
     cli.add("batch"   , "bool"  , "no"        , "Output summary line at the end (for tabulation).");
 
     cli.parseCmdLine(argc, argv);
@@ -212,14 +213,15 @@ int main(int argc, char** argv)
     // Get mapping options:
     uint n_rounds = cli.get("rounds").int_val;;
     Params_TechMap P;
-    P.cuts_per_node  = cli.get("N").int_val;
-    P.n_iters        = cli.get("iters").int_val;
-    P.recycle_iter   = (uint)cli.get("rc-iter").int_val;
-    P.delay_factor   = cli.get("df").float_val;
-    P.struct_mapping = cli.get("struct").bool_val;
-    P.unmap_to_ands  = cli.get("un-and").bool_val;
-    P.use_fmux       = cli.get("fmux").bool_val;
-    P.batch_output   = cli.get("batch").bool_val;
+    P.cuts_per_node    = cli.get("N").int_val;
+    P.n_iters          = cli.get("iters").int_val;
+    P.recycle_iter     = (uint)cli.get("rc-iter").int_val;
+    P.delay_factor     = cli.get("df").float_val;
+    P.struct_mapping   = cli.get("struct").bool_val;
+    P.unmap_to_ands    = cli.get("un-and").bool_val;
+    P.use_fmux         = cli.get("fmux").bool_val;
+    P.exact_local_area = cli.get("ela").bool_val;
+    P.batch_output     = cli.get("batch").bool_val;
     if (cli.get("slack").choice == 1)
         P.slack_util = cli.get("slack").float_val;
 
