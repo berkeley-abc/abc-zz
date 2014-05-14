@@ -189,6 +189,8 @@ int main(int argc, char** argv)
 {
     ZZ_Init;
 
+    setupSignalHandlers();
+
     // Setup commandline:
     cli.add("input"   , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
     cli.add("output"  , "string", "",           "Output GNL.", 1);
