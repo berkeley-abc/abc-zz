@@ -23,7 +23,8 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-void removeInverters(Gig& N, bool quiet);
+void removeRemapSigns(Gig& N, WMapX<GLit>& remap);
+void removeInverters(Gig& N, WMapX<GLit>* remap, bool quiet = false);
 void removeMuxViolations(Gig& N, const WMap<float>& arrival, float target_arrival, float delay_fraction);
 
 

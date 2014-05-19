@@ -302,6 +302,7 @@ class TechMap {
     // Input:
     Gig&                  N;
     const Params_TechMap& P;
+    WMapX<GLit>*          remap;
 
     // State:
     StackAlloc<uint64>  mem;
@@ -358,7 +359,8 @@ class TechMap {
     void exactLocalArea();
 
 public:
-    TechMap(Gig& N_, const Params_TechMap& P_) : N(N_), P(P_), active(INACTIVE), Q(arrival.base()) {}
+    TechMap(Gig& N_, const Params_TechMap& P_, WMapX<GLit>* remap_) :
+        N(N_), P(P_), remap(remap_), active(INACTIVE), Q(arrival.base()) {}
     void run();
 };
 
@@ -783,7 +785,7 @@ bool TechMap::tryRef(uint depth)
     // For now, try every combination always:
     bool success = false;
     for (uint k = 0; k < cuts.size(); k++){
-        /**/if (depth != 0){
+        /**/if (depth > 1){
         /**/    if (k == 0) k = impl[DELAY][w].idx;
         /**/    else break;
         /**/}
@@ -792,7 +794,16 @@ bool TechMap::tryRef(uint depth)
         if (acc_cost + cost >= acc_lim)
             continue;
 
-        // <<== kolla timing här
+        // Check timing:
+        bool meets_timing = true;
+        for (uint i = 0; i < c.size(); i++){
+            Wire v = c[i] + N;
+            if (arrival[v] + depart[w] > target_arrival){
+                meets_timing = false;
+                break; }
+        }
+        if (!meets_timing)
+            continue;
 
         acc_cost += cost;
 
@@ -877,14 +888,13 @@ void TechMap::exactLocalArea()
             newMax(ela_max_arrival, arrival[w]);
     //Dump(ela_max_arrival);
 
-    WMap<uint> fanouts_copy;
-    WMap<GLit> mux_fanout_copy;
-    fanouts.copyTo(fanouts_copy);
-    mux_fanout.copyTo(mux_fanout_copy);
+    //WMap<uint> fanouts_copy;
+    //WMap<GLit> mux_fanout_copy;
+    //fanouts.copyTo(fanouts_copy);
+    //mux_fanout.copyTo(mux_fanout_copy);
 
     For_Gates_Rev(N, w){
         if (fanouts[w] > 0 && isLogic(w)){
-            /**/putchar('.'), fflush(stdout);
             acc_cost = 0;
             acc_lim  = ELA_GLOBAL_LIM;
             //*E*/WriteLn "\a/--TRYING: \a*%_\a0", w;
@@ -903,7 +913,7 @@ void TechMap::exactLocalArea()
                     undo.clear();
                     ref(w);
                 }
-                Q.clear();
+                while (Q.size() > 0) Q.pop();   // -- clear queue
             }else
                 undoDeref();
             //*E*/Write "\a/ACTIVE 3:"; For_Gates(N, w) Write " %_=%d(%d)", w.lit(), active[w], fanouts[w]; NewLine; Write "\a/";
@@ -1041,7 +1051,96 @@ void TechMap::induceMapping(bool instantiate)
     }
 
     /**/For_Gates(N, w) assert(!active[w] || !isLogic(w) || (fanouts[w] > 0 && active[w] >= FIRST_CUT));
+    /**/if (iter != 0)
     exactLocalArea();
+
+#if 0   /*DEBUG*/
+    active.clear();
+    depart.clear();
+    fanouts.clear();
+    mux_fanout.clear();
+
+    For_All_Gates_Rev(N, w){
+        if (isCO(w)){
+            active(w) = ACTIVE;
+            if (P.slack_util != FLT_MAX)
+                depart(w) = max_(0.0f, (target_arrival - impl[DELAY][w[0]].arrival) - P.slack_util);
+        }
+
+        if (!active[w]){
+            depart(w) = FLT_MAX;    // <<== for now, give a well defined value to inactive nodes
+
+        }else{
+            if (isLogic(w)){
+                float req_time = target_arrival - depart[w];
+
+                uint  best_i    = UINT_MAX;
+                float best_area = FLT_MAX;
+
+                // Pick best implementation among current choices:
+                for (uint i = 0; i < impl.size(); i++){
+                    if (impl[i][w].idx == CutImpl::NONE) continue;
+                    if (impl[i][w].arrival <= req_time){
+                        if (i == F7MUX){
+                            int j = impl[F7MUX][w].idx;
+                            Cut cut = cutmap[w][j];
+                            Wire w0, w1, w2;
+                            muxInputs(N, cut, w0, w1, w2, true);
+                            if (mux_fanout[w] != GLit_NULL || mux_fanout[w1] != GLit_NULL || mux_fanout[w2] != GLit_NULL)
+                                continue;   // -- either feeding a F7 or fed by a LUT that feed a F7
+                        }
+                        if (newMin(best_area, impl[i][w].area_est))
+                            best_i = i;
+                    }
+                }
+
+                // For non-COs close to the outputs, required time may not be met:
+                if (best_i == UINT_MAX)
+                    best_i = DELAY;
+
+                uint j = impl[best_i][w].idx; assert(j < cutmap[w].size());
+                Cut cut = cutmap[w][j];
+
+                assert(j < 254);
+                active(w) = best_i + FIRST_CUT;
+
+                for (uint k = 0; k < cut.size(); k++){
+                    Wire v = cut[k] + N;
+                    //**/if (v == gate_Lut4 && v.arg() == 0xAAAA) Dump(w, v);
+                    active(v) = ACTIVE;
+                    fanouts(v)++;
+                }
+
+                if (best_i != F7MUX){
+                    for (uint k = 0; k < cut.size(); k++)
+                        newMax(depart(cut[k] + N), depart[w] + 1.0f);
+
+                }else{
+                    Wire w0, w1, w2;
+                    muxInputs(N, cut, w0, w1, w2, true);
+                    newMax(depart(w0), depart[w] + 1.0f);
+                    newMax(depart(w1), depart[w]);
+                    newMax(depart(w2), depart[w]);
+
+                    mux_fanout(w1) = w;   // -- mark fanin LUTs as "consumed" w.r.t. F7MUXes.
+                    mux_fanout(w2) = w;
+                }
+
+            }else{
+                if (!isCI(w)){
+                    float delay = (w != gate_Delay) ? 0.0f : w.arg() * P.delay_fraction;
+                    For_Inputs(w, v){
+                        active(v) = ACTIVE;
+                        /**/if (v == gate_Lut4 && v.arg() == 0xAAAA) Dump(2, w, v);
+                        fanouts(v)++;
+                        newMax(depart(v), depart[w] + delay);
+                    }
+                }
+            }
+        }
+    }
+#endif  /*END DEBUG*/
+
 
     if (instantiate){
         // Change AND gate into a LUT6 or MUX:
@@ -1069,7 +1168,11 @@ void TechMap::induceMapping(bool instantiate)
         For_Gates_Rev(N, w)
             if (isLogic(w))
                 remove(w);
-        N.compact();    // <<== signal tracking
+
+        GigRemap m;
+        N.compact(m);
+        if (remap)
+            m.applyTo(remap->base());
 
 #if 0
             removeMuxViolations(N, arrival, target_arrival, P.delay_fraction);
@@ -1082,8 +1185,6 @@ void TechMap::induceMapping(bool instantiate)
     For_Gates(N, w){
         /**/if (!(!active[w] || depart[w] != FLT_MAX)) Dump(w);
         assert(!active[w] || depart[w] != FLT_MAX); }
-
-    // <<== verify that 'fanouts[]' is accurate!
 }
 
 
@@ -1287,32 +1388,56 @@ static void compact(Gig& N, WMapX<GLit>& remap)
 }
 
 
-void techMap(Gig& N, const Vec<Params_TechMap>& Ps)
+void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
 {
-#if 0   //<<== do compaction with signal tracking here, if necessary
+    if (remap)
+        remap->initBuiltins();
+
+    // Make sure netlist is topologically sorted:
+    N.unstrash();
     if (!isCanonical(N)){
-        assert(!initial_winners);   // <<== after unmapping, netlist should be canonical; if not, there should be no initial winners
         WriteLn "Compacting... %_", info(N);
-        N.compact();       // <<== needs remap here
+
+        gate_id orig_sz = N.size();
+        GigRemap m;
+        N.compact(m);
+        if (remap){
+            for (gate_id i = 0; i < orig_sz; i++){
+                Lit p = GLit(i);
+                (*remap)(p) = m(p);
+            }
+        }
+        WriteLn "Done... %_", info(N);
+
+    }else if (remap){
+        For_All_Gates(N, w)
+            (*remap)(w) = w;
     }
-#endif
+
+    normalizeLut4s(N);
 
     // Techmap:
     assert(Ps.size() >= 1);
     for (uint round = 0; round < Ps.size(); round++){
         if (round > 0){
-            WMapX<GLit> remap;
-            unmap(N, &remap);
+            WMapX<GLit> xlat;
+            unmap(N, &xlat);
+            N.unstrash();
             if (Ps[round].unmap_to_ands)
                 expandXigGates(N);
-            N.unstrash();
-            compact(N, remap);
+            compact(N, xlat);
+
+            if (remap){
+                Vec<GLit>& v = remap->base();
+                for (uint i = gid_FirstUser; i < v.size(); i++)
+                    v[i] = xlat[v[i]];
+            }
 
             NewLine;
             WriteLn "Unmap: %_", info(N);
             NewLine;
         }
-        TechMap map(N, Ps[round]);
+        TechMap map(N, Ps[round], remap);
 
         map.run();
     }
@@ -1320,17 +1445,17 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps)
     if (!Ps.last().batch_output){
         NewLine;
         WriteLn "Legalization..."; }
-    removeInverters(N, Ps.last().batch_output);
+    removeInverters(N, remap, Ps.last().batch_output);
 }
 
 
-void techMap(Gig& N, const Params_TechMap& P, uint n_rounds)
+void techMap(Gig& N, const Params_TechMap& P, uint n_rounds, WMapX<GLit>* remap)
 {
     assert(n_rounds >= 1);
     Vec<Params_TechMap> Ps;
     for (uind i = 0; i < n_rounds; i++)
         Ps.push(P);
-    techMap(N, Ps);
+    techMap(N, Ps, remap);
 }
 
 

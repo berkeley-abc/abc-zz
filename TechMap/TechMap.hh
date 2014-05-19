@@ -66,8 +66,8 @@ struct Params_TechMap {
 };
 
 
-void techMap(Gig& N, const Vec<Params_TechMap>& Ps);
-void techMap(Gig& N, const Params_TechMap& P, uint n_rounds);
+void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap = NULL);
+void techMap(Gig& N, const Params_TechMap& P, uint n_rounds, WMapX<GLit>* remap = NULL);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

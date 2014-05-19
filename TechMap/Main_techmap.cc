@@ -19,6 +19,7 @@
 #include "ZZ_Unix.hh"
 #include "TechMap.hh"
 #include "GigReader.hh"
+#include "PostProcess.hh"
 
 using namespace ZZ;
 
@@ -185,6 +186,108 @@ void printStats(const Gig& N)
 }
 
 
+void mapWithSignals(Gig& N, const Params_TechMap& P, uint n_rounds, uint sig)
+{
+    WMapX<GLit> remap;
+    Gig N_orig;
+    N.copyTo(N_orig);
+
+    techMap(N, P, n_rounds, &remap);
+
+    if (sig == 2){      // -- 2 == 'pos' (no negative literals)     // <<== move this into mapper itself (as an option)?
+        double T0 = cpuTime();
+        uint n_luts = N.typeCount(gate_Lut6);
+        removeRemapSigns(N, remap);
+        removeInverters(N, &remap);
+        WriteLn "Inverter removal time: %t", cpuTime() - T0;
+        WriteLn "LUTs added: %_", N.typeCount(gate_Lut6) - n_luts;
+
+        For_Gates(N, w)
+            For_Inputs(w, v)
+                assert(!v.sign);
+    }
+
+    // Internal points verification -- turn combinational inputs into PIs and add POs to every internal point:
+    For_Gatetype(N_orig, gate_PO, w)
+        remove(w);
+    For_Gatetype(N, gate_PO, w)
+        remove(w);
+
+    /**/WSeen vs, ns;
+    For_Gates(N_orig, w){
+        if (w == gate_PI || w == gate_PO) continue;
+
+        if (isLogicGate(w)){
+            For_Inputs(w, v){
+                if (!isLogicGate(v) && v != gate_PI && v != gate_Const){
+                    Wire n = remap[v] + N; assert(+n); assert(n != gate_PI && n != gate_Const);
+                  #if 1
+                    /**/if (vs.has(v)) WriteLn "Duplicate in v: %_", v;
+                    /**/if (ns.has(n)) WriteLn "Duplicate in n: %_", n;
+                    /**/vs.add(v); ns.add(n);
+                    change(v, gate_PI);
+                    change(n, gate_PI);
+                    assert(v.num() == n.num());
+                  #endif
+                }
+            }
+        }else{
+            Wire m = remap[w] + N; assert(+m);
+            assert(w.size() == m.size());
+            for (uint i = 0; i < w.size(); i++){
+                if (!w[i]){ assert(!m[i]); continue; }
+                assert(m[i]);
+
+                if (!isLogicGate(w[i])) continue;
+
+                N_orig.add(gate_PO).init(w[i]);
+                N     .add(gate_PO).init(m[i]);
+            }
+        }
+    }
+
+    For_UpOrder(N_orig, w)
+        if (!isLogicGate(w) && w != gate_PI && w != gate_PO)
+            remove(w);
+
+    For_UpOrder(N, m)
+        if (!isLogicGate(m) && m != gate_PI && m != gate_PO)
+            remove(m);
+
+    For_Gates(N_orig, w)
+        For_Inputs(w, v){
+            /**/if (!(!v.isRemoved()))Dump(w);
+            assert(!v.isRemoved());
+        }
+
+    For_Gates(N, w)
+        For_Inputs(w, v)
+            assert(!v.isRemoved());
+
+    WriteLn "Signal tracking verificaton:";
+    WriteLn "  Transformed original: %_", info(N_orig);
+    WriteLn "  Transformed mapped  : %_", info(N);
+
+    uint count = 0;
+    Vec<GLit>& v = remap.base();
+    for (uint i = gid_FirstUser; i < v.size(); i++){
+        if (v[i] && isLogicGate(v[i] + N)){
+            count++;
+            N_orig.add(gate_PO).init(N_orig[i]);
+            N.add(gate_PO).init(v[i]);
+        }
+    }
+
+    WriteLn "  Signals retained: %_", count;
+
+    writeBlifFile("src.blif", N_orig);
+    WriteLn "Wrote: \a*src.blif\a*";
+
+    writeBlifFile("dst.blif", N);
+    WriteLn "Wrote: \a*dst.blif\a*";
+}
+
+
 int main(int argc, char** argv)
 {
     ZZ_Init;
@@ -195,6 +298,7 @@ int main(int argc, char** argv)
     cli.add("input"   , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
     cli.add("output"  , "string", "",           "Output GNL.", 1);
     cli.add("cec"     , "bool"  , "no"        , "Output files for equivalence checking.");
+    cli.add("sig"     , "{off,full,pos}","off", "[DEBUG] Map with signal tracking? (\"full\" includes negative literals).");
     cli.add("cost"    , "{unit, wire, mix}", "wire",
                                                 "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
     cli.add("mux-cost", "float" , "-1"        , "Cost of a mux; -1 means use default depending on 'cost'.");
@@ -255,7 +359,11 @@ int main(int argc, char** argv)
 
     // Map:
     double T0 = cpuTime();
-    techMap(N, P, n_rounds);
+    if (cli.get("sig").enum_val == 0)
+        techMap(N, P, n_rounds);
+    else
+        mapWithSignals(N, P, n_rounds, cli.get("sig").enum_val);
+
     if (!P.batch_output){
         printStats(N);
         WriteLn "CPU time: %t", cpuTime() - T0;

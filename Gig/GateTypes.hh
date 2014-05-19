@@ -230,7 +230,8 @@ macro bool isNumbered(GateType type) {
 
 #define gtm_Logic \
     ( GTM_(And) | GTM_(Xor) | GTM_(Mux) | GTM_(Maj) | GTM_(One) | GTM_(Gamb) | GTM_(Dot) | GTM_(Buf) | GTM_(Not) | GTM_(Or) \
-    | GTM_(Equiv) | GTM_(Conj) | GTM_(Disj) | GTM_(Even) | GTM_(Odd) | GTM_(Lut4) | GTM_(Npn4) | GTM_(Lut6) | GTM_(WLut) )
+    | GTM_(Equiv) | GTM_(Conj) | GTM_(Disj) | GTM_(Even) | GTM_(Odd) | GTM_(Lut4) | GTM_(Npn4) | GTM_(Lut6) | GTM_(WLut) \
+    | GTM_(F7Mux) | GTM_(F8Mux) )
 
 #define gtm_And  GTM_(And)
 #define gtm_Lut4 GTM_(Lut4)

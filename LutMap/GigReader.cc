@@ -214,7 +214,7 @@ void readGigForTechmap(String filename, Gig& N)
         }
     }
 
-    N.compact();
+    //N.compact();      // <<== disable this temporarily to test signal tracking
 }
 
 
