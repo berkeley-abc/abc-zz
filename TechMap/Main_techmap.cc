@@ -141,7 +141,7 @@ void readInput(String input, Gig& N)
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-void printStats(const Gig& N)
+void printStats(const Gig& N, float delay_fraction)
 {
     Vec<uint> sizeC(7, 0);
     WMap<uint> depth;
@@ -152,17 +152,16 @@ void printStats(const Gig& N)
 
         if (isCI(w))
             depth(w) = 0;
+        else if (w == gate_F7Mux || w == gate_F8Mux)
+            depth(w) = max_(depth[w[0]] + 1, max_(depth[w[1]], depth[w[2]]));
         else{
             uint d = 0;
             For_Inputs(w, v)
                 newMax(d, depth[v]);
-            if (isLogicGate(w)){
-                if (w == gate_Mux)
-                    depth(w) = d;
-                else
-                    depth(w) = d + 1;
-            }else if (w == gate_Delay)
-                depth(w) = d + w.arg();     // -- should use DELAY_FRACTION here
+            if (isLogicGate(w))
+                depth(w) = d + 1;
+            else if (w == gate_Delay)
+                depth(w) = d + w.arg() * delay_fraction;     // -- should use DELAY_FRACTION here
             else
                 depth(w) = d;
         }
@@ -365,7 +364,7 @@ int main(int argc, char** argv)
         mapWithSignals(N, P, n_rounds, cli.get("sig").enum_val);
 
     if (!P.batch_output){
-        printStats(N);
+        printStats(N, P.delay_fraction);
         WriteLn "CPU time: %t", cpuTime() - T0;
     }
 

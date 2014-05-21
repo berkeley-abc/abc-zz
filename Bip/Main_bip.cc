@@ -1366,7 +1366,7 @@ int main(int argc, char** argv)
             for (uint i = 0; i < properties.size(); i++)
                 properties[i].set(0, ~properties[i][0]);
         }
-        writeAigerFile(output, N);
+        writeAigerFile(output, N, Array<uchar>(), true);
         WriteLn "Wrote: \a*%_\a*", output;
 
     }else if (cli.cmd == "save-smv"){
@@ -1430,7 +1430,7 @@ int main(int argc, char** argv)
 
         // Write AIGER file:
         String aig_output = cli_abs.get("aig").string_val;
-        if (aig_output != "") writeAbstrAiger(N, abstr, aig_output, P.renumber, quiet);
+        if (aig_output != "" && aig_output != "-") writeAbstrAiger(N, abstr, aig_output, P.renumber, quiet);
         if (!quiet) writeResourceUsage(T0, Tr0);
 
     }else if (cli.cmd == "bmc"){

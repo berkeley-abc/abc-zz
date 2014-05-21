@@ -82,12 +82,9 @@ void removeInverters(Gig& N, WMapX<GLit>* remap, bool quiet)
                     // LUT has a signed fanout:
                     neg.add(v);
                 }else if (v == gate_Const){
-                    if (v == ~N.True())
-                        w.set(Input_Pin(v), N.False());
-                    else if (v == ~N.False())
-                        w.set(Input_Pin(v), N.True());
-                    else
-                        assert(false);
+                    if      (v == ~N.True ()) w.set(Input_Pin(v), N.False());
+                    else if (v == ~N.False()) w.set(Input_Pin(v), N.True());
+                    else                      assert(false);
                 }else{
                     // Non-LUT to non-LUT connection with inverters -- need to insert a inverter:
                     Wire u = N.add(gate_Lut6).init(+v);
