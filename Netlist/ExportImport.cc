@@ -486,6 +486,7 @@ bool writeAigerFile(String filename, NetlistRef N, Array<uchar> comment, bool ai
     return true;
 }
 
+
 void sortPOS(NetlistRef N, Vec<Wire>& os, Vec<Wire>& bs, Vec<Wire>& cs, Vec<Vec<Wire> >& js, Vec<Wire>& fcs, bool aiger_1_9)
 {
     WSeen propPOs;
@@ -1468,6 +1469,123 @@ void readSif(String filename, NetlistRef N, String* module_name, Vec<String>* li
     }
 
     removeAllUnreach(N);
+}
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// SIF writer:
+
+
+static
+char* sifLit(GLit w, Vec<char>& buf)
+{
+    buf.clear();
+    if (w.sign) buf.push('^');
+    buf.push('w');
+    pushf(buf, "%u", w.id);
+    buf.push(0);
+    return &buf[0];
+}
+
+
+void writeSif(Out& out, NetlistRef N)
+{
+    Get_Pob(N, flop_init);
+
+    Vec<char> buf, buf2, buf3;
+    uint undefC = 0;
+
+    // Header:
+    FWriteLn(out) "MODULE main;";
+    FWriteLn(out) "ZERO zero;";
+    FWriteLn(out) "%s = ^zero;", sifLit(N.True(), buf);
+    FWriteLn(out) "%s = zero;", sifLit(N.False(), buf);
+
+    // Logic:
+    Vec<gate_id> order;
+    upOrder(N, order);
+
+    for (uint i = 0; i < order.size(); i++){
+        Wire w = order[i] + N;
+        switch (type(w)){
+        case gate_PI:
+            FWriteLn(out) "INPUT %s;", sifLit(w, buf); break;
+        case gate_PO:
+            FWriteLn(out) "%s = %s;", sifLit(w, buf), sifLit(w[0], buf2); break;
+        case gate_Flop:{
+            cchar* init;
+            if      (flop_init[w] == l_True)  init = sifLit(N.True() , buf2);
+            else if (flop_init[w] == l_False) init = sifLit(N.False(), buf2);
+            else{ assert(flop_init[w] == l_Undef);
+                buf2.clear();
+                FWriteLn(out) "INPUT r%_;", undefC;
+                pushf(buf2, "r%u", undefC);
+                undefC++;
+                buf2.push(0);
+                init = &buf2[0];
+            }
+            FWriteLn(out) "STATE_PLUS %s [%s];", sifLit(w, buf), init;
+            break;}
+        case gate_And:
+            FWriteLn(out) "%s = %s & %s;", sifLit(w, buf), sifLit(w[0], buf2), sifLit(w[1], buf3); break;
+        default:
+            fprintf(stderr, "ERROR! Gate type not supported by SIF-writer (yet): %s\n", GateType_name[type(w)]);
+            exit(1);
+        }
+    }
+
+    // Close flops:
+    for (uint i = 0; i < order.size(); i++){
+        Wire w = order[i] + N;
+        if (type(w) == gate_Flop)
+            FWriteLn(out) "STATE_PLUS %s = %s;", sifLit(w, buf), sifLit(w[0], buf2);
+    }
+
+    // Properties:
+    if (Has_Pob(N, properties)){
+        Get_Pob2(N, properties, props);
+        for (uint i = 0; i < props.size(); i++)
+            FWriteLn(out) "TEST %s;", sifLit(props[i], buf);
+    }
+
+    if (Has_Pob(N, fair_properties)){
+        Get_Pob2(N, fair_properties , fairs);
+
+        for (uint i = 0; i < fairs.size(); i++){
+            Vec<GLit> ws;
+            append(ws, fairs[i]);
+            if (Has_Pob(N, fair_constraints)){
+                Get_Pob2(N, fair_constraints, fcons);
+                append(ws, fcons);
+            }
+
+            FWrite(out) "INFINITELY_OFTEN liveness_%_ ", i;
+            for (uint j = 0; j < ws.size(); j++){
+                if (j > 0) FWrite(out) " & ";
+                FWrite(out) "%s", sifLit(ws[j], buf);
+            }
+            FWriteLn(out) ";";
+        }
+    }
+
+    // Constraints:
+    if (Has_Pob(N, constraints)){
+        Get_Pob2(N, constraints, constrs);
+        for (uint i = 0; i < constrs.size(); i++)
+            FWriteLn(out) "CONSTRAINT %s;", sifLit(constrs[i], buf);
+    }
+
+    FWriteLn(out) "END;";
+}
+
+
+bool writeSifFile(String filename, NetlistRef N)
+{
+    OutFile out(filename);
+    if (out.null()) return false;
+
+    writeSif(out, N);
+    return true;
 }
 
 

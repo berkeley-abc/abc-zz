@@ -1067,6 +1067,7 @@ int main(int argc, char** argv)
     cli.addCommand("save-smv", "Convert input to SMV format.");
     cli.addCommand("save-gig", "Convert input to GIG format.", &cli_save_gig);
     cli.addCommand("save-aig", "Convert input to AIGER format.");
+    cli.addCommand("save-sif", "Convert input to SIF format.");
     cli.addCommand("info"    , "Show some netlist statistics.");
 
     // Command line -- PARSE!
@@ -1387,6 +1388,12 @@ int main(int argc, char** argv)
             nameByCurrentId(N);
         }
         N.write(output);
+        WriteLn "Wrote: \a*%_\a*", output;
+
+    }else if (cli.cmd == "save-sif"){
+        if (output == "")
+            output = setExtension(input, "sif");
+        writeSifFile(output, N);
         WriteLn "Wrote: \a*%_\a*", output;
 
     }else if (cli.cmd == "abs"){

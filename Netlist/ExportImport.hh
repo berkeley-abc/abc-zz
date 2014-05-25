@@ -51,6 +51,9 @@ void readBlif(String filename, NetlistRef N, bool expect_aig, bool store_names);
 void readSif(String filename, NetlistRef N, String* module_name = NULL, Vec<String>* liveness_names = NULL);
     // -- throws 'Excp_SifParseError' if the file could not be opened or on parse error.
 
+void writeSif(Out& out, NetlistRef N);
+bool writeSifFile(String filename, NetlistRef N);
+
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }
