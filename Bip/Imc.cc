@@ -281,7 +281,7 @@ lbool imcStd_(NetlistRef           N0,
             d++;
             if (bf_depth) newMax(*bf_depth, int(k + d));
 
-            if (par){
+            if (par && P.par_send_result){
                 assert(bf_depth);
                 String progress;
                 FWriteLn(progress) "trace-length: %_", k;

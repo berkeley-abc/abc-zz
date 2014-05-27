@@ -35,16 +35,18 @@ struct Params_ImcStd {
     bool    quant_claus;
     bool    spin;
     bool    quiet;
+    bool    par_send_result;
 
     Params_ImcStd() :
-        fwd           (true),
-        first_k       (0),
-        simplify_itp  (true),
-        prune_itp     (false),
-        simple_tseitin(false),
-        quant_claus   (false),
-        spin          (false),
-        quiet         (false)
+        fwd            (true),
+        first_k        (0),
+        simplify_itp   (true),
+        prune_itp      (false),
+        simple_tseitin (false),
+        quant_claus    (false),
+        spin           (false),
+        quiet          (false),
+        par_send_result(true)
     {}
 };
 

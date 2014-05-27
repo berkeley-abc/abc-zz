@@ -290,12 +290,14 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P, Cex* 
     Cex     cex;
     int     bug_free_depth;
 
-    Params_Treb P_treb;
-    Params_Pdr2 P_pdr2;
-    Params_Bmc  P_bmc;
+    Params_Treb   P_treb;
+    Params_Pdr2   P_pdr2;
+    Params_Bmc    P_bmc;
+    Params_ImcStd P_imc;
     P_treb.par_send_result = false;
     P_pdr2.par_send_result = false;
     P_bmc .par_send_result = false;
+    P_imc .par_send_result = false;
 
     lbool ret;
     switch (P.eng){
@@ -323,7 +325,7 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P, Cex* 
         break;
 
     case Params_Liveness::eng_Imc:
-        imcStd(N, props, Params_ImcStd(), &cex, Netlist_NULL, &bug_free_depth);
+        imcStd(N, props, P_imc, &cex, Netlist_NULL, &bug_free_depth);
         break;
 
     default: assert(false); }

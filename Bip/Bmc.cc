@@ -313,32 +313,6 @@ lbool lookaheadBmc(BmcTrace& T, const Params_Bmc& P, Cex* cex, int* bf_depth, Ne
 }
 
 
-#if 0
-        if (result == l_True){
-            if (!P.quiet) WriteLn "\a/|\a/ Done!  \a/|\a/  %>5%'D  %>5%'D  %>5%'D  \a/|\a/  %>6%^DB  %>8%t  \a/|\a/",
-                                  T.nClauses(), T.nVars(), T.nConflicts(), memUsed(), cpuTime() - cpu_time0;
-            if (!P.quiet) WriteLn "\a/========================================================\a/";
-            if (!P.quiet) WriteLn "Counterexample found.";
-            if (cex){
-                Vec<Vec<lbool> > pi, ff;
-                T.getModel(pi, ff);
-                translateCex(pi, ff, N0, *cex);
-                    // <<== PAR. Need to probe which properties have been violated here. Maybe exclude and go on?
-            }
-            return l_False;
-        }else if (result == l_False){
-            if (bf_depth)
-                *bf_depth = d;
-            if (par)
-                sendMsg_Progress(0, 1, (FMT "bug-free-depth: %_\n", d));
-            if (!T.force(~w_bad))       // -- returns FALSE if clausification timed out
-                return l_Undef;
-        }else{ assert(result == l_Undef);
-            return l_Undef;
-        }
-#endif
-
-
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Incremental BMC:
 
@@ -447,7 +421,7 @@ lbool bmc_(NetlistRef N0, const Vec<Wire>& props, const Params_Bmc& P, Cex* cex,
         }else if (result == l_False){
             if (bf_depth)
                 *bf_depth = d;
-            if (par)
+            if (par && P.par_send_result)
                 sendMsg_Progress(0, 1/*safety*/, (FMT "bug-free-depth: %_\n", d));
             if (!T.force(~w_bad))       // -- returns FALSE if clausification timed out
                 return l_Undef;
