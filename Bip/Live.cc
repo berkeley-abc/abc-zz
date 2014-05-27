@@ -278,9 +278,8 @@ lbool liveness(NetlistRef N0, uint fair_prop_no, const Params_Liveness& P, Cex* 
     }
 
     if (P.aig_output != ""){
-        WriteLn "AIGER writing not supported yet.";
-        //writeAigerFile(P.aig_output, N);    // <<== have to support AIGER 1.9 first...
-        //WriteLn "Wrote: \a*%_\a*", P.aig_output;
+        writeAigerFile(P.aig_output, N, Array<uchar>(), true);
+        WriteLn "Wrote: \a*%_\a*", P.aig_output;
     }
 
     // Run safety engine on conversion:
