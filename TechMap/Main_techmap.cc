@@ -111,6 +111,7 @@ void readInput(String input, Gig& N)
     }
 
     // Add missing 'gate_Seq's:
+#if 0
     {
         uint n_fixes = 0;
         For_Gates(N, w){
@@ -126,6 +127,7 @@ void readInput(String input, Gig& N)
         if (n_fixes > 0)
             WriteLn "Fixed %_ Box/Seq problems", n_fixes;
     }
+#endif
 
     double T1 = cpuTime();
     WriteLn "Parsing: %t", T1-T0;
@@ -335,6 +337,7 @@ int main(int argc, char** argv)
     cli.add("struct"  , "bool"  , "no"        , "Use structural mapping (mostly for debugging/comparison).");
     cli.add("un-and"  , "bool"  , "no"        , "Unmap to AND gates instead of richer set of gates.");
     cli.add("fmux"    , "bool"  , "no"        , "Use F7/F8 MUXes.");
+    cli.add("fmux-ff" , "bool"  , "no"        , "F7/F8 MUXes can feed flip-flops ('Seq' gate).");
     cli.add("slack"   , "{max} | float", "max", "Slack utilization. Smaller values means better average slack (but worse area).");
     cli.add("ela"     , "bool"  , "no"        , "Exact local area.");
     cli.add("batch"   , "bool"  , "no"        , "Output summary line at the end (for tabulation).");
@@ -351,6 +354,7 @@ int main(int argc, char** argv)
     P.struct_mapping   = cli.get("struct").bool_val;
     P.unmap_to_ands    = cli.get("un-and").bool_val;
     P.use_fmux         = cli.get("fmux").bool_val;
+    P.fmux_feeds_seq   = cli.get("fmux-ff").bool_val;
     P.exact_local_area = cli.get("ela").bool_val;
     P.batch_output     = cli.get("batch").bool_val;
     if (cli.get("slack").choice == 1)

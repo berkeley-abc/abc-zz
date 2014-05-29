@@ -43,6 +43,7 @@ struct Params_TechMap {
     bool        struct_mapping;     // -- if TRUE, FTBs are not used to reduce cuts (= mapping with structural cuts)
     bool        unmap_to_ands;      // -- if TRUE, XIG gates (XOR, MUX etc.) are turned into ANDs after unmapping.
     bool        use_fmux;           // -- enable F7/F8 MUXes for Xilinx series 7.
+    bool        fmux_feeds_seq;     // -- if FALSE, F7/F8 MUXes cannot feed a 'gate_Seq' (which would correspond to a FF, sharing the same resource).
     Vec<float>  lut_cost;           // -- Cost of LUTs of different sizes.
     float       mux_cost;           // -- Cost of F7/F8 MUXes.
     float       slack_util;         // -- How much slack to utilize in non-critical regions (small number means better average slack but worse area)
@@ -59,6 +60,7 @@ struct Params_TechMap {
         struct_mapping  (false),
         unmap_to_ands   (false),
         use_fmux        (false),
+        fmux_feeds_seq  (false),
         mux_cost        (1),                          // -- selector signal costs one (wire mode)
         slack_util      (FLT_MAX),
         exact_local_area(false),

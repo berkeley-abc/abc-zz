@@ -983,13 +983,14 @@ void TechMap::induceMapping(bool instantiate)
     fanouts.clear();
     mux_fanout.clear();
 
+    WSeen skip_f7;  // -- gates in this set will not be considered for F7MUX (they feed at least one 'Seq' gate)
+
     For_All_Gates_Rev(N, w){
         if (isCO(w)){
             active(w) = ACTIVE;
             if (P.slack_util != FLT_MAX)
                 depart(w) = max_(0.0f, (target_arrival - impl[DELAY][w[0]].arrival) - P.slack_util);
         }
-//<<==don't chose F7 if has Seq fanout
 
         if (!active[w]){
             depart(w) = FLT_MAX;    // <<== for now, give a well defined value to inactive nodes
@@ -1006,6 +1007,8 @@ void TechMap::induceMapping(bool instantiate)
                     if (impl[i][w].idx == CutImpl::NONE) continue;
                     if (impl[i][w].arrival <= req_time){
                         if (i == F7MUX){
+                            if (skip_f7.has(w))
+                                continue;
                             int j = impl[F7MUX][w].idx;
                             Cut cut = cutmap[w][j];
                             Wire w0, w1, w2;
@@ -1055,9 +1058,13 @@ void TechMap::induceMapping(bool instantiate)
                     float delay = (w != gate_Delay) ? 0.0f : w.arg() * P.delay_fraction;
                     For_Inputs(w, v){
                         active(v) = ACTIVE;
-                        /**/if (v == gate_Lut4 && v.arg() == 0xAAAA) Dump(2, w, v);
                         fanouts(v)++;
                         newMax(depart(v), depart[w] + delay);
+                    }
+
+                    if (w == gate_Seq && !P.fmux_feeds_seq){
+                        For_Inputs(w, v)
+                            skip_f7.add(v);
                     }
                 }
             }
