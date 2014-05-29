@@ -51,6 +51,7 @@ void shrinkAig(NetlistRef N, NetlistRef M, uint64& seed)
 
     WMap<Wire> n2m;
     n2m(N.True()) = M.True();
+    n2m(N.False()) = M.False();
 
     Vec<gate_id> order;
     removeUnreach(N, NULL, false);
@@ -68,6 +69,10 @@ void shrinkAig(NetlistRef N, NetlistRef M, uint64& seed)
                     m = s_And(n2m[w[0]] ^ sign(w[0]), n2m[w[1]] ^ sign(w[1]));
                 else
                     m = M.add(And_(), n2m[w[0]] ^ sign(w[0]), n2m[w[1]] ^ sign(w[1]));
+
+            }else if (type(w) == gate_Lut4){
+                m = M.add(Lut4_(), n2m[w[0]] ^ sign(w[0]), n2m[w[1]] ^ sign(w[1]), n2m[w[2]] ^ sign(w[2]), n2m[w[3]] ^ sign(w[3]));
+                attr_Lut4(m).ftb = attr_Lut4(w).ftb;
 
             }else if (type(w) == gate_PO)
                 m = M.add(PO_(), n2m[w[0]] ^ sign(w[0]));
@@ -104,7 +109,8 @@ void shrinkAig(NetlistRef N, NetlistRef M, uint64& seed)
                 m = M.True();
         }
 
-        /**/if (!+m) Dump(w, m);
+        /**/if (!(+m != Wire_NULL))Dump(w, pick);
+        /**/assert(+m != Wire_NULL);
         n2m(w) = m;
     }
 

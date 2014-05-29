@@ -107,7 +107,7 @@ void readGigForTechmap(String filename, Gig& N)
                 forAll(args, trimStr);
             }
 
-            // Create gate: 
+            // Create gate:
             Wire w;
             if (phase == 0){
                 if      (eq(gate, "Const")) w = N.True() ^ (attr[0] == '0');
@@ -235,7 +235,11 @@ bool writeGigForTechmap(String filename, Gig& N)
             FWrite(out) "(";
             for (uint i = 0; i < w.size(); i++){
                 if (i != 0) out += ", ";
-                if (w[i])
+                if (w[i] == N.True() || w[i] == ~N.False())
+                    FWrite(out) "1";
+                else if (w[i] == ~N.True() || w[i] == N.False())
+                    FWrite(out) "0";
+                else if (w[i])
                     FWrite(out) "%w", w[i].lit();
                 else
                     out += '-';

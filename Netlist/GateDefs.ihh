@@ -168,7 +168,7 @@ struct GateAttr_Lut4 : GateAttr<gate_Lut4, 4> {
         putc(out, toHex(ftb >> 12));
         putc(out, toHex((ftb >> 8) & 0xF));
         putc(out, toHex((ftb >> 4) & 0xF));
-        putc(out, toHex(ftb& 0xF)); }
+        putc(out, toHex(ftb & 0xF)); }
 
     void read(Str in) {
         if (in.size() > 4) throw Excp_AttrParseError();

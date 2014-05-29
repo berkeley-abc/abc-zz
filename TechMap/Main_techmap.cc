@@ -191,6 +191,17 @@ void mapWithSignals(Gig& N, const Params_TechMap& P, uint n_rounds, uint sig)
     Gig N_orig;
     N.copyTo(N_orig);
 
+    // Store signals that feed into non-logic (and check that they are remapped):
+    WZet sink_logic;
+    For_Gates(N, w){
+        if (!isTechmapLogic(w)){
+            For_Inputs(w, v){
+                if (isTechmapLogic(v)){
+                    sink_logic.add(+v); }
+            }
+        }
+    }
+
     techMap(N, P, n_rounds, &remap);
 
     if (sig == 2){      // -- 2 == 'pos' (no negative literals)     // <<== move this into mapper itself (as an option)?
@@ -204,6 +215,23 @@ void mapWithSignals(Gig& N, const Params_TechMap& P, uint n_rounds, uint sig)
         For_Gates(N, w)
             For_Inputs(w, v)
                 assert(!v.sign);
+    }
+
+    // Check that sinks are remapped:
+    for (uint i = 0; i < sink_logic.size(); i++){
+        Wire w = sink_logic[i] + N_orig;
+        if (!remap[w]){
+            ShoutLn "INTERNAL ERROR! Missing gate in remap: %f", w;
+            For_Gates(N_orig, w0){
+                if (!isTechmapLogic(w0)){
+                    For_Inputs(w0, v){
+                        if (+v == w)
+                            ShoutLn "  -- feeding: %f   (remapped to: %_)", w0, remap[w0];
+                    }
+                }
+            }
+            //assert(false);
+        }
     }
 
     // Internal points verification -- turn combinational inputs into PIs and add POs to every internal point:
@@ -220,14 +248,12 @@ void mapWithSignals(Gig& N, const Params_TechMap& P, uint n_rounds, uint sig)
             For_Inputs(w, v){
                 if (!isLogicGate(v) && v != gate_PI && v != gate_Const){
                     Wire n = remap[v] + N; assert(+n); assert(n != gate_PI && n != gate_Const);
-                  #if 1
                     /**/if (vs.has(v)) WriteLn "Duplicate in v: %_", v;
                     /**/if (ns.has(n)) WriteLn "Duplicate in n: %_", n;
                     /**/vs.add(v); ns.add(n);
                     change(v, gate_PI);
                     change(n, gate_PI);
                     assert(v.num() == n.num());
-                  #endif
                 }
             }
         }else{
@@ -255,13 +281,13 @@ void mapWithSignals(Gig& N, const Params_TechMap& P, uint n_rounds, uint sig)
 
     For_Gates(N_orig, w)
         For_Inputs(w, v){
-            /**/if (!(!v.isRemoved()))Dump(w);
+            /**/if (!(!v.isRemoved())) Dump(w);
             assert(!v.isRemoved());
         }
 
     For_Gates(N, w)
         For_Inputs(w, v)
-            assert(!v.isRemoved());
+            if (v.isRemoved()){ remove(w); break; }
 
     WriteLn "Signal tracking verificaton:";
     WriteLn "  Transformed original: %_", info(N_orig);

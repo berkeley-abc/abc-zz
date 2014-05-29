@@ -141,7 +141,8 @@ void removeInverters(Gig& N, WMapX<GLit>* remap, bool quiet)
         Vec<GLit>& r = remap->base();
         for (uint i = 0; i < r.size(); i++)
             if (flipped.has(r[i]))
-                r[i] = GLit_NULL;
+                r[i] = ~r[i];
+//              r[i] = GLit_NULL;
     }
 
     // Remove inverters on the input side of a LUT:

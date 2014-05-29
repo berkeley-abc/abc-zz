@@ -47,10 +47,7 @@ using namespace std;
 // Helpers:
 
 
-macro bool isLogic(Wire w) {
-    uint64 mask = GTM_(And) | GTM_(Xor) | GTM_(Mux) | GTM_(Maj) | GTM_(One) | GTM_(Gamb) | GTM_(Dot) | GTM_(Lut4);
-    return (1ull << w.type()) & mask;
-}
+macro bool isLogic(Wire w) { return isTechmapLogic(w); }
 
 
 macro uint countInputs(Wire w) {
@@ -320,6 +317,8 @@ class TechMap {
     uint                iter;
     float               target_arrival;
     WMap<uint>          fanouts;    // -- number of fanouts in the current induced mapping
+
+    WMapX<GLit>         bufmap;     // -- used if remap is non-NULL; internal remap required to handle buffer removal
 
     // Temporaries:
     Tmp                 tmp;
@@ -653,6 +652,20 @@ void TechMap::generateCuts(Wire w)
 
             cutmap(w) = dcuts.done(mem);
 
+#if 1   /*DEBUG*/
+            if (remap){
+                uint64 ftb = cutmap[w][0].ftb();
+                if (ftb == 0x0000000000000000ull)
+                    bufmap(w) = N.False();
+                else if (ftb == 0xFFFFFFFFFFFFFFFFull)
+                    bufmap(w) = N.True();
+                else if (ftb == 0x5555555555555555ull)
+                    bufmap(w) = bufmap[~N[cutmap[w][0][0]]];
+                else if (ftb == 0xAAAAAAAAAAAAAAAAull)
+                    bufmap(w) = bufmap[N[cutmap[w][0][0]]];
+            }
+#endif  /*END DEBUG*/
+
         }else
             prioritizeCuts(w, cutmap(w));
         break;}
@@ -976,6 +989,7 @@ void TechMap::induceMapping(bool instantiate)
             if (P.slack_util != FLT_MAX)
                 depart(w) = max_(0.0f, (target_arrival - impl[DELAY][w[0]].arrival) - P.slack_util);
         }
+//<<==don't chose F7 if has Seq fanout
 
         if (!active[w]){
             depart(w) = FLT_MAX;    // <<== for now, give a well defined value to inactive nodes
@@ -1169,17 +1183,23 @@ void TechMap::induceMapping(bool instantiate)
             if (isLogic(w))
                 remove(w);
 
+        if (remap){
+            // Apply bufmap first:
+            for (uint i = 0; i < remap->base().size(); i++)
+                remap->base()[i] = bufmap[remap->base()[i]];
+        }
+
         GigRemap m;
         N.compact(m);
-        if (remap)
+        if (remap){
             m.applyTo(remap->base());
 
-#if 0
+          #if 0     // -- no longer necessary
             removeMuxViolations(N, arrival, target_arrival, P.delay_fraction);
             WriteLn "  -- Legalizing MUXes by duplication, adding:  #Mux=%_   #Lut6=%_", N.typeCount(gate_F7Mux) - n_muxes, N.typeCount(gate_Lut6) - n_luts;
             N.compact();
+          #endif
         }
-#endif
     }
 
     For_Gates(N, w){
@@ -1342,6 +1362,11 @@ void TechMap::run()
     }
     cuts_enumerated = 0;
 
+    if (remap){
+        For_All_Gates(N, w)
+            bufmap(w) = w;
+    }
+
     // Map:
     Vec<gate_id> order;
     upOrderBfs(N, order);
@@ -1390,8 +1415,37 @@ static void compact(Gig& N, WMapX<GLit>& remap)
 
 void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
 {
-    if (remap)
+    // Add protectors for bad netlists:
+    Vec<uint> protectors;
+    {
+        Assure_Gob(N, FanoutCount);
+        For_Gates(N, w){
+            if (nFanouts(w) == 0 && !isCO(w)){
+                WriteLn "WARNING! Fanout-free non-combinational output: %_", w;
+                protectors.push(N.add(gate_PO).init(w).num());
+            }
+        }
+        if (protectors.size() > 0)
+            WriteLn "Protectors added: %_", protectors.size();
+    }
+
+    Vec<Trip<GLit,GLit,uint> > co_srcs;
+    if (remap){
         remap->initBuiltins();
+
+        WSeen seen;
+        For_Gates(N, w){
+            if (!isLogic(w)){
+                For_Inputs(w, v){
+                    if (isLogic(v) && !seen.has(v)){
+                        co_srcs.push(tuple(w, v, Iter_Var(v)));
+                        seen.add(v);
+                    }
+                }
+            }
+        }
+    }
+
 
     // Make sure netlist is topologically sorted:
     N.unstrash();
@@ -1446,6 +1500,25 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
         NewLine;
         WriteLn "Legalization..."; }
     removeInverters(N, remap, Ps.last().batch_output);
+
+    // Patch up remap from sources of combinational outputs:
+    if (remap){
+        for (uint i = 0; i < co_srcs.size(); i++){
+            Wire w = (*remap)[co_srcs[i].fst] + N; assert(+w);
+            Wire v = (*remap)[co_srcs[i].snd] + N;
+            uint pin = co_srcs[i].trd;
+            if (!+v || v.sign){
+                assert(!w[pin].sign);
+                (*remap)(+co_srcs[i].snd) = w[pin] ^ co_srcs[i].snd.sign;
+            }
+        }
+    }
+
+    // Remove protectors:
+    if (protectors.size() > 0){
+        for (uint i = 0; i < protectors.size(); i++)
+            remove(N(gate_PO, protectors[i]));
+    }
 }
 
 
@@ -1467,7 +1540,17 @@ void techMap(Gig& N, const Params_TechMap& P, uint n_rounds, WMapX<GLit>* remap)
 TODO:
 
  - try left->right shuffling of k-AND/XOR in unmapping, second time [left, right, random, (depth?)...]
- - signal tracking?? (ouch); esp. across unmap
  - check memory behavior
  - ban F7/F8 feeding Seq?
+*/
+
+
+
+/*
+- Investigate whether TechMap is losing signals feeding COs
+- Implement restriction on F7/F8 muxes feeding 'Seq' gates (for both mappers).
+- Exact-Local-Area optimization.
+
+- Delay box relative to FMAX?
+- Multi-input/output delay box?
 */
