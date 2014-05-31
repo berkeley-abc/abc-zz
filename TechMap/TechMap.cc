@@ -799,11 +799,28 @@ bool TechMap::tryRef(uint depth)
     // For now, try every combination always:
     bool success = false;
     for (uint k = 0; k < cuts.size(); k++){
+#if 0
+        /**/int sel;
         /**/if (depth > 2){
-        /**/    if (k == 0) k = impl[DELAY][w].idx;
+        /**/    if (k == 0) sel = impl[DELAY][w].idx;
         /**/    else break;
-        /**/}
-        Cut c = cuts[k]; assert(c.size() <= 6);
+        /**/}else sel = k;
+#else
+        int sel;
+        if (depth < 2)
+            sel = k;
+        else if (depth < 4){
+            if (k < 4) sel = k;
+            else break;
+        }else{
+            if (k == 0) sel = impl[DELAY][w].idx;
+            else break;
+        }
+        if (sel == CutImpl::NONE)
+            continue;
+#endif
+
+        Cut c = cuts[sel]; assert(c.size() <= 6);
         float cost = lutCost(w, c);
         if (acc_cost + cost >= acc_lim)
             continue;
@@ -837,7 +854,7 @@ bool TechMap::tryRef(uint depth)
 
         if (tryRef(depth + 1)){
             // New best implementation; store it:
-            impl[AREA](w).idx = k;
+            impl[AREA](w).idx = sel;
             active(w) = AREA + FIRST_CUT;
             success = true;
         }
@@ -1103,7 +1120,7 @@ void TechMap::induceMapping(bool instantiate)
     }
 
     /**/For_Gates(N, w) assert(!active[w] || !isLogic(w) || (fanouts[w] > 0 && active[w] >= FIRST_CUT));
-    /**/if (iter != 0)
+    //**/if (iter != 0)
     //**/if (iter == P.n_iters - 1)
     exactLocalArea();
 
