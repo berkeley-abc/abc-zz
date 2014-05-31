@@ -1103,8 +1103,8 @@ void TechMap::induceMapping(bool instantiate)
     }
 
     /**/For_Gates(N, w) assert(!active[w] || !isLogic(w) || (fanouts[w] > 0 && active[w] >= FIRST_CUT));
-    //**/if (iter != 0)
-    /**/if (iter == P.n_iters - 1)
+    /**/if (iter != 0)
+    //**/if (iter == P.n_iters - 1)
     exactLocalArea();
 
 #if 0   /*DEBUG*/
@@ -1565,8 +1565,10 @@ void techMap(Gig& N, const Params_TechMap& P, uint n_rounds, WMapX<GLit>* remap)
 {
     assert(n_rounds >= 1);
     Vec<Params_TechMap> Ps;
-    for (uind i = 0; i < n_rounds; i++)
+    for (uind i = 0; i < n_rounds; i++){
         Ps.push(P);
+        /**/if (i != n_rounds-1) Ps.last().exact_local_area = false;
+    }
     techMap(N, Ps, remap);
 }
 
