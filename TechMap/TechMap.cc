@@ -348,8 +348,9 @@ class TechMap {
     float       acc_lim;
     Vec<GLit>   undo;
 
-    WMap<float> arrival;            // -- only used during ELA; elsewhere 'impl' is used.
+    WMap<float>   arrival;            // -- only used during ELA; elsewhere 'impl' is used.
     IdHeap<float> Q;
+    WZet          depQ;
 
     bool deref(GLit w);
     void undoDeref();
@@ -770,12 +771,11 @@ void TechMap::ref(GLit w)
         //*E*/WriteLn "ref:ing %_", v + N;
         fanouts(v)++;
         if (fanouts[v] == 1){
-            depart(v) = 0.0f;       // -- otherwise FLT_MAX for inactive nodes
+            depart(v) = 0.0f;
             ref(v);
         }
-        /**/if (!(depart[w] != FLT_MAX)) Dump(w);
+        newMax(arrival(w), arrival[v] + 1.0f);      // -- new implementation may  be slower
         assert(depart[w] != FLT_MAX);
-        newMax(depart(v), depart[w] + 1.0f);    // <<== f7 here too
     }
 }
 
@@ -794,11 +794,12 @@ bool TechMap::tryRef(uint depth)
 
     uint added[6];
     uint added_sz;
+    float old_dep[6];
 
     // For now, try every combination always:
     bool success = false;
     for (uint k = 0; k < cuts.size(); k++){
-        /**/if (depth > 1){
+        /**/if (depth > 2){
         /**/    if (k == 0) k = impl[DELAY][w].idx;
         /**/    else break;
         /**/}
@@ -811,7 +812,7 @@ bool TechMap::tryRef(uint depth)
         bool meets_timing = true;
         for (uint i = 0; i < c.size(); i++){
             Wire v = c[i] + N;
-            if (arrival[v] + depart[w] > target_arrival){
+            if (arrival[v] + depart[w] + 1.0f > target_arrival){
                 meets_timing = false;
                 break; }
         }
@@ -823,25 +824,28 @@ bool TechMap::tryRef(uint depth)
         added_sz = 0;
         for (uint i = 0; i < c.size(); i++){
             Wire v = c[i] + N;
+
+            old_dep[i] = depart[v];
+            newMax(depart(v), depart[w] + 1.0f);
+
             //*E*/WriteLn "    <<working on cut #%_,  fanouts[%_]=%_  inQ=%_>>  for %_", k, v, fanouts[v], Q.has(v.id), w;
             if (fanouts[v] == 0 && !Q.has(v.id)){
-                //<<== uppdatera departure här (och återställ efter rekursion nedan)
                 Q.add(v.id);     // <<== could add up conservative costs for inputs and abort earlier
                 added[added_sz++] = v.id;
             }
         }
 
-        //*E*/Wire w_try = (Q.size() > 0) ? Q.peek() + N : Wire_NULL;
         if (tryRef(depth + 1)){
             // New best implementation; store it:
             impl[AREA](w).idx = k;
             active(w) = AREA + FIRST_CUT;
-            //*E*/Write "  sel[%_] = %_  -- cut:", w, k;
-            //*E*/for (uint i = 0; i < c.size(); i++) Write " %_", c[i] + N; NewLine;
             success = true;
-            //*E*/WriteLn "  success with: %_", w_try;
         }
-        //*E*/else WriteLn "  failure with: %_", w_try;
+
+        for (uint i = c.size(); i > 0;){ i--;
+            Wire v = c[i] + N;
+            depart(v) = old_dep[i];
+        }
 
         for (uint i = 0; i < added_sz; i++)
             if (Q.has(added[i]))
@@ -853,7 +857,6 @@ bool TechMap::tryRef(uint depth)
     if (!success)
         Q.weakAdd(w.id);
 
-    //*E*/WriteLn "triedRef(depth=%_) -- Q.size()=%_   w=%_  ==>>  success=%_", depth, Q.size(), w, success;
     return success;
 }
 
@@ -925,6 +928,34 @@ void TechMap::exactLocalArea()
                     //*E*/WriteLn "[Found better solution: %_]", acc_lim;
                     undo.clear();
                     ref(w);
+
+                    // Update departure recursively:
+                    assert(depQ.size() == 0);
+                    depQ.add(w);
+                    for (uint q = 0; q < depQ.size(); q++){
+                        Wire w = depQ[q] + N;
+                        if (isLogic(w)){
+                            assert(active[w] >= FIRST_CUT);
+                            Cut cut = cutmap[w][impl[active[w] - FIRST_CUT][w].idx];
+
+                            for (uint i = 0; i < cut.size(); i++){
+                                Wire v = cut[i] + N;
+                                if (newMax(depart(v), depart[w] + 1.0f)){
+                                    depQ.add(v); }
+                            }
+
+                        }else{
+                            if (!isCI(w)){
+                                float delay = (w != gate_Delay) ? 0.0f : w.arg() * P.delay_fraction;
+                                For_Inputs(w, v){
+                                    assert(active[v]);
+                                    if (newMax(depart(v), depart[w] + delay))
+                                        depQ.add(v);
+                                }
+                            }
+                        }
+                    }
+                    depQ.clear();
                 }
                 while (Q.size() > 0) Q.pop();   // -- clear queue
             }else
@@ -1072,7 +1103,8 @@ void TechMap::induceMapping(bool instantiate)
     }
 
     /**/For_Gates(N, w) assert(!active[w] || !isLogic(w) || (fanouts[w] > 0 && active[w] >= FIRST_CUT));
-    /**/if (iter != 0)
+    //**/if (iter != 0)
+    /**/if (iter == P.n_iters - 1)
     exactLocalArea();
 
 #if 0   /*DEBUG*/
