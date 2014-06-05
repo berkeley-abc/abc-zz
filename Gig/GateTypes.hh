@@ -240,7 +240,7 @@ macro bool isNumbered(GateType type) {
 #define gtm_XigLogic (GTM_(And) | GTM_(Xor) | GTM_(Mux) | GTM_(Maj) | GTM_(One) | GTM_(Gamb) | GTM_(Dot))
 #define gtm_Strashed (GTM_(And) | GTM_(Xor) | GTM_(Mux) | GTM_(Maj) | GTM_(One) | GTM_(Gamb) | GTM_(Dot) | GTM_(Lut4))
 
-#define gtm_SI (GTM_(FF) | GTM_(PI) | GTM_(Clk) | GTM_(PPI) | GTM_(Const))
+#define gtm_SI (GTM_(FF) | GTM_(PI) | GTM_(Clk) | GTM_(PPI) | GTM_(Reset) | GTM_(Const))
 #define gtm_SO (GTM_(PO) | GTM_(SafeProp) | GTM_(SafeCons) | GTM_(FairProp) | GTM_(FairCons))
     // primary inputs and outputs for SEQUENTIAL netlists
 

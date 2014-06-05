@@ -76,6 +76,7 @@ void upOrderBfs(Gig& N, Vec<gate_id>& result)
 
     WMap<uint> ready(N, 0);
     For_All_Gates(N, w){
+        /**/if (!isCI(w) && w.size() == 0){ WriteLn "WARNING, bad combinational input: %_", w; result.push(w.id); }
         if (isCI(w))
             result.push(w.id);
         else{
@@ -97,6 +98,12 @@ void upOrderBfs(Gig& N, Vec<gate_id>& result)
                 result.push(v.id);
         }
     }
+
+#if 1   /*DEBUG*/
+    For_All_Gates(N, w)
+        if (ready[w] != w.size() && !isCI(w))
+            Dump(w, ready[w], w.size());
+#endif  /*END DEBUG*/
 
     N.is_frozen = was_frozen;
 }
@@ -529,6 +536,7 @@ void TechMap::bypassTrivialCutsets(Wire w)
     // If a buffer or a constant was detected during cut enumeration, replace input
     // with input of buffer or the constant that was detected:
     For_Inputs(w, v){
+        if (!isLogic(v)) continue;
         if (cutmap[v].size() == 1 && cutmap[v][0].size() <= 1){
             assert(cutmap[v][0].ftbSz() == 1);
             uint64 ftb = cutmap[v][0].ftb();
@@ -880,9 +888,6 @@ bool TechMap::tryRef(uint depth)
 
 void TechMap::exactLocalArea()
 {
-    //*E*/N.save("ela.gnl");
-    //*E*/For_Gates(N, w) WriteLn "depart[%_] = %_    active[%_] = %d", w, depart[w], w, active[w];
-
     // Recompute arrival times on the now induced mapping (including non-mapped nodes):
     arrival.clear();
     For_Gates(N, w){

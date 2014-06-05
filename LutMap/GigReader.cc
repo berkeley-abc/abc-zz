@@ -115,12 +115,16 @@ void readGigForTechmap(String filename, Gig& N)
                 else if (eq(gate, "PO"   )) w = N.add(gate_PO);
                 else if (eq(gate, "And"  )) w = N.add(gate_And);
                 else if (eq(gate, "FF"   )) w = N.add(gate_FF);
+                else if (eq(gate, "Flop" )) w = N.add(gate_FF);
                 else if (eq(gate, "FD01" )) w = N.addDyn(gate_Box, args.size());
+                else if (eq(gate, "Box"  )) w = N.addDyn(gate_Box, args.size());
                 else if (eq(gate, "Pin"  )) w = N.add(gate_Sel);
                 else if (eq(gate, "MemR" )) w = N.addDyn(gate_Delay, args.size(), delay_MemR);
                 else if (eq(gate, "MemW" )) w = N.addDyn(gate_Delay, args.size(), delay_MemW);
                 else if (eq(gate, "PadR" )) w = N.addDyn(gate_Delay, args.size(), delay_PadR);
                 else if (eq(gate, "PadW" )) w = N.addDyn(gate_Delay, args.size(), delay_PadW);
+                else if (eq(gate, "Seq"  )) w = N.add(gate_Seq);
+                else if (eq(gate, "Buf"  )) w = N.add(gate_Lut4, 0xAAAA);
                 else if (eq(gate, "Lut") || eq(gate, "Lut4") || eq(gate, "Loop")){
                     if (attr.size() != 4)
                         Throw(Excp_Msg) "[line %_] Invalid FTB, must be exactly four hexadecimal digits.", line_no;
