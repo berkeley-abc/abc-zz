@@ -47,7 +47,7 @@ struct Params_TechMap {
     Vec<float>  lut_cost;           // -- Cost of LUTs of different sizes.
     float       mux_cost;           // -- Cost of F7/F8 MUXes.
     float       slack_util;         // -- How much slack to utilize in non-critical regions (small number means better average slack but worse area)
-    bool        exact_local_area;   // -- Post-optimize induced mapping by peep-hole optimization.
+    bool        exact_local_area;   // -- Post-optimize induced mapping by peep-hole optimization. [no F7Mux support yet]
     bool        batch_output;       // -- print a one-line summary at the end of techmapping which can be used to produce tables
 
     Params_TechMap() :
@@ -61,7 +61,7 @@ struct Params_TechMap {
         unmap_to_ands   (false),
         use_fmux        (false),
         fmux_feeds_seq  (false),
-        mux_cost        (1),                          // -- selector signal costs one (wire mode)
+        mux_cost        (1),                        // -- selector signal costs one (wire mode)
         slack_util      (FLT_MAX),
         exact_local_area(false),
         batch_output    (false)
