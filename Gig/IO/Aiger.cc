@@ -297,6 +297,7 @@ void writeAiger(Out& out, const Gig& N, Array<uchar> comment)
         case gate_FF  : fs.push(w); break;
         case gate_PO  : os.push(w); break;
         case gate_And : as.push(w); break;
+        case gate_Seq : break;
         default: assert(false); }
     }
 
@@ -321,6 +322,7 @@ void writeAiger(Out& out, const Gig& N, Array<uchar> comment)
             out += '0', '\n';       // -- missing flops are constant 0
         else{
             Wire w0 = fs[i][0];
+            if (w0 == gate_Seq) w0 = w0[0] ^ w0.sign;
             out += n2a[w0] ^ uind(sign(w0)), '\n';
         }
     }

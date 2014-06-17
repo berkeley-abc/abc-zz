@@ -661,7 +661,6 @@ void TechMap::generateCuts(Wire w)
 
             cutmap(w) = dcuts.done(mem);
 
-#if 1   /*DEBUG*/
             if (remap){
                 uint64 ftb = cutmap[w][0].ftb();
                 if (ftb == 0x0000000000000000ull)
@@ -673,7 +672,6 @@ void TechMap::generateCuts(Wire w)
                 else if (ftb == 0xAAAAAAAAAAAAAAAAull)
                     bufmap(w) = bufmap[N[cutmap[w][0][0]]];
             }
-#endif  /*END DEBUG*/
 
         }else
             prioritizeCuts(w, cutmap(w));
@@ -1331,7 +1329,7 @@ void TechMap::printProgress(double T0)
         }
     }
 
-    // TEMPORAY <<==
+    // TEMPORARY <<==
     uint   len_count = 0;
     double len_total = 0.0;
     if (iter == P.n_iters - 1){
@@ -1430,7 +1428,14 @@ void TechMap::run()
 
     // Map:
     Vec<gate_id> order;
+#if 1
     upOrderBfs(N, order);
+#else
+    Vec<GLit> order_;
+    upOrder(N, order_);
+    for (uint i = 0; i < order_.size(); i++) order.push(order_[i].id);
+    order_.clear(true);
+#endif
 
     for (iter = 0; iter < P.n_iters; iter++){
         if (iter < P.recycle_iter)
@@ -1591,6 +1596,10 @@ void techMap(Gig& N, const Params_TechMap& P, uint n_rounds, WMapX<GLit>* remap)
         Ps.push(P);
         /**/if (i != n_rounds-1) Ps.last().exact_local_area = false;
     }
+    //**/WriteLn "DON'T FORGET TO REMOVE DELAY FACTOR HACK!";
+    //**/Ps[0].delay_factor = 1.2;
+    //**/Ps[1].delay_factor = 1.1;
+    //**/Ps[2].delay_factor = 1.0;
     techMap(N, Ps, remap);
 }
 
