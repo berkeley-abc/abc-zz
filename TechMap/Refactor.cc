@@ -17,6 +17,9 @@
 #include "ZZ/Generics/Sort.hh"
 #include "ZZ/Generics/Map.hh"
 
+//#define WRITE_DEBUG_FILES
+#define LAZY_OCCUR
+
 namespace ZZ {
 using namespace std;
 
@@ -77,7 +80,6 @@ void removeBuffers(Gig& N, WMapX<GLit>& remap)
     N.compact(m);
     m.applyTo(remap.base());
 
-    /**/N.save("N3.gnl"); WriteLn "Wrote: N3.gnl";
     assert(N.typeCount(gate_Buf) == 0);
 }
 
@@ -107,16 +109,20 @@ class Refactor {
     Vec<Pair<GLit,GLit> >                id2pair;           // -- convert 'pair_id' to the actual pair
     Vec<conj_id*>                        pair_occur;        // -- indexed by 'pair_id'; bounded by 'pair_n_occurs' (maps pair to conjunctions in which it occurs)
     Vec<uint>                            pair_occur_sz;     // -- size of vector pointed to by 'pair_occur_conjs'
+    Vec<uint>                            prio;              // -- for now, equivalent to 'pair_occur_sz' but will later include timing as well
     IdHeap<uint, true>                   Q;                 // -- return 'pair_id's
 
+    void addPairs();
     void combine(pair_id pid);
+
+    void checkQ();  // <<== DEBUG
 
 public:
     Refactor(Gig& N_, const WMap<uchar>& fanout_count_, GateType combinator_) :
         N(N_),
         fanout_count(fanout_count_),
         combinator(combinator_),
-        Q(pair_occur_sz)
+        Q(prio)
     {}
 
     void addConj(GLit w_top, const Vec<GLit>& conj);
@@ -156,13 +162,42 @@ void Refactor::addConj(GLit w_top, const Vec<GLit>& elems)
 }
 
 
+// Operates on member variable 'pairs'.
+void Refactor::addPairs()
+{
+    sort(pairs);
+    for (uint i = 0; i+1 < pairs.size();){
+        if (pairs[i].fst == pairs[i+1].fst){
+            uint j = i+1;
+            while (j < pairs.size() && pairs[i].fst == pairs[j].fst)
+                j++;
+
+            // Add '[i,j[' to pair maps:
+            pair_id pid = id2pair.size();
+            id2pair.push(pairs[i].fst);
+            pair2id.set(pairs[i].fst, pid);
+            conj_id* cs = pair_mem.alloc(j - i);
+            for (uint n = 0; n < j - i; n++)
+                cs[n] = pairs[i + n].snd;
+            pair_occur.push(cs);
+            pair_occur_sz.push(j - i);
+            prio.push(j - i);
+            Q.add(pid);
+
+            i = j;
+        }else
+            i++;
+    }
+    pairs.clear(true);
+}
+
+
 void Refactor::combine(pair_id pid)
 {
     GLit x[2];
     x[0] = id2pair[pid].fst;
     x[1] = id2pair[pid].snd;
     Wire w = N.add(combinator).init(x[0], x[1]);
-    //**/WriteLn "  %_ = combine(%_, %_)", w, x[0], x[1];
 
     for (uint n = 0; n < pair_occur_sz[pid]; n++){
         conj_id cid = pair_occur[pid][n];
@@ -170,6 +205,16 @@ void Refactor::combine(pair_id pid)
         // Remove 'x' and 'y' from conjunction:
         ushort& sz = conj_sz[cid];
         GLit*   c  = conj[cid];
+      #if defined(LAZY_OCCUR)
+        uint x0_occ = 0, x1_occ = 0;
+        for (uint i = 0; i < sz; i++){
+            if (c[i] == x[0]) x0_occ++;
+            if (c[i] == x[1]) x1_occ++;
+        }
+        if (x0_occ != 1 || x1_occ != 1)
+            continue;
+      #endif
+
         ushort  orig_sz = sz;
         for (uint i = 0; i < sz;){
             if (c[i] == x[0] || c[i] == x[1]){
@@ -186,11 +231,14 @@ void Refactor::combine(pair_id pid)
                 GLit u = c[i], v = x[j];
                 if (u > v) swp(u, v);
                 pair_id pid_gone;
-                if (pair2id.peek(tuple(u, v), pid_gone)){
+                if (pair2id.peek(tuple(u, v), pid_gone)){   // <<== better: if in 'Q' (which should entail in 'pair2id')
                     // Remove 'cid' from 'pair_occur[pid_gone]' (which will decrease 'pair_occur_sz', so perculate or remove from 'Q'):
+                    assert(pid_gone != pid);
+
+                  #if !defined(LAZY_OCCUR)
                     uint&    p_sz = pair_occur_sz[pid_gone];
                     conj_id* p    = pair_occur   [pid_gone];
-                    for (uint k = 0; k < p_sz; k++){
+                    for (uint k = 0; k < p_sz; k++){        // <<== maybe leave it in here to avoid quadratic behavior, then allow pairs not to be found in search above?
                         if (p[k] == cid){
                             p_sz--;
                             p[k] = p[p_sz];
@@ -199,57 +247,79 @@ void Refactor::combine(pair_id pid)
                     }
                     assert(false);
                   Found:;
+                  #endif
 
-                    if (p_sz < 2)
-                        Q.exclude(pid_gone);
-                    else
-                        Q.update(pid_gone);
+                    prio[pid_gone]--;
+                    if (prio[pid_gone] < 2) Q.exclude(pid_gone);
+                    else                    Q.update(pid_gone);
                 }
             }
         }
 
+        // Push new pairs involving 'w' on buffer:
+        for (uint i = 0; i < sz; i++){
+            if (c[i] < w.lit()) pairs.push(tuple(tuple(c[i], w), cid));
+            else          pairs.push(tuple(tuple(w, c[i]), cid));
+        }
+
         // Add 'w' to conjunction:
         c[sz++] = w;
-
-        // Push new pairs involving 'w' on buffer:
     }
 
     // Keep new pairs in buffer with occurance >= 2:
+    addPairs();
+}
+
+
+void Refactor::checkQ()
+{
+    WriteLn "-------------------------------------------------------------------------------";
+    for (uint i = 0; i < conj.size(); i++){
+        WriteLn "%_ = conj[%_] = %_", top[i], i, Array_new(conj[i], conj_sz[i]);
+    }
+    WriteLn "-------------------------------------------------------------------------------";
+
+    const Vec<pair_id>& pids = Q.base();
+    for (uint n = 0; n < pids.size(); n++){
+        pair_id pid = pids[n];
+        GLit x = id2pair[pid].fst;
+        GLit y = id2pair[pid].snd;
+
+        for (uint i = 0; i < pair_occur_sz[pid]; i++){
+            conj_id cid = pair_occur[pid][i];
+            ushort& sz = conj_sz[cid];
+            GLit*   c  = conj[cid];
+
+            uint x_occ = 0, y_occ = 0;
+            for (uint j = 0; j < sz; j++){
+                if (c[j] == x) x_occ++;
+                if (c[j] == y) y_occ++;
+            }
+
+            if (!(x_occ == 1 && y_occ == 1)){
+                Dump(x, y);
+                Dump(x_occ, y_occ);
+                Write "c:";
+                for (uint i = 0; i < sz; i++)
+                    Write " %_", c[i];
+                NewLine;
+                assert(false);
+            }
+        }
+    }
 }
 
 
 void Refactor::run()
 {
     // Populate pair data structures:
-    sort(pairs);
     /**/WriteLn "Total number of pairs: %_", pairs.size();
-    for (uint i = 0; i+1 < pairs.size();){
-        if (pairs[i].fst == pairs[i+1].fst){
-            uint j = i+1;
-            while (j < pairs.size() && pairs[i].fst == pairs[j].fst)
-                j++;
-
-            // Add '[i,j[' to pair maps:
-            pair_id pid = id2pair.size();
-            id2pair.push(pairs[i].fst);
-            pair2id.set(pairs[i].fst, pid);
-            conj_id* cs = pair_mem.alloc(j - i);
-            for (uint n = 0; n < j - i; n++)
-                cs[n] = pairs[i + n].snd;
-            pair_occur.push(cs);
-            pair_occur_sz.push(j - i);
-            Q.push(pid);
-
-            i = j;
-        }else
-            i++;
-    }
-    pairs.clear(true);
-    Q.heapify();
+    addPairs();
     /**/WriteLn "Duplicated pairs: %_", id2pair.size();
 
     // Create shared part of conjunctions from pairs:
     while (Q.size() > 0)
+        //**/checkQ(),
         combine(Q.pop());
 
     // Add singleton nodes to conjunctions:
@@ -260,17 +330,14 @@ void Refactor::run()
         assert(c.size() > 0);
         if (c.size() == 1){
             change(w, gate_Buf).init(c[0]);
-            //**/WriteLn "  buf(%_) = %_", w, c[0];
         }else{
             // <<== do this timing aware
             vecCopy(c, leaves);
             for (uint i = 0; i < leaves.size() - 2; i += 2){
                 leaves.push(N.add(combinator).init(leaves[i], leaves[i+1]));
-                //**/WriteLn "  %_ = finalize(%_, %_)", leaves[i], leaves[i+1], leaves.last();
             }
             w.set(0, leaves[LAST-1]);
             w.set(1, leaves[LAST]);
-            //**/WriteLn "  set(%_) = (%_, %_)", w, leaves[LAST-1], leaves[LAST];
         }
     }
 }
@@ -308,6 +375,7 @@ conj2: a | k l m
 
 void refactor(Gig& N)
 {
+    /**/WriteLn "Init. size: %_", info(N);
     /**/WriteLn "Set extraction...";
 
     // Params/inputs:
@@ -329,10 +397,12 @@ void refactor(Gig& N)
 
     Refactor R(N, fanout_count, gate_And);
 
+#if WRITE_DEBUG_FILES
     /**/N.save("N.gnl"); WriteLn "Wrote: N.gnl";
     /**/WriteLn "info: %_", info(N);
     /**/writeAigerFile("before.aig", N); WriteLn "Wrote: before.aig";
     /**/WriteLn "recycling: %_", N.isRecycling();
+#endif
 
     // Extract sets 
     WSeenS seen;
@@ -404,10 +474,17 @@ void refactor(Gig& N)
 
     /**/WriteLn "Refactoring...";
     R.run();
+#if WRITE_DEBUG_FILES
     /**/N.save("N2.gnl"); WriteLn "Wrote: N2.gnl";
+#endif
 
     removeBuffers(N, remap);
+#if WRITE_DEBUG_FILES
+    /**/N.save("N3.gnl"); WriteLn "Wrote: N3.gnl";
     /**/writeAigerFile("after.aig", N); WriteLn "Wrote: after.aig";
+#endif
+
+    /**/WriteLn "Final size: %_", info(N);
 }
 
 

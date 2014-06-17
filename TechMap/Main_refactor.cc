@@ -36,7 +36,12 @@ int main(int argc, char** argv)
     }
 
     N.compact();
+    double T0 = cpuTime();
     refactor(N);
+    double T1 = cpuTime();
+
+    WriteLn "CPU Time: %t", T1 - T0;
+    WriteLn "Mem used: %DB", memUsed();
 
     return 0;
 }
