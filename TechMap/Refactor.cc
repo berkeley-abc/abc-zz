@@ -231,7 +231,7 @@ void Refactor::combine(pair_id pid)
                 GLit u = c[i], v = x[j];
                 if (u > v) swp(u, v);
                 pair_id pid_gone;
-                if (pair2id.peek(tuple(u, v), pid_gone)){   // <<== better: if in 'Q' (which should entail in 'pair2id')
+                if (pair2id.peek(tuple(u, v), pid_gone)){
                     // Remove 'cid' from 'pair_occur[pid_gone]' (which will decrease 'pair_occur_sz', so perculate or remove from 'Q'):
                     assert(pid_gone != pid);
 
@@ -379,7 +379,7 @@ void refactor(Gig& N)
     /**/WriteLn "Set extraction...";
 
     // Params/inputs:
-    uint max_conj_size = 10;     // -- must be at least 3
+    uint max_conj_size = 100;     // -- must be at least 3
     WMapX<GLit> remap;      // <<== for now; this should be returned
     remap.initBuiltins();
 
@@ -450,7 +450,8 @@ void refactor(Gig& N)
                 if (conj.size() <= max_conj_size){
                     R.addConj(w, conj);
                 }else{
-                    // <<== sort elements on fanout number (decending order)
+                    sobSort(ordReverse(sob(conj, proj_lt(brack<uchar,GLit>(fanout_count)))));
+                        // -- sort 'conj' gates on decending fanout count
                     uint n_parts = (conj.size() + max_conj_size-1) / max_conj_size;
                     createBalancedTree(w, gate_And, n_parts, bal);
                     uint j = 0, c = 0;
