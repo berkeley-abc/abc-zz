@@ -12,12 +12,12 @@
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
+#include "Refactor.hh"
 #include "ZZ_Gig.IO.hh"
 #include "ZZ/Generics/IdHeap.hh"
 #include "ZZ/Generics/Sort.hh"
 #include "ZZ/Generics/Map.hh"
 
-//#define WRITE_DEBUG_FILES
 #define LAZY_OCCUR
 
 namespace ZZ {
@@ -44,6 +44,43 @@ void collectConjunction(Wire w, WSeenS& seen, const WMap<uchar>& fanout_count, /
 }
 
 
+static
+void collectBigXor_(Wire w, const WMap<uchar>& fanout_count, /*out*/Vec<GLit>& bigxor, bool& s)
+{
+    assert(w == gate_Xor);
+    assert(!w.sign);
+    for (uint i = 0; i < 2; i++){
+        if (w[i] != gate_Xor || fanout_count[w[i]] > 1)
+            bigxor.push(+w[i]);
+        else{
+            if (w[i].sign) s = !s;
+            collectBigXor_(+w[i], fanout_count, bigxor, s);
+        }
+    }
+}
+
+// Returns TRUE if 'w' should be negated.
+static
+bool collectBigXor(Wire w, const WMap<uchar>& fanout_count, /*out*/Vec<GLit>& bigxor)
+{
+    bool s = false;
+    collectBigXor_(w, fanout_count, bigxor, s);
+
+    sort(bigxor);
+    for (uint i = 0; i < bigxor.size()-1;){
+        if (bigxor[i] == bigxor[i+1]){
+            bigxor[i]   = GLit_NULL;
+            bigxor[i+1] = GLit_NULL;
+            i += 2;
+        }else
+            i++;
+    }
+    filterOut(bigxor, isNull<GLit>);
+
+    return s;
+}
+
+
 // Create balanced AND/XOR tree in place at node 'w'. Leaves are AND/XOR gates with no inputs.
 static
 void createBalancedTree(Wire w, GateType gtype, uint size, /*out*/Vec<GLit>& leaves)
@@ -67,13 +104,14 @@ static
 void removeBuffers(Gig& N, WMapX<GLit>& remap)
 {
     For_UpOrder(N, w){
-        if (w == gate_Buf)
-            remap(w) = remap[w[0]];
-
         For_Inputs(w, v)
             if (v == gate_Buf)
                 w.set(Iter_Var(v), v[0] ^ v.sign);
     }
+
+    For_Gates(N, w)     // -- this is redundant, but provides an extra check
+        if (w == gate_Buf)
+            remove(w);
 
     // Remove unreachable gates:
     GigRemap m;
@@ -89,9 +127,10 @@ void removeBuffers(Gig& N, WMapX<GLit>& remap)
 
 
 class Refactor {
-    Gig&               N;
-    const WMap<uchar>& fanout_count;        // -- saturated at 255.
-    const GateType     combinator;          // -- either 'gate_And' or 'gate_Xor'.
+    const Params_Refactor& P;
+    Gig&                   N;
+    const WMap<uchar>&     fanout_count;    // -- saturated at 255.
+    const GateType         combinator;      // -- either 'gate_And' or 'gate_Xor'.
 
     typedef uint conj_id;
     typedef uint pair_id;
@@ -115,10 +154,9 @@ class Refactor {
     void addPairs();
     void combine(pair_id pid);
 
-    void checkQ();  // <<== DEBUG
-
 public:
-    Refactor(Gig& N_, const WMap<uchar>& fanout_count_, GateType combinator_) :
+    Refactor(Gig& N_, const WMap<uchar>& fanout_count_, GateType combinator_, const Params_Refactor& P_) :
+        P(P_),
         N(N_),
         fanout_count(fanout_count_),
         combinator(combinator_),
@@ -238,7 +276,7 @@ void Refactor::combine(pair_id pid)
                   #if !defined(LAZY_OCCUR)
                     uint&    p_sz = pair_occur_sz[pid_gone];
                     conj_id* p    = pair_occur   [pid_gone];
-                    for (uint k = 0; k < p_sz; k++){        // <<== maybe leave it in here to avoid quadratic behavior, then allow pairs not to be found in search above?
+                    for (uint k = 0; k < p_sz; k++){
                         if (p[k] == cid){
                             p_sz--;
                             p[k] = p[p_sz];
@@ -271,55 +309,15 @@ void Refactor::combine(pair_id pid)
 }
 
 
-void Refactor::checkQ()
-{
-    WriteLn "-------------------------------------------------------------------------------";
-    for (uint i = 0; i < conj.size(); i++){
-        WriteLn "%_ = conj[%_] = %_", top[i], i, Array_new(conj[i], conj_sz[i]);
-    }
-    WriteLn "-------------------------------------------------------------------------------";
-
-    const Vec<pair_id>& pids = Q.base();
-    for (uint n = 0; n < pids.size(); n++){
-        pair_id pid = pids[n];
-        GLit x = id2pair[pid].fst;
-        GLit y = id2pair[pid].snd;
-
-        for (uint i = 0; i < pair_occur_sz[pid]; i++){
-            conj_id cid = pair_occur[pid][i];
-            ushort& sz = conj_sz[cid];
-            GLit*   c  = conj[cid];
-
-            uint x_occ = 0, y_occ = 0;
-            for (uint j = 0; j < sz; j++){
-                if (c[j] == x) x_occ++;
-                if (c[j] == y) y_occ++;
-            }
-
-            if (!(x_occ == 1 && y_occ == 1)){
-                Dump(x, y);
-                Dump(x_occ, y_occ);
-                Write "c:";
-                for (uint i = 0; i < sz; i++)
-                    Write " %_", c[i];
-                NewLine;
-                assert(false);
-            }
-        }
-    }
-}
-
-
 void Refactor::run()
 {
     // Populate pair data structures:
-    /**/WriteLn "Total number of pairs: %_", pairs.size();
+    if (!P.quiet) WriteLn "  - potentially shared pairs: %,d", pairs.size();
     addPairs();
-    /**/WriteLn "Duplicated pairs: %_", id2pair.size();
+    if (!P.quiet) WriteLn "  - actually shared pairs:    %,d", id2pair.size();
 
     // Create shared part of conjunctions from pairs:
     while (Q.size() > 0)
-        //**/checkQ(),
         combine(Q.pop());
 
     // Add singleton nodes to conjunctions:
@@ -344,7 +342,7 @@ void Refactor::run()
 
 
 /*
-(pair_id, conj_id); 
+(pair_id, conj_id);
 
 f*g: in conjs: 3 8 42 47...
 
@@ -373,123 +371,215 @@ conj2: a | k l m
 // Refactor -- extract sets:
 
 
-void refactor(Gig& N)
+// NOTE! 'remap' should be EMPTY; it will map old gates to new gates (or null).
+//
+void refactor(Gig& N, WMapX<GLit>& remap, const Params_Refactor& P)
 {
-    /**/WriteLn "Init. size: %_", info(N);
-    /**/WriteLn "Set extraction...";
-
-    // Params/inputs:
-    uint max_conj_size = 100;     // -- must be at least 3
-    WMapX<GLit> remap;      // <<== for now; this should be returned
-    remap.initBuiltins();
+    for (uint i = 0; i < N.size(); i++)
+        remap(GLit(i)) = GLit(i);
 
     // Prepare:
     N.is_frozen = false;
     N.unstrash();
     N.setRecycling(true);       // <<== try turning this off and remove 'aux' to see how memory/speed is affected
 
-    WMap<uchar> fanout_count(N, 0);
-    For_Gates(N, w)
-        // <<== kan ha vassare fanout_count genom att hoppas över 'w' som inte är av rätt type 'gate_And/Xor'
-        For_Inputs(w, v)
-            if (fanout_count[v] < 255)
-                fanout_count(v)++;
+    if (!P.quiet){
+        WriteLn "========== Refactoring ==========";
+        WriteLn "Input: %_", info(N);
+        NewLine;
+    }
 
-    Refactor R(N, fanout_count, gate_And);
+    for (uint phase = 0; phase < 2; phase++){
+        GateType gtype = (phase == 0) ? gate_And : gate_Xor;
+        uint orig_size = N.typeCount(gtype);
+        if (orig_size == 0)
+             continue;
 
-#if WRITE_DEBUG_FILES
-    /**/N.save("N.gnl"); WriteLn "Wrote: N.gnl";
-    /**/WriteLn "info: %_", info(N);
-    /**/writeAigerFile("before.aig", N); WriteLn "Wrote: before.aig";
-    /**/WriteLn "recycling: %_", N.isRecycling();
-#endif
+        if (!P.quiet){
+            if (gtype == gate_And)
+                WriteLn "Extracting ANDs...";
+            else
+                WriteLn "Extracting XORs...";
+        }
+        double T0 = cpuTime();
 
-    // Extract sets 
-    WSeenS seen;
-    WSeen  aux;
-    Vec<GLit> conj;
-    Vec<GLit> bal;
-    Vec<GLit> sub_conj;
-    For_DownOrder(N, w){
-        if (w != gate_And){
-            remap(w) = w;
+        // Count fanouts:
+        WMap<uchar> fanout_count(N, 0);
+        WMap<uchar> gtype_fanout_count(N, 0);       // -- only counts fanouts to gates of type 'gtype'
+        For_Gates(N, w){
+            For_Inputs(w, v)
+                if (fanout_count[v] < 255)
+                    fanout_count(v)++;
 
-        }else if (seen.has(w)){
-            assert(w == gate_And);
-            remove(w);
-
-        }else if (aux.has(w)){
-            /**/WriteLn "AUX: %_", w;       // <<==
-
-        }else{
-            remap(w) = w;
-
-            collectConjunction(w, seen, fanout_count, conj);
-            w.set(0, Wire_NULL);
-            w.set(1, Wire_NULL);
-
-            bool is_zero = false;
-            for (uint i = 0; i < conj.size(); i++){
-                if (seen.has(~conj[i])){
-                    is_zero = true;
-                    break;
-                }
+            if (w == gtype){
+                For_Inputs(w, v)
+                    if (gtype_fanout_count[v] < 255)
+                        gtype_fanout_count(v)++;
             }
+        }
 
-            if (is_zero){
-                // Constant:
-                change(w, gate_Buf);
-                w.set(0, ~N.True());
-            }else if (conj.size() == 0){
-                assert(false);
-            }else if (conj.size() == 1){
-                // Buffer:
-                change(w, gate_Buf);
-                w.set(0, conj[0]);
+        // Extract sets
+        Refactor R(N, gtype_fanout_count, gtype, P);
+
+        WSeenS seen;
+        WSeen  aux;
+        Vec<GLit> conj;
+        Vec<GLit> bal;
+        Vec<GLit> sub_conj;
+        For_DownOrder(N, w){
+            if (w != gtype) continue;
+
+            if (seen.has(w)){
+                remap(w) = GLit_NULL;
+                remove(w);
+
+            }else if (aux.has(w)){
+                assert(false);      // <<== this should never happen; when convinced of this, remove 'aux' altogether
+
             }else{
-                if (conj.size() <= max_conj_size){
-                    R.addConj(w, conj);
+                bool s = false;
+                if (gtype == gate_And){
+                    collectConjunction(w, seen, fanout_count, conj);
+                    assert(conj.size() != 0);
+                }else
+                    s = collectBigXor(w, fanout_count, conj);
+
+                if (s){     // -- will only happen if XORs are not normalized (which they are in after unmapping)
+                    Wire w2 = N.add(gtype);
+                    change(w, gate_Buf).init(w2);
+                    w = w2;
+                    /**/putchar('.'); fflush(stdout);
+                }
+
+                w.set(0, Wire_NULL);
+                w.set(1, Wire_NULL);
+
+                bool is_zero = false;
+                if (gtype == gate_And){
+                    for (uint i = 0; i < conj.size(); i++){
+                        if (seen.has(~conj[i])){
+                            is_zero = true;
+                            break;
+                        }
+                    }
+                }else
+                    is_zero = (conj.size() == 0);   // -- XOR(x, x) = FALSE
+
+                if (is_zero){
+                    // Constant:
+                    change(w, gate_Buf);
+                    w.set(0, ~N.True());
+                }else if (conj.size() == 1){
+                    // Buffer:
+                    change(w, gate_Buf);
+                    w.set(0, conj[0]);
                 }else{
-                    sobSort(ordReverse(sob(conj, proj_lt(brack<uchar,GLit>(fanout_count)))));
-                        // -- sort 'conj' gates on decending fanout count
-                    uint n_parts = (conj.size() + max_conj_size-1) / max_conj_size;
-                    createBalancedTree(w, gate_And, n_parts, bal);
-                    uint j = 0, c = 0;
-                    for (uint i = 0; i < bal.size(); i++){
-                        aux.add(bal[i]);
-                        for (; c < conj.size(); c += n_parts, j++){
-                            assert(j < conj.size());
-                            sub_conj.push(conj[j]); }
-                        R.addConj(bal[i], sub_conj);
-                        sub_conj.clear();
-                        c -= conj.size();
+                    if (conj.size() <= P.max_conj_size){
+                        R.addConj(w, conj);
+                    }else{
+                        sobSort(ordReverse(sob(conj, proj_lt(brack<uchar,GLit>(gtype_fanout_count)))));
+                            // -- sort 'conj' gates on decending fanout count
+                        uint n_parts = (conj.size() + P.max_conj_size-1) / P.max_conj_size;
+                        createBalancedTree(w, gtype, n_parts, bal);
+                        uint j = 0, c = 0;
+                        for (uint i = 0; i < bal.size(); i++){
+                            aux.add(bal[i]);
+                            for (; c < conj.size(); c += n_parts, j++){
+                                assert(j < conj.size());
+                                sub_conj.push(conj[j]); }
+                            R.addConj(bal[i], sub_conj);
+                            sub_conj.clear();
+                            c -= conj.size();
+                        }
                     }
                 }
-            }
 
-            for (uint i = 0; i < conj.size(); i++)
-                seen.exclude(conj[i]);
-            conj.clear();
+                for (uint i = 0; i < conj.size(); i++)
+                    seen.exclude(conj[i]);
+                conj.clear();
+            }
+        }
+
+        // Do actual refactoring:
+        double T1 = cpuTime();
+        if (!P.quiet)
+            WriteLn "Reconstruction...";
+
+        R.run();
+        removeBuffers(N, remap);
+        double T2 = cpuTime();
+
+        if (!P.quiet){
+            NewLine;
+            WriteLn "  Reduction:  %,d -> %,d gates   (%.2f %% of this gate type)", orig_size, N.typeCount(gtype), 100.0 * (orig_size - N.typeCount(gtype)) / orig_size;
+            WriteLn "  Runtime  :  %t", T2-T0;
+            WriteLn "    - extraction    : %t", T1-T0;
+            WriteLn "    - reconstruction: %t", T2-T1;
+            NewLine;
         }
     }
 
-    /**/WriteLn "Refactoring...";
-    R.run();
-#if WRITE_DEBUG_FILES
-    /**/N.save("N2.gnl"); WriteLn "Wrote: N2.gnl";
-#endif
-
-    removeBuffers(N, remap);
-#if WRITE_DEBUG_FILES
-    /**/N.save("N3.gnl"); WriteLn "Wrote: N3.gnl";
-    /**/writeAigerFile("after.aig", N); WriteLn "Wrote: after.aig";
-#endif
-
-    /**/WriteLn "Final size: %_", info(N);
+    if (!P.quiet){
+        WriteLn "Output: %_", info(N);
+        WriteLn "======== End Refactoring ========";
+        NewLine;
+    }
 }
 
 
 // <<== prova att expandera delade konjunktioner av storlek 2 och 3
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Coarsening:
+
+
+void introduceXorsAndMuxes(Gig& N)
+{
+    Bury_Gob(N, Strash);
+    Assure_Gob(N, FanoutCount);
+
+//    For_UpOrder(N, w){
+    For_DownOrder(N, w){
+        if (w.isRemoved()) continue;
+
+        Wire sel, d1, d0;
+        if (isMux(w, sel, d1, d0)){
+            Wire u = w[0]; assert(!u.isRemoved());
+            Wire v = w[1]; assert(!v.isRemoved());
+
+            if (d1 == ~d0){
+                // Change gate 'w' to 'sel ^ d0':
+                change(w, gate_Xor).init(sel, d0);
+            }else{
+                // Change gate 'w' to 'sel ? d1 : d0':      <<== do this fanout dependent!!
+                change(w, gate_Mux).init(sel, d1, d0);
+                if (nFanouts(u) == 0)             remove(u);
+                if (nFanouts(v) == 0 && +u != +v) remove(v);
+            }
+        }
+    }
+
+    // Normalize XORs:
+    WSeen flipped;
+    For_UpOrder(N, w){
+        For_Inputs(w, v)
+            if (flipped.has(v))
+                w.set(Iter_Var(v), ~v);
+
+        if (w == gate_Xor){
+            bool s = false;
+            for (uint i = 0; i < 2; i++){
+                if (w[i].sign){
+                    w.set(i, +w[i]);
+                    s = !s;
+                }
+            }
+            if (s)
+                flipped.add(w);
+        }
+    }
+}
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

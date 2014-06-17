@@ -13,6 +13,9 @@
 
 #ifndef ZZ__TechMap__Refactor_hh
 #define ZZ__TechMap__Refactor_hh
+
+#include "ZZ_Gig.hh"
+
 namespace ZZ {
 using namespace std;
 
@@ -20,7 +23,22 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-void refactor(Gig& N);
+struct Params_Refactor {
+    uint max_conj_size;
+    bool timing_aware;      // <<== ignored for now
+    bool quiet;
+
+    Params_Refactor() :
+        max_conj_size(100),
+        timing_aware(true),
+        quiet(false)
+    {}
+};
+
+
+void refactor(Gig& N, WMapX<GLit>& remap, const Params_Refactor& P);
+
+void introduceXorsAndMuxes(Gig& N);     // -- may be moved to Gig/StdLib...
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

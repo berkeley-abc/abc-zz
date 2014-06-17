@@ -48,6 +48,7 @@ struct Params_TechMap {
     float       mux_cost;           // -- Cost of F7/F8 MUXes.
     float       slack_util;         // -- How much slack to utilize in non-critical regions (small number means better average slack but worse area)
     bool        exact_local_area;   // -- Post-optimize induced mapping by peep-hole optimization. [no F7Mux support yet]
+    bool        refactor;
     bool        batch_output;       // -- print a one-line summary at the end of techmapping which can be used to produce tables
 
     Params_TechMap() :
@@ -64,6 +65,7 @@ struct Params_TechMap {
         mux_cost        (1),                        // -- selector signal costs one (wire mode)
         slack_util      (FLT_MAX),
         exact_local_area(false),
+        refactor        (false),
         batch_output    (false)
     {
         for (uint i = 0; i <= cut_size; i++)        // -- default LUT cost is "number of inputs" (wire mode)

@@ -21,6 +21,7 @@
 #include "ZZ/Generics/IdHeap.hh"
 #include "Unmap.hh"
 #include "PostProcess.hh"
+#include "Refactor.hh"
 
 #define ELA_GLOBAL_LIM 200      // -- if nodes costing mroe than this are dereferenced, MFFC is too big to consider
 
@@ -1554,7 +1555,19 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
             }
 
             NewLine;
-            WriteLn "Unmap: %_", info(N);
+            WriteLn "Unmap.: %_", info(N);
+
+            if (Ps[round].refactor /*hack*/&& round == 1){
+                Params_Refactor P;
+                P.quiet = true;
+                refactor(N, xlat, P);
+                if (remap){
+                    Vec<GLit>& v = remap->base();
+                    for (uint i = gid_FirstUser; i < v.size(); i++)
+                        v[i] = xlat[v[i]];
+                }
+                WriteLn "Refact: %_", info(N);
+            }
             NewLine;
         }
         TechMap map(N, Ps[round], remap);

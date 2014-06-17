@@ -340,6 +340,7 @@ int main(int argc, char** argv)
     cli.add("fmux-ff" , "bool"  , "no"        , "F7/F8 MUXes can feed flip-flops ('Seq' gate).");
     cli.add("slack"   , "{max} | float", "max", "Slack utilization. Smaller values means better average slack (but worse area).");
     cli.add("ela"     , "bool"  , "no"        , "Exact local area.");
+    cli.add("refact"  , "bool"  , "no"        , "Refactoring (applied after unmapping)..");
     cli.add("batch"   , "bool"  , "no"        , "Output summary line at the end (for tabulation).");
 
     cli.parseCmdLine(argc, argv);
@@ -356,6 +357,7 @@ int main(int argc, char** argv)
     P.use_fmux         = cli.get("fmux").bool_val;
     P.fmux_feeds_seq   = cli.get("fmux-ff").bool_val;
     P.exact_local_area = cli.get("ela").bool_val;
+    P.refactor         = cli.get("refact").bool_val;
     P.batch_output     = cli.get("batch").bool_val;
     if (cli.get("slack").choice == 1)
         P.slack_util = cli.get("slack").float_val;
