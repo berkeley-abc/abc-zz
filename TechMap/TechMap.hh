@@ -15,6 +15,7 @@
 #define ZZ__TechMap__TechMap_hh
 
 #include "ZZ_Gig.hh"
+#include "Unmap.hh"
 
 namespace ZZ {
 using namespace std;
@@ -48,7 +49,8 @@ struct Params_TechMap {
     float       mux_cost;           // -- Cost of F7/F8 MUXes.
     float       slack_util;         // -- How much slack to utilize in non-critical regions (small number means better average slack but worse area)
     bool        exact_local_area;   // -- Post-optimize induced mapping by peep-hole optimization. [no F7Mux support yet]
-    bool        refactor;
+    bool        refactor;           // -- refactor big-ANDs and big-XORs.
+    Params_Unmap unmap;             // -- options for unmapping
     bool        batch_output;       // -- print a one-line summary at the end of techmapping which can be used to produce tables
 
     Params_TechMap() :

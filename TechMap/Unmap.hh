@@ -23,7 +23,29 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 
-void unmap(Gig& N, WMapX<GLit>* remap = NULL);
+struct Params_Unmap {
+    bool shuffle;           // -- shuffle the inputs of a k-input AND/XOR before combining them 
+    bool try_share;         // -- prefer combining nodes "f*g" that already exists in the netlist
+    bool balanced;          // -- prefer combining original nodes before combined nodes.
+    bool depth_aware;       // -- only consider depth-optimal alternatives when combining nodes
+
+    void setOptions(uint v) {
+        shuffle     = v & 1;
+        try_share   = v & 2;
+        balanced    = v & 4;
+        depth_aware = v & 8;
+    }
+
+    Params_Unmap() :
+        shuffle(false),
+        try_share(true),
+        balanced(true),
+        depth_aware(true)
+    {}
+};
+
+
+void unmap(Gig& N, WMapX<GLit>* remap = NULL, const Params_Unmap& P = Params_Unmap());
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

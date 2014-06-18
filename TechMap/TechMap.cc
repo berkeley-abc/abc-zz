@@ -1542,7 +1542,7 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
     for (uint round = 0; round < Ps.size(); round++){
         if (round > 0){
             WMapX<GLit> xlat;
-            unmap(N, &xlat);
+            unmap(N, &xlat, Ps[round].unmap);
             N.unstrash();
             if (Ps[round].unmap_to_ands)
                 expandXigGates(N);
