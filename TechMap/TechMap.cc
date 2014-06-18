@@ -1540,7 +1540,8 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
     // Techmap:
     assert(Ps.size() >= 1);
     for (uint round = 0; round < Ps.size(); round++){
-        if (round > 0){
+        //if (round > 0)
+        {
             WMapX<GLit> xlat;
             unmap(N, &xlat, Ps[round].unmap);
             N.unstrash();
@@ -1557,7 +1558,7 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
             NewLine;
             WriteLn "Unmap.: %_", info(N);
 
-            if (Ps[round].refactor /*hack*/&& round == 1){
+            if (Ps[round].refactor /*hack*/&& round <= 1){  // <<== only apply in round 0?
                 Params_Refactor P;
                 P.quiet = true;
                 refactor(N, xlat, P);
@@ -1622,20 +1623,8 @@ void techMap(Gig& N, const Params_TechMap& P, uint n_rounds, WMapX<GLit>* remap)
 
 
 /*
-TODO:
+ - unmap in round 0 (to get rid of Lut4s) -- followed by coarsening? or is Unmap good enough
+   for coarsening?
 
- - try left->right shuffling of k-AND/XOR in unmapping, second time [left, right, random, (depth?)...]
- - check memory behavior
- - ban F7/F8 feeding Seq?
-*/
-
-
-
-/*
-- Investigate whether TechMap is losing signals feeding COs
-- Implement restriction on F7/F8 muxes feeding 'Seq' gates (for both mappers).
-- Exact-Local-Area optimization.
-
-- Delay box relative to FMAX?
-- Multi-input/output delay box?
+ - fix ELA for F7s (hard work)
 */

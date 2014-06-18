@@ -223,14 +223,22 @@ void unmap(Gig& N, WMapX<GLit>* remap, const Params_Unmap& PU)
     Params_Dsd P;
     P.use_kary = true;
 
+    WMap<uint> level(UINT_MAX);        // -- only used in depth-aware mode
+    if (PU.depth_aware){
+        For_Gates(N, w)
+            if (isCI(w))
+                level(w) = 0;
+    }
+
     WMapX<GLit> xlat;
     xlat.initBuiltins();
     Vec<GLit>   nodes;
     Vec<uchar>  prog;
-    WMap<uint>  level(UINT_MAX);        // -- only used in depth-aware mode
     For_Gates(N, w){
-        if (w == gate_Lut6 || w == gate_F7Mux || w == gate_F8Mux){      // <<== or just simply replace F7/F8 with Mux?
-            uint64 ftb_ = (w == gate_Lut6) ? ftb(w) : 0xD8D8D8D8D8D8D8D8ull;
+        if (w == gate_Lut6 || w == gate_Lut4 || w == gate_F7Mux || w == gate_F8Mux){
+            uint64 ftb_ = (w == gate_Lut6) ? ftb(w) :
+                          (w == gate_Lut4) ? (uint64)w.arg() | ((uint64)w.arg() << 16)  | ((uint64)w.arg() << 32)  | ((uint64)w.arg() << 48) :
+                          /*otherwise*/      0xD8D8D8D8D8D8D8D8ull;
             dsd6(ftb_, prog, P);
 
             // Replace LUT with 'prog':

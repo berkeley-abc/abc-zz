@@ -20,6 +20,7 @@
 #include "TechMap.hh"
 #include "GigReader.hh"
 #include "PostProcess.hh"
+#include "Refactor.hh"
 
 using namespace ZZ;
 
@@ -326,6 +327,7 @@ int main(int argc, char** argv)
     cli.add("output"  , "string", "",           "Output GNL.", 1);
     cli.add("cec"     , "bool"  , "no"        , "Output files for equivalence checking.");
     cli.add("sig"     , "{off,full,pos}","off", "[DEBUG] Map with signal tracking? (\"full\" includes negative literals).");
+    cli.add("pre-coarsen", "bool", "no"       , "[EXPERIMENTAL] Coarsen input before calling mapper (no signal tracking).");
     cli.add("cost"    , "{unit, wire, mix}", "wire",
                                                 "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
     cli.add("mux-cost", "float" , "-1"        , "Cost of a mux; -1 means use default depending on 'cost'.");
@@ -384,6 +386,9 @@ int main(int argc, char** argv)
     // Read input:
     Gig N;
     readInput(cli.get("input").string_val, N);
+
+    if (cli.get("pre-coarsen").bool_val)
+        introduceXorsAndMuxes(N);
 
     if (cli.get("cec").bool_val){
         writeBlifFile("src.blif", N);

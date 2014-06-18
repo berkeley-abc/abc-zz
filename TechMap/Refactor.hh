@@ -38,7 +38,8 @@ struct Params_Refactor {
 
 void refactor(Gig& N, WMapX<GLit>& remap, const Params_Refactor& P);
 
-void introduceXorsAndMuxes(Gig& N);     // -- may be moved to Gig/StdLib...
+void introduceXorsAndMuxes(Gig& N, uint fanout_lim = 2);
+    // -- may be moved to Gig/StdLib (only used in command line mode as part of parsing)
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

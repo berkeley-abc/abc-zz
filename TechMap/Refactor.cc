@@ -4,11 +4,11 @@
 //| Author(s)   : Niklas Een
 //| Module      : TechMap
 //| Description : Refactor big conjunctions and XORs
-//| 
+//|
 //| (C) Copyright 2013, The Regents of the University of California
 //|________________________________________________________________________________________________
 //|                                                                                  -- COMMENTS --
-//| 
+//|
 //|________________________________________________________________________________________________
 
 #include "Prelude.hh"
@@ -534,7 +534,8 @@ void refactor(Gig& N, WMapX<GLit>& remap, const Params_Refactor& P)
 // Coarsening:
 
 
-void introduceXorsAndMuxes(Gig& N)
+// 'fanout_lim' restricts when MUXes can be extracted.
+void introduceXorsAndMuxes(Gig& N, uint fanout_lim)
 {
     Bury_Gob(N, Strash);
     Assure_Gob(N, FanoutCount);
@@ -551,12 +552,12 @@ void introduceXorsAndMuxes(Gig& N)
             if (d1 == ~d0){
                 // Change gate 'w' to 'sel ^ d0':
                 change(w, gate_Xor).init(sel, d0);
-            }else{
+            }else if (nFanouts(u) <= fanout_lim && nFanouts(v) <= fanout_lim){
                 // Change gate 'w' to 'sel ? d1 : d0':      <<== do this fanout dependent!!
                 change(w, gate_Mux).init(sel, d1, d0);
-                if (nFanouts(u) == 0)             remove(u);
-                if (nFanouts(v) == 0 && +u != +v) remove(v);
             }
+            if (nFanouts(u) == 0)             remove(u);
+            if (nFanouts(v) == 0 && +u != +v) remove(v);
         }
     }
 
