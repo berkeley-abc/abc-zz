@@ -17,7 +17,7 @@
 #include "ZZ/Generics/IdHeap.hh"
 #include "ZZ/Generics/Sort.hh"
 #include "ZZ/Generics/Map.hh"
-#include "Techmap.hh"
+#include "TechMap.hh"
 
 #define LAZY_OCCUR
 
