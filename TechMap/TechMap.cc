@@ -1455,8 +1455,7 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
     // Techmap:
     assert(Ps.size() >= 1);
     for (uint round = 0; round < Ps.size(); round++){
-        //if (round > 0)
-        {
+        if (round > 0){
             WMapX<GLit> xlat;
             unmap(N, &xlat, Ps[round].unmap);
             N.unstrash();
