@@ -83,7 +83,7 @@ void readInput(String input, Gig& N)
     try{
         if (hasExtension(input, "aig")){
             readAigerFile(input, N, false);
-        }else if (hasExtension(input, "aig.gpg")){
+        }else if (hasExtension(input, "aig.gpg") || hasExtension(input, "gnl.gpg")){
             // Start GPG process:
             int pid;
             int io[3];
@@ -94,7 +94,10 @@ void readInput(String input, Gig& N)
             // Read file:
             File file(io[1], READ, false);
             In   in(file);
-            readAiger(in, N, false);
+            if (hasExtension(input, "aig.gpg"))
+                readAiger(in, N, false);
+            else
+                N.load(in);
             closeChildIo(io);
             waitpid(pid, NULL, 0);
 
