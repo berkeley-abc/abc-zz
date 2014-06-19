@@ -26,12 +26,12 @@ using namespace std;
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-// Helpers:
+// Timing:
 
 
 // NOTE! This function assumes 'delay_fraction' (for 'Delay' gates) is '1.0'.
-static
-void computeTiming(const Gig& N, WMap<uint>& arr, WMap<uint>& dep, WMap<uint>& len)
+static void computeTiming(const Gig& N, WMap<uint>& arr, WMap<uint>& dep, WMap<uint>& len) ___unused;
+static void computeTiming(const Gig& N, WMap<uint>& arr, WMap<uint>& dep, WMap<uint>& len)
 {
     arr.reserve(N.size());
     dep.reserve(N.size());
@@ -64,6 +64,22 @@ void computeTiming(const Gig& N, WMap<uint>& arr, WMap<uint>& dep, WMap<uint>& l
 }
 
 
+static void computeArrival(const Gig& N, WMap<uint>& arr)
+{
+    arr.reserve(N.size());
+
+    For_UpOrder(N, w){
+        if (isCI(w))
+            arr(w) = 0;
+        else{
+            uint del = isTechmapLogic(w) ? 1 : (w == gate_Delay) ? w.arg() : 0;
+            For_Inputs(w, v)
+                newMax(arr(w), arr[v] + del);
+        }
+    }
+}
+
+
 static
 uint computeDepth(const Gig& N)
 {
@@ -80,6 +96,10 @@ uint computeDepth(const Gig& N)
     }
     return depth;
 }
+
+
+//mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+// Helpers:
 
 
 static
@@ -440,23 +460,12 @@ void refactor(Gig& N, WMapX<GLit>& remap, const Params_Refactor& P)
     N.setRecycling(true);       // <<== try turning this off and remove 'aux' to see how memory/speed is affected
 
     WMap<uint> arr;
-    WMap<uint> dep;
-    WMap<uint> len;
-    computeTiming(N, arr, dep, len);
-    For_Gates(N, w)
-        len(w) = ~len[w];       // -- we use this as secondary prioriy; want to give preference to short lengths
+    computeArrival(N, arr);
 
     uint max_arr = 0;
     For_Gates(N, w)
         if (isCO(w))
             newMax(max_arr, arr[w]) ;
-#if 1   /*DEBUG*/
-    uint max_dep = 0;
-    For_Gates(N, w)
-        if (isCI(w))
-            newMax(max_dep, dep[w]) ;
-    assert(max_arr == max_dep);
-#endif  /*END DEBUG*/
 
     if (!P.quiet){
         WriteLn "========== Refactoring ==========";
@@ -495,7 +504,8 @@ void refactor(Gig& N, WMapX<GLit>& remap, const Params_Refactor& P)
         }
 
         // Extract sets
-        Refactor R(N, gtype_fanout_count, len, gtype, P);
+        For_Gates(N, w) arr(w) = ~arr[w];   // -- 'arr' is secondary priority, with preference to large numbers (so invert them to prioritize short delays when combining nodes)
+        Refactor R(N, gtype_fanout_count, arr, gtype, P);
 
         WSeenS seen;
         WSeen  aux;
