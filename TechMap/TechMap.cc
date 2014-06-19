@@ -77,7 +77,7 @@ void upOrderBfs(Gig& N, Vec<gate_id>& result)
 
     WMap<uint> ready(N, 0);
     For_All_Gates(N, w){
-        /**/if (!isCI(w) && w.size() == 0){ WriteLn "WARNING, bad combinational input: %_", w; result.push(w.id); }
+        /**/if (!isCI(w) && w.size() == 0){ WriteLn "WARNING! Bad combinational input: %_", w; result.push(w.id); }
         if (isCI(w))
             result.push(w.id);
         else{
@@ -1123,98 +1123,13 @@ void TechMap::induceMapping(bool instantiate)
         }
     }
 
-    /**/For_Gates(N, w) assert(!active[w] || !isLogic(w) || (fanouts[w] > 0 && active[w] >= FIRST_CUT));
-    //**/if (iter != 0)
-    //**/if (iter == P.n_iters - 1)
+    /*check*/For_Gates(N, w) assert(!active[w] || !isLogic(w) || (fanouts[w] > 0 && active[w] >= FIRST_CUT));
+
+    /**/if (iter == 1) target_arrival += 2;     // -- give ELA some slack in early iterations
+    /**/if (iter == 2) target_arrival += 1;
     exactLocalArea();
-
-#if 0   /*DEBUG*/
-    active.clear();
-    depart.clear();
-    fanouts.clear();
-    mux_fanout.clear();
-
-    For_All_Gates_Rev(N, w){
-        if (isCO(w)){
-            active(w) = ACTIVE;
-            if (P.slack_util != FLT_MAX)
-                depart(w) = max_(0.0f, (target_arrival - impl[DELAY][w[0]].arrival) - P.slack_util);
-        }
-
-        if (!active[w]){
-            depart(w) = FLT_MAX;    // <<== for now, give a well defined value to inactive nodes
-
-        }else{
-            if (isLogic(w)){
-                float req_time = target_arrival - depart[w];
-
-                uint  best_i    = UINT_MAX;
-                float best_area = FLT_MAX;
-
-                // Pick best implementation among current choices:
-                for (uint i = 0; i < impl.size(); i++){
-                    if (impl[i][w].idx == CutImpl::NONE) continue;
-                    if (impl[i][w].arrival <= req_time){
-                        if (i == F7MUX){
-                            int j = impl[F7MUX][w].idx;
-                            Cut cut = cutmap[w][j];
-                            Wire w0, w1, w2;
-                            muxInputs(N, cut, w0, w1, w2, true);
-                            if (mux_fanout[w] != GLit_NULL || mux_fanout[w1] != GLit_NULL || mux_fanout[w2] != GLit_NULL)
-                                continue;   // -- either feeding a F7 or fed by a LUT that feed a F7
-                        }
-                        if (newMin(best_area, impl[i][w].area_est))
-                            best_i = i;
-                    }
-                }
-
-                // For non-COs close to the outputs, required time may not be met:
-                if (best_i == UINT_MAX)
-                    best_i = DELAY;
-
-                uint j = impl[best_i][w].idx; assert(j < cutmap[w].size());
-                Cut cut = cutmap[w][j];
-
-                assert(j < 254);
-                active(w) = best_i + FIRST_CUT;
-
-                for (uint k = 0; k < cut.size(); k++){
-                    Wire v = cut[k] + N;
-                    //**/if (v == gate_Lut4 && v.arg() == 0xAAAA) Dump(w, v);
-                    active(v) = ACTIVE;
-                    fanouts(v)++;
-                }
-
-                if (best_i != F7MUX){
-                    for (uint k = 0; k < cut.size(); k++)
-                        newMax(depart(cut[k] + N), depart[w] + 1.0f);
-
-                }else{
-                    Wire w0, w1, w2;
-                    muxInputs(N, cut, w0, w1, w2, true);
-                    newMax(depart(w0), depart[w] + 1.0f);
-                    newMax(depart(w1), depart[w]);
-                    newMax(depart(w2), depart[w]);
-
-                    mux_fanout(w1) = w;   // -- mark fanin LUTs as "consumed" w.r.t. F7MUXes.
-                    mux_fanout(w2) = w;
-                }
-
-            }else{
-                if (!isCI(w)){
-                    float delay = (w != gate_Delay) ? 0.0f : w.arg() * P.delay_fraction;
-                    For_Inputs(w, v){
-                        active(v) = ACTIVE;
-                        /**/if (v == gate_Lut4 && v.arg() == 0xAAAA) Dump(2, w, v);
-                        fanouts(v)++;
-                        newMax(depart(v), depart[w] + delay);
-                    }
-                }
-            }
-        }
-    }
-#endif  /*END DEBUG*/
-
+    /**/if (iter == 1) target_arrival -= 2;
+    /**/if (iter == 2) target_arrival -= 1;
 
     if (instantiate){
         // Change AND gate into a LUT6 or MUX:
@@ -1558,10 +1473,11 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
             NewLine;
             WriteLn "Unmap.: %_", info(N);
 
-            if (Ps[round].refactor /*hack*/&& round <= 1){  // <<== only apply in round 0?
-                Params_Refactor P;
-                P.quiet = true;
-                refactor(N, xlat, P);
+            if (Ps[round].refactor /*hack*/&& round <= 1){      // -- apply refactoring only in round 0 and 1
+                Params_Refactor PR;
+                PR.quiet = true;
+                assert(Ps[round].delay_fraction == 1.0f);       // -- you cannot use refactoring code with a delay fraction different from 1 (due to its simplified timing model)
+                refactor(N, xlat, PR);
                 if (remap){
                     Vec<GLit>& v = remap->base();
                     for (uint i = gid_FirstUser; i < v.size(); i++)
@@ -1608,7 +1524,7 @@ void techMap(Gig& N, const Params_TechMap& P, uint n_rounds, WMapX<GLit>* remap)
     Vec<Params_TechMap> Ps;
     for (uind i = 0; i < n_rounds; i++){
         Ps.push(P);
-        /**/if (i != n_rounds-1) Ps.last().exact_local_area = false;
+        if (i != n_rounds-1) Ps.last().exact_local_area = false;    // -- ELA is best applied only in the last round
     }
     //**/WriteLn "DON'T FORGET TO REMOVE DELAY FACTOR HACK!";
     //**/Ps[0].delay_factor = 1.2;

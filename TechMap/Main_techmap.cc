@@ -324,11 +324,11 @@ int main(int argc, char** argv)
 
     // Setup commandline:
     cli.add("input"   , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
-    cli.add("output"  , "string", "",           "Output GNL.", 1);
+    cli.add("output"  , "string", "",           "Output GNL.");
     cli.add("cec"     , "bool"  , "no"        , "Output files for equivalence checking.");
     cli.add("sig"     , "{off,full,pos}","off", "[DEBUG] Map with signal tracking? (\"full\" includes negative literals).");
     cli.add("pre-coarsen", "bool", "no"       , "[EXPERIMENTAL] Coarsen input before calling mapper (no signal tracking).");
-    cli.add("cost"    , "{unit, wire, mix}", "wire",
+    cli.add("cost"    , "{unit, wire, mix}", "mix",
                                                 "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
     cli.add("mux-cost", "float" , "-1"        , "Cost of a mux; -1 means use default depending on 'cost'.");
     cli.add("rounds"  , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
@@ -341,8 +341,8 @@ int main(int argc, char** argv)
     cli.add("fmux"    , "bool"  , "no"        , "Use F7/F8 MUXes.");
     cli.add("fmux-ff" , "bool"  , "no"        , "F7/F8 MUXes can feed flip-flops ('Seq' gate).");
     cli.add("slack"   , "{max} | float", "max", "Slack utilization. Smaller values means better average slack (but worse area).");
-    cli.add("ela"     , "bool"  , "no"        , "Exact local area.");
-    cli.add("refact"  , "bool"  , "no"        , "Refactoring (applied after unmapping)..");
+    cli.add("ela"     , "bool"  , "yes"       , "Exact local area.");
+    cli.add("refact"  , "bool"  , "yes"       , "Refactoring (applied after unmapping)..");
     cli.add("unmap"   , "int[0:15]", "14"     , "Unmap options; see 'Unmap.hh'.");
     cli.add("batch"   , "bool"  , "no"        , "Output summary line at the end (for tabulation).");
 
@@ -365,6 +365,10 @@ int main(int argc, char** argv)
     P.batch_output     = cli.get("batch").bool_val;
     if (cli.get("slack").choice == 1)
         P.slack_util = cli.get("slack").float_val;
+
+    if (P.exact_local_area && P.use_fmux){
+        WriteLn "NOTE! Exact local area turned off when using F7 MUXes.";
+        P.use_fmux = false; }
 
     if (cli.get("cost").enum_val == 0){
         for (uint i = 0; i <= 6; i++)

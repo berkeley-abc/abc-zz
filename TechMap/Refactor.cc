@@ -17,6 +17,7 @@
 #include "ZZ/Generics/IdHeap.hh"
 #include "ZZ/Generics/Sort.hh"
 #include "ZZ/Generics/Map.hh"
+#include "Techmap.hh"
 
 #define LAZY_OCCUR
 
@@ -26,6 +27,59 @@ using namespace std;
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Helpers:
+
+
+// NOTE! This function assumes 'delay_fraction' (for 'Delay' gates) is '1.0'.
+static
+void computeTiming(const Gig& N, WMap<uint>& arr, WMap<uint>& dep, WMap<uint>& len)
+{
+    arr.reserve(N.size());
+    dep.reserve(N.size());
+    len.reserve(N.size());
+
+    For_UpOrder(N, w){
+        if (isCI(w))
+            arr(w) = 0;
+        else{
+            uint del = isTechmapLogic(w) ? 1 : (w == gate_Delay) ? w.arg() : 0;
+            For_Inputs(w, v)
+                newMax(arr(w), arr[v] + del);
+        }
+
+        dep(w) = 0;     // -- clear it, just to be safe
+    }
+
+    For_DownOrder(N, w){
+        if (!isCI(w)){
+            uint del = isTechmapLogic(w) ? 1 : (w == gate_Delay) ? w.arg() : 0;
+            For_Inputs(w, v)
+                newMax(dep(v), dep[w] + del);
+        }
+    }
+
+    For_Gates(N, w){
+        uint del = isTechmapLogic(w) ? 1 : (w == gate_Delay) ? w.arg() : 0;
+        len(w) = arr[w] + dep[w] - del;
+    }
+}
+
+
+static
+uint computeDepth(const Gig& N)
+{
+    WMap<uint> arr(N, 0);
+
+    uint depth = 0;
+    For_UpOrder(N, w){
+        if (!isCI(w)){
+            uint del = isTechmapLogic(w) ? 1 : (w == gate_Delay) ? w.arg() : 0;
+            For_Inputs(w, v)
+                newMax(arr(w), arr[v] + del);
+            newMax(depth, arr[w]);
+        }
+    }
+    return depth;
+}
 
 
 static
@@ -130,6 +184,7 @@ class Refactor {
     const Params_Refactor& P;
     Gig&                   N;
     const WMap<uchar>&     fanout_count;    // -- saturated at 255.
+    const WMap<uint>&      sec_prio;        // -- secondary priority (after pair occurance)
     const GateType         combinator;      // -- either 'gate_And' or 'gate_Xor'.
 
     typedef uint conj_id;
@@ -148,17 +203,18 @@ class Refactor {
     Vec<Pair<GLit,GLit> >                id2pair;           // -- convert 'pair_id' to the actual pair
     Vec<conj_id*>                        pair_occur;        // -- indexed by 'pair_id'; bounded by 'pair_n_occurs' (maps pair to conjunctions in which it occurs)
     Vec<uint>                            pair_occur_sz;     // -- size of vector pointed to by 'pair_occur_conjs'
-    Vec<uint>                            prio;              // -- for now, equivalent to 'pair_occur_sz' but will later include timing as well
-    IdHeap<uint, true>                   Q;                 // -- return 'pair_id's
+    Vec<Pair<uint,uint> >                prio;              // -- lexicographical: '(#pair-occur, sec-prio)'
+    IdHeap<Pair<uint,uint>, true>        Q;                 // -- return 'pair_id's
 
     void addPairs();
     void combine(pair_id pid);
 
 public:
-    Refactor(Gig& N_, const WMap<uchar>& fanout_count_, GateType combinator_, const Params_Refactor& P_) :
+    Refactor(Gig& N_, const WMap<uchar>& fanout_count_, const WMap<uint>& sec_prio_, GateType combinator_, const Params_Refactor& P_) :
         P(P_),
         N(N_),
         fanout_count(fanout_count_),
+        sec_prio(sec_prio_),
         combinator(combinator_),
         Q(prio)
     {}
@@ -219,7 +275,7 @@ void Refactor::addPairs()
                 cs[n] = pairs[i + n].snd;
             pair_occur.push(cs);
             pair_occur_sz.push(j - i);
-            prio.push(j - i);
+            prio.push(tuple(j - i, max_(sec_prio[pairs[i].fst.fst], sec_prio[pairs[i].fst.snd])));
             Q.add(pid);
 
             i = j;
@@ -287,9 +343,9 @@ void Refactor::combine(pair_id pid)
                   Found:;
                   #endif
 
-                    prio[pid_gone]--;
-                    if (prio[pid_gone] < 2) Q.exclude(pid_gone);
-                    else                    Q.update(pid_gone);
+                    prio[pid_gone].fst--;
+                    if (prio[pid_gone].fst < 2) Q.exclude(pid_gone);
+                    else                        Q.update(pid_gone);
                 }
             }
         }
@@ -383,9 +439,29 @@ void refactor(Gig& N, WMapX<GLit>& remap, const Params_Refactor& P)
     N.unstrash();
     N.setRecycling(true);       // <<== try turning this off and remove 'aux' to see how memory/speed is affected
 
+    WMap<uint> arr;
+    WMap<uint> dep;
+    WMap<uint> len;
+    computeTiming(N, arr, dep, len);
+    For_Gates(N, w)
+        len(w) = ~len[w];       // -- we use this as secondary prioriy; want to give preference to short lengths
+
+    uint max_arr = 0;
+    For_Gates(N, w)
+        if (isCO(w))
+            newMax(max_arr, arr[w]) ;
+#if 1   /*DEBUG*/
+    uint max_dep = 0;
+    For_Gates(N, w)
+        if (isCI(w))
+            newMax(max_dep, dep[w]) ;
+    assert(max_arr == max_dep);
+#endif  /*END DEBUG*/
+
     if (!P.quiet){
         WriteLn "========== Refactoring ==========";
-        WriteLn "Input: %_", info(N);
+        WriteLn "Input.: %_", info(N);
+        WriteLn "Levels: %_", max_arr;
         NewLine;
     }
 
@@ -419,14 +495,14 @@ void refactor(Gig& N, WMapX<GLit>& remap, const Params_Refactor& P)
         }
 
         // Extract sets
-        Refactor R(N, gtype_fanout_count, gtype, P);
+        Refactor R(N, gtype_fanout_count, len, gtype, P);
 
         WSeenS seen;
         WSeen  aux;
         Vec<GLit> conj;
         Vec<GLit> bal;
         Vec<GLit> sub_conj;
-        For_DownOrder(N, w){
+        For_DownOrder(N, w){        // <<== pre-compute this order and use for timing computation as well
             if (w != gtype) continue;
 
             if (seen.has(w)){
@@ -521,13 +597,14 @@ void refactor(Gig& N, WMapX<GLit>& remap, const Params_Refactor& P)
 
     if (!P.quiet){
         WriteLn "Output: %_", info(N);
+        WriteLn "Levels: %_", computeDepth(N);
         WriteLn "======== End Refactoring ========";
         NewLine;
     }
 }
 
 
-// <<== prova att expandera delade konjunktioner av storlek 2 och 3
+// <<== prova att expandera delade konjunktioner av storlek 2 och 3 ("unshare small nodes")
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
