@@ -216,6 +216,10 @@ void printOptions(Params_TechMap& P, uint round, Out& out)
     }
     if (P.exact_local_area != P0.exact_local_area)
         FWriteLn(out) "exact_local_area: %_", P.exact_local_area;
+    if (P.est_power != P0.est_power)
+        FWriteLn(out) "est_power       : %_", P.est_power;
+    if (P.est_const != P0.est_const)
+        FWriteLn(out) "est_const       : %_", P.est_const;
 }
 
 
@@ -234,6 +238,8 @@ void randomizeParams(Params_TechMap& P, uint64 seed)
     P.exact_local_area = FLIP;
     P.refactor         = FLIP;
     P.unmap.setOptions(RND(0, 15));
+    P.est_power        = float(RND(0, 10)) / 2.0f;
+    P.est_const        = float(RND(0,100)) / 10.0f;
 
     switch (RND(0, 4)){
     case 0: // LUT cost
@@ -266,20 +272,22 @@ void randomizeParams(Params_TechMap& P, uint64 seed)
 
 void mutateParams(Params_TechMap& P, uint64 seed)
 {
-    uint choice = RND(0, 15);
+    uint choice = RND(0, 17);
     switch (choice){
-    case 0: P.n_iters          = RND(1, 6); break;
-    case 1: P.recycle_iter     = RND(1, P.n_iters); break;
-    case 2: P.cuts_per_node    = RND(2, 10); break;
-    case 3: P.delay_factor     = FLIP ? -(int)RND(0, 2) : RND(100, 150) / 100.0; break;
-    case 4: P.unmap_to_ands    = !P.unmap_to_ands; break;
-    case 5: P.use_fmux         = use_f7 && (!P.use_fmux); break;
-    case 6: P.slack_util       = FLIP ? RND(0, 3) : FLT_MAX; break;
-    case 7: P.exact_local_area = !P.exact_local_area; break;
-    case 8: P.refactor         = !P.refactor; break;
-    case 9: P.unmap.setOptions(RND(0, 15)); break;
+    case 0:  P.n_iters          = RND(1, 6); break;
+    case 1:  P.recycle_iter     = RND(1, P.n_iters); break;
+    case 2:  P.cuts_per_node    = RND(2, 10); break;
+    case 3:  P.delay_factor     = FLIP ? -(int)RND(0, 2) : RND(100, 150) / 100.0; break;
+    case 4:  P.unmap_to_ands    = !P.unmap_to_ands; break;
+    case 5:  P.use_fmux         = use_f7 && (!P.use_fmux); break;
+    case 6:  P.slack_util       = FLIP ? RND(0, 3) : FLT_MAX; break;
+    case 7:  P.exact_local_area = !P.exact_local_area; break;
+    case 8:  P.refactor         = !P.refactor; break;
+    case 9:  P.unmap.setOptions(RND(0, 15)); break;
+    case 10: P.est_power        = float(RND(0, 10)) / 2.0f; break;
+    case 11: P.est_const        = float(RND(0,100)) / 10.0f; break;
     default:
-        choice -= 10;
+        choice -= 12;
         if (choice <= 6)
             P.lut_cost[choice + 2] = float((int)RND(0, 100) - 20) / 10;
         else
@@ -306,7 +314,7 @@ ExtCost run(String input, Script script)
     Gig N;
     readInput(input, N);
 
-    // Construct parameters:    
+    // Construct parameters:
     assert(script.Ps.size() == n_rounds);
     Vec<Params_TechMap>& Ps = script.Ps;
 
@@ -324,8 +332,20 @@ int main(int argc, char** argv)
     ZZ_Init;
 
     cli.add("input", "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
+    cli.add("output", "string", "", "Save winning script to this file.");
     cli.parseCmdLine(argc, argv);
     String design = cli.get("input").string_val;
+    String output = cli.get("output").string_val;
+
+    if (output == ""){
+        output = design;
+        stripSuffix(output, ".gpg");
+        stripSuffix(output, ".gz");
+        stripSuffix(output, ".gnl");
+        stripSuffix(output, ".gig");
+        stripSuffix(output, ".aig");
+        output += ".win";
+    }
 
     uint64 seed = realTimeAbs();
     WriteLn "Using seed: %_", seed;
@@ -359,7 +379,7 @@ int main(int argc, char** argv)
             best = cost;
             Write "\a/";
 
-            OutFile out("winner_script.txt");
+            OutFile out(output);
             for (uint i = 0; i < script.size(); i++){
                 if (i != 0) FNewLine(out);
                 FWriteLn(out) "[Round %_]", i;

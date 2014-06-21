@@ -51,6 +51,8 @@ struct Params_TechMap {
     bool        exact_local_area;   // -- Post-optimize induced mapping by peep-hole optimization. [no F7Mux support yet]
     bool        refactor;           // -- refactor big-ANDs and big-XORs.
     Params_Unmap unmap;             // -- options for unmapping
+    float       est_power;          // -- Exponent to use for fanout estimate blending.
+    float       est_const;          // -- Constant to use for fanout estimate blending.
     bool        batch_output;       // -- print a one-line summary at the end of techmapping which can be used to produce tables
     bool        quiet;              // -- suppress print-outs
 
@@ -69,6 +71,8 @@ struct Params_TechMap {
         slack_util      (FLT_MAX),
         exact_local_area(true),
         refactor        (true),
+        est_power       (2.0f),
+        est_const       (1.0f),
         batch_output    (false),
         quiet           (false)
     {

@@ -1158,9 +1158,13 @@ void TechMap::updateEstimates()
 {
     // Fanout est. (temporary)
     uint  r = iter + 1;
-    float alpha = 1.0f - 1.0f / (float)(r*r + 1.0f);            // <AT>
+#if 0
+    float alpha = 1.0f - 1.0f / (float)(r*r + 1.0f);
     //float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 2.0f);
     float beta  = 1.0f - alpha;
+#endif
+    float beta = 1.0f / (powf(r, P.est_power) + P.est_const);
+    float alpha = 1.0f - beta;
 
     For_Gates(N, w){
         if (isLogic(w)){
