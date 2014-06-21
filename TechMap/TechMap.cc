@@ -249,38 +249,52 @@ template<> fts_macro void write_(Out& out, const Cost& v)
 }
 
 
+macro bool almostEqual(float x, float y) {
+    return fabsf(x - y) / max_(x, y) < 0.00001f; }
+
+
 struct Area_lt {
     bool operator()(const Cost& x, const Cost& y) const {
         if (!x.late && y.late) return true;
         if (x.late && !y.late) return false;
         if (!x.late){
-            if (x.area < y.area) return true;
-            if (x.area > y.area) return false;
-            /**/if (x.inputs < y.inputs) return true;       // <<== evaluate this
-            /**/if (x.inputs > y.inputs) return false;
+            if (!almostEqual(x.area, y.area)){      // -- note that this is slightly broken (can create cycles in less-than operator)
+                if (x.area < y.area) return true;
+                return false;
+            }
+            if (!almostEqual(x.inputs, y.inputs)){
+                if (x.inputs < y.inputs) return true;       // <<== evaluate this   // <AT>
+                return false;
+            }
             if (x.delay < y.delay) return true;
-            if (x.delay > y.delay) return false;
+            return false;
         }else{
-            if (x.delay < y.delay) return true;
-            if (x.delay > y.delay) return false;
-            /**/if (x.inputs < y.inputs) return true;       // <<== evaluate this
-            /**/if (x.inputs > y.inputs) return false;
+            if (!almostEqual(x.delay, y.delay)){
+                if (x.delay < y.delay) return true;
+                return false;
+            }
+            if (!almostEqual(x.inputs, y.inputs)){
+                if (x.inputs < y.inputs) return true;       // <<== evaluate this   // <AT>
+                return false;
+            }
             if (x.area < y.area) return true;
-            if (x.area > y.area) return false;
+            return false;
         }
-        return false;
     }
 };
 
 
 struct Delay_lt {
     bool operator()(const Cost& x, const Cost& y) const {
-        if (x.delay < y.delay) return true;
-        if (x.delay > y.delay) return false;
-        if (x.inputs < y.inputs) return true;
-        if (x.inputs > y.inputs) return false;
+        if (!almostEqual(x.delay, y.delay)){
+            if (x.delay < y.delay) return true;
+            return false;
+        }
+        if (!almostEqual(x.inputs, y.inputs)){
+            if (x.inputs < y.inputs) return true;
+            return false;
+        }
         if (x.area < y.area) return true;
-        if (x.area > y.area) return false;
         return false;
     }
 };
@@ -711,10 +725,6 @@ bool TechMap::deref(GLit w)
 
     acc_cost += (j == F7MUX) ? P.mux_cost : lutCost(w, cut);
 
-    //*E*/WriteLn "deref(%_) -- acc_cost=%_  acc_lim=%_", w, acc_cost, acc_lim;
-    //*E*/Write "  cut-inputs:";
-    //*E*/for (uint i = 0; i < cut.size(); i++) Write " %_", cut[i] + N;
-    //*E*/NewLine;
     if (acc_cost > acc_lim)
         return false;
 
@@ -733,7 +743,6 @@ bool TechMap::deref(GLit w)
         }else
             undo.push(v);
 
-        //*E*/WriteLn "deref:ing %_ (%_ fanouts)", v + N, fanouts[v];
         fanouts(v)--;
         if (fanouts[v] == 0){
             if (!deref(v))
@@ -748,7 +757,6 @@ void TechMap::undoDeref()
 {
     while (undo.size() > 0){
         GLit v = undo.popC();
-        //*E*/WriteLn "undo:ing %_", v + N;
         if (v.sign)
             mux_fanout(v) = undo.popC();
         fanouts(v)++;
@@ -763,10 +771,6 @@ void TechMap::ref(GLit w)
     uint sel = impl[j][w].idx;
     Cut  cut = cutmap[w][sel];
 
-    //*E*/Write "ref(%_) cut:", w;
-    //*E*/for (uint i = 0; i < cut.size(); i++) Write " %_", cut[i] + N;
-    //*E*/NewLine;
-
     // Recurse:
     for (uint i = 0; i < cut.size(); i++){
         Wire v = cut[i] + N;
@@ -775,7 +779,6 @@ void TechMap::ref(GLit w)
         if (j == F7MUX && mux_fanout[v])
             assert(false);
 
-        //*E*/WriteLn "ref:ing %_", v + N;
         fanouts(v)++;
         if (fanouts[v] == 1){
             depart(v) = 0.0f;
@@ -797,7 +800,6 @@ bool TechMap::tryRef(uint depth)
 
     Wire w = Q.pop() + N;
     const CutSet& cuts = cutmap[w];
-    //*E*/WriteLn "tryRef(depth=%_) -- Q.size()=%_   w=%_", depth, Q.size(), w;
 
     uint added[6];
     uint added_sz;
@@ -806,13 +808,6 @@ bool TechMap::tryRef(uint depth)
     // For now, try every combination always:
     bool success = false;
     for (uint k = 0; k < cuts.size(); k++){
-#if 0
-        /**/int sel;
-        /**/if (depth > 2){
-        /**/    if (k == 0) sel = impl[DELAY][w].idx;
-        /**/    else break;
-        /**/}else sel = k;
-#else
         int sel;
         if (depth < 2)
             sel = k;
@@ -825,7 +820,6 @@ bool TechMap::tryRef(uint depth)
         }
         if (sel == CutImpl::NONE)
             continue;
-#endif
 
         Cut c = cuts[sel]; assert(c.size() <= 6);
         float cost = lutCost(w, c);
@@ -852,7 +846,6 @@ bool TechMap::tryRef(uint depth)
             old_dep[i] = depart[v];
             newMax(depart(v), depart[w] + 1.0f);
 
-            //*E*/WriteLn "    <<working on cut #%_,  fanouts[%_]=%_  inQ=%_>>  for %_", k, v, fanouts[v], Q.has(v.id), w;
             if (fanouts[v] == 0 && !Q.has(v.id)){
                 Q.add(v.id);     // <<== could add up conservative costs for inputs and abort earlier
                 added[added_sz++] = v.id;
@@ -934,19 +927,13 @@ void TechMap::exactLocalArea()
         if (fanouts[w] > 0 && isLogic(w)){
             acc_cost = 0;
             acc_lim  = ELA_GLOBAL_LIM;
-            //*E*/WriteLn "\a/--TRYING: \a*%_\a0", w;
-            //*E*/Write "\a/ACTIVE 1:"; For_Gates(N, w) Write " %_=%d(%d)", w.lit(), active[w], fanouts[w]; NewLine; Write "\a/";
             if (deref(w)){
-                //*E*/Write "\a/ACTIVE 2:"; For_Gates(N, w) Write " %_=%d(%d)", w.lit(), active[w], fanouts[w]; NewLine; Write "\a/";
                 acc_lim = acc_cost;
                 acc_cost = 0;
-                //*E*/WriteLn "Trying to beat cost: %_", acc_lim;
                 Q.add(w.id);
                 if (!tryRef(0)){
-                    //*E*/WriteLn "[didn't find better solution]";
                     undoDeref();
                 }else{
-                    //*E*/WriteLn "[Found better solution: %_]", acc_lim;
                     undo.clear();
                     ref(w);
 
@@ -981,21 +968,12 @@ void TechMap::exactLocalArea()
                 while (Q.size() > 0) Q.pop();   // -- clear queue
             }else
                 undoDeref();
-            //*E*/Write "\a/ACTIVE 3:"; For_Gates(N, w) Write " %_=%d(%d)", w.lit(), active[w], fanouts[w]; NewLine; Write "\a/";
         }
     }
 
     For_Gates(N, w)
         if (isLogic(w) && fanouts[w] == 0)
             active(w) = INACTIVE;
-
-    //*E*/For_Gates(N, w) WriteLn "depart[%_] = %_    active[%_] = %d", w, depart[w], w, active[w];
-#if 0
-    For_Gates(N, w){
-        if (fanouts[w] != fanouts_copy[w]){ Dump(w, fanouts[w], fanouts_copy[w]); assert(false); }
-        if (mux_fanout[w] != mux_fanout_copy[w]){ Dump(w, mux_fanout[w], mux_fanout_copy[w]); assert(false); }
-    }
-#endif
 }
 
 
@@ -1166,15 +1144,8 @@ void TechMap::induceMapping(bool instantiate)
 
         GigRemap m;
         N.compact(m);
-        if (remap){
+        if (remap)
             m.applyTo(remap->base());
-
-          #if 0     // -- no longer necessary
-            removeMuxViolations(N, arrival, target_arrival, P.delay_fraction);
-            WriteLn "  -- Legalizing MUXes by duplication, adding:  #Mux=%_   #Lut6=%_", N.typeCount(gate_F7Mux) - n_muxes, N.typeCount(gate_Lut6) - n_luts;
-            N.compact();
-          #endif
-        }
     }
 
     For_Gates(N, w){
@@ -1187,7 +1158,7 @@ void TechMap::updateEstimates()
 {
     // Fanout est. (temporary)
     uint  r = iter + 1;
-    float alpha = 1.0f - 1.0f / (float)(r*r + 1.0f);
+    float alpha = 1.0f - 1.0f / (float)(r*r + 1.0f);            // <AT>
     //float alpha = 1.0f - 1.0f / (float)(r*r*r*r + 2.0f);
     float beta  = 1.0f - alpha;
 
@@ -1288,9 +1259,10 @@ void TechMap::printProgress(double T0)
     }
 
     double T = realTime();
-    WriteLn "Delay: %_    Wires: %,d    LUTs: %,d   [iter=%t  total=%t]", mapped_delay, (uint64)total_wires, (uint64)total_luts, T - T0, T;
+    if (!P.quiet)
+        WriteLn "Delay: %_    Wires: %,d    LUTs: %,d   [iter=%t  total=%t]", mapped_delay, (uint64)total_wires, (uint64)total_luts, T - T0, T;
 
-    if (len_count > 0)
+    if (len_count > 0 && !P.quiet)
         WriteLn "Average path length: %.2f", len_total / len_count;
 
     if (P.batch_output && iter == P.n_iters - 1){
@@ -1403,12 +1375,13 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
         Assure_Gob(N, FanoutCount);
         For_Gates(N, w){
             if (nFanouts(w) == 0 && !isCO(w)){
-                WriteLn "WARNING! Fanout-free non-combinational output: %_", w;
+                if (!isCI(w))
+                    if (!Ps[0].quiet) WriteLn "WARNING! Fanout-free non-combinational output: %_", w;   // <<== bring back this warning after done with tmtune
                 protectors.push(N.add(gate_PO).init(w).num());
             }
         }
         if (protectors.size() > 0)
-            WriteLn "Protectors added: %_", protectors.size();
+            if (!Ps[0].quiet) WriteLn "Protectors added: %_", protectors.size();
     }
 
     Vec<Trip<GLit,GLit,uint> > co_srcs;
@@ -1455,7 +1428,7 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
     // Techmap:
     assert(Ps.size() >= 1);
     for (uint round = 0; round < Ps.size(); round++){
-        if (round > 0){
+        if (round > 0){     // <<== make this check an option
             WMapX<GLit> xlat;
             unmap(N, &xlat, Ps[round].unmap);
             N.unstrash();
@@ -1469,10 +1442,11 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
                     v[i] = xlat[v[i]];
             }
 
-            NewLine;
-            WriteLn "Unmap.: %_", info(N);
+            if (!Ps[round].quiet){
+                NewLine;
+                WriteLn "Unmap.: %_", info(N); }
 
-            if (Ps[round].refactor /*hack*/&& round <= 1){      // -- apply refactoring only in round 0 and 1
+            if (Ps[round].refactor){                            // -- apply refactoring only in round 0 and 1
                 Params_Refactor PR;
                 PR.quiet = true;
                 assert(Ps[round].delay_fraction == 1.0f);       // -- you cannot use refactoring code with a delay fraction different from 1 (due to its simplified timing model)
@@ -1482,19 +1456,19 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
                     for (uint i = gid_FirstUser; i < v.size(); i++)
                         v[i] = xlat[v[i]];
                 }
-                WriteLn "Refact: %_", info(N);
+                if (!Ps[round].quiet) WriteLn "Refact: %_", info(N);
             }
-            NewLine;
+            if (!Ps[round].quiet) NewLine;
         }
         TechMap map(N, Ps[round], remap);
 
         map.run();
     }
 
-    if (!Ps.last().batch_output){
+    if (!Ps.last().batch_output && !Ps.last().quiet){
         NewLine;
         WriteLn "Legalization..."; }
-    removeInverters(N, remap, Ps.last().batch_output);
+    removeInverters(N, remap, Ps.last().batch_output || Ps.last().quiet);
 
     // Patch up remap from sources of combinational outputs:
     if (remap){
@@ -1524,7 +1498,11 @@ void techMap(Gig& N, const Params_TechMap& P, uint n_rounds, WMapX<GLit>* remap)
     for (uind i = 0; i < n_rounds; i++){
         Ps.push(P);
         if (i != n_rounds-1) Ps.last().exact_local_area = false;    // -- ELA is best applied only in the last round
+        if (i >= 2)          Ps.last().refactor = false;            // -- apply refactoring only in round 0 and 1
     }
+    //**/WriteLn "DON'T FORGET TO REMOVE CUTSIZE HACK!";
+    //**/Ps[0].cut_size = 4;
+
     //**/WriteLn "DON'T FORGET TO REMOVE DELAY FACTOR HACK!";
     //**/Ps[0].delay_factor = 1.2;
     //**/Ps[1].delay_factor = 1.1;

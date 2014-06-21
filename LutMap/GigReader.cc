@@ -124,14 +124,16 @@ void readGigForTechmap(String filename, Gig& N)
                 else if (eq(gate, "PadR" )) w = N.addDyn(gate_Delay, args.size(), delay_PadR);
                 else if (eq(gate, "PadW" )) w = N.addDyn(gate_Delay, args.size(), delay_PadW);
                 else if (eq(gate, "Seq"  )) w = N.add(gate_Seq);
+                else if (eq(gate, "Bar"  )) w = N.add(gate_Bar);
+                else if (eq(gate, "Sel"  )) w = N.add(gate_Sel);        // -- forget attribute; doesn't matter for mapping
                 else if (eq(gate, "Buf"  )) w = N.add(gate_Lut4, 0xAAAA);
                 else if (eq(gate, "Lut") || eq(gate, "Lut4") || eq(gate, "Loop")){
                     if (attr.size() != 4)
                         Throw(Excp_Msg) "[line %_] Invalid FTB, must be exactly four hexadecimal digits.", line_no;
-                    ushort ftb = fromHex(attr[0])
-                               | (fromHex(attr[1]) << 4)
-                               | (fromHex(attr[2]) << 8)
-                               | (fromHex(attr[3]) << 12);
+                    ushort ftb = fromHex(attr[3])
+                               | (fromHex(attr[2]) << 4)
+                               | (fromHex(attr[1]) << 8)
+                               | (fromHex(attr[0]) << 12);
                     w = N.add(gate_Lut4, ftb);
                     if (gate[1] == 'o')
                         loops.push(w);
@@ -171,7 +173,11 @@ void readGigForTechmap(String filename, Gig& N)
 
                     v = v + N;
                     if (+v != Wire_NULL)
+                      #if defined(FIXUP)
                         w.set(i, !isSeqElem(w) ? v : N.add(gate_Seq).init(v));  // -- 'Seq's are added here!
+                      #else
+                        w.set(i, v);
+                      #endif
                 }
             }
         }
@@ -179,6 +185,7 @@ void readGigForTechmap(String filename, Gig& N)
         in.rewind();
     }
 
+  #if defined(FIXUP)
     // Post-process 'Loop's:
     for (uint i = 0; i < loops.size(); i++){
         // For loops, pin 0 should be the implicit unit-delayed output signal:
@@ -218,7 +225,8 @@ void readGigForTechmap(String filename, Gig& N)
         }
     }
 
-    //N.compact();      // <<== disable this temporarily to test signal tracking
+    N.compact();
+  #endif
 }
 
 
@@ -254,6 +262,8 @@ bool writeGigForTechmap(String filename, Gig& N)
                 FWrite(out) " [%.16X]", ftb(w);
             else if (w == gate_Lut4)
                 FWrite(out) " [%.4X]", w.arg();
+            else if (w == gate_Delay)
+                FWrite(out) " [%_]", w.arg();
 
             FNewLine(out);
         }

@@ -36,6 +36,13 @@ struct Params_Unmap {
         depth_aware = v & 8;
     }
 
+    uint getOptions() const {
+        return (uint)shuffle
+             | ((uint)try_share   << 1)
+             | ((uint)balanced    << 2)
+             | ((uint)depth_aware << 3);
+    }
+
     Params_Unmap() :
         shuffle(false),
         try_share(true),

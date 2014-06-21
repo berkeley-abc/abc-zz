@@ -45,18 +45,19 @@ struct Params_TechMap {
     bool        unmap_to_ands;      // -- if TRUE, XIG gates (XOR, MUX etc.) are turned into ANDs after unmapping.
     bool        use_fmux;           // -- enable F7/F8 MUXes for Xilinx series 7.
     bool        fmux_feeds_seq;     // -- if FALSE, F7/F8 MUXes cannot feed a 'gate_Seq' (which would correspond to a FF, sharing the same resource).
-    Vec<float>  lut_cost;           // -- Cost of LUTs of different sizes.
+    float       lut_cost[7];        // -- Cost of LUTs of different sizes.
     float       mux_cost;           // -- Cost of F7/F8 MUXes.
     float       slack_util;         // -- How much slack to utilize in non-critical regions (small number means better average slack but worse area)
     bool        exact_local_area;   // -- Post-optimize induced mapping by peep-hole optimization. [no F7Mux support yet]
     bool        refactor;           // -- refactor big-ANDs and big-XORs.
     Params_Unmap unmap;             // -- options for unmapping
     bool        batch_output;       // -- print a one-line summary at the end of techmapping which can be used to produce tables
+    bool        quiet;              // -- suppress print-outs
 
     Params_TechMap() :
         cut_size        (6),
         n_iters         (5),
-        recycle_iter    (UINT_MAX),
+        recycle_iter    (3),
         cuts_per_node   (8),
         delay_factor    (1.0),
         delay_fraction  (1.0),
@@ -66,18 +67,13 @@ struct Params_TechMap {
         fmux_feeds_seq  (false),
         mux_cost        (1),                        // -- selector signal costs one (wire mode)
         slack_util      (FLT_MAX),
-        exact_local_area(false),
-        refactor        (false),
-        batch_output    (false)
+        exact_local_area(true),
+        refactor        (true),
+        batch_output    (false),
+        quiet           (false)
     {
-        for (uint i = 0; i <= cut_size; i++)        // -- default LUT cost is "number of inputs" (wire mode)
-            lut_cost.push(i);
-    }
-
-    Params_TechMap(const Params_TechMap& other) {
-        memcpy(this, &other, sizeof(Params_TechMap));
-        new (&lut_cost) Vec<float>();
-        other.lut_cost.copyTo(lut_cost);
+        for (uint i = 0; i <= 6; i++)               // -- default LUT cost is "number of inputs + 1" (mixed mode)
+            lut_cost[i] = i + 1;
     }
 };
 

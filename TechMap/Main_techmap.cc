@@ -328,10 +328,11 @@ int main(int argc, char** argv)
     // Setup commandline:
     cli.add("input"   , "string", arg_REQUIRED, "Input AIGER, GIG or GNL.", 0);
     cli.add("output"  , "string", "",           "Output GNL.");
+    cli.add("lutsize" , "int[3:6]", "6"       , "Map to LUTs of this size.");
     cli.add("cec"     , "bool"  , "no"        , "Output files for equivalence checking.");
     cli.add("sig"     , "{off,full,pos}","off", "[DEBUG] Map with signal tracking? (\"full\" includes negative literals).");
     cli.add("pre-coarsen", "bool", "no"       , "[EXPERIMENTAL] Coarsen input before calling mapper (no signal tracking).");
-    cli.add("cost"    , "{unit, wire, mix}", "mix",
+    cli.add("cost"    , "{unit, wire, mix, mix2}", "mix",
                                                 "Reduce the number of LUTs (\"unit\") or sum of LUT-inputs (\"wire\").");
     cli.add("mux-cost", "float" , "-1"        , "Cost of a mux; -1 means use default depending on 'cost'.");
     cli.add("rounds"  , "uint"  , "3"         , "Number of mapping rounds (with unmapping in between).");
@@ -354,6 +355,7 @@ int main(int argc, char** argv)
     // Get mapping options:
     uint n_rounds = cli.get("rounds").int_val;;
     Params_TechMap P;
+    P.cut_size         = cli.get("lutsize").int_val;
     P.cuts_per_node    = cli.get("N").int_val;
     P.n_iters          = cli.get("iters").int_val;
     P.recycle_iter     = (uint)cli.get("rc-iter").int_val;
@@ -381,9 +383,13 @@ int main(int argc, char** argv)
         for (uint i = 0; i <= 6; i++)
             P.lut_cost[i] = i;
         P.mux_cost = 1;
-    }else{
+    }else if (cli.get("cost").enum_val == 2){
         for (uint i = 0; i <= 6; i++)
             P.lut_cost[i] = i + 1;
+        P.mux_cost = 1;
+    }else{
+        for (uint i = 0; i <= 6; i++)
+            P.lut_cost[i] = i + 4;
         P.mux_cost = 1;
     }
     float mux_cost = cli.get("mux-cost").float_val;
