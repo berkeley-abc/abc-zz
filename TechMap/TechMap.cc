@@ -1504,8 +1504,8 @@ void techMap(Gig& N, const Params_TechMap& P, uint n_rounds, WMapX<GLit>* remap)
     //**/Ps[0].cut_size = 4;
 
     //**/WriteLn "DON'T FORGET TO REMOVE DELAY FACTOR HACK!";
-    //**/Ps[0].delay_factor = 1.2;
-    //**/Ps[1].delay_factor = 1.1;
+    //**/Ps[0].delay_factor = 1.0;
+    //**/Ps[1].delay_factor = -1;
     //**/Ps[2].delay_factor = 1.0;
     techMap(N, Ps, remap);
 }

@@ -389,7 +389,8 @@ int main(int argc, char** argv)
         P.mux_cost = 1;
     }else{
         for (uint i = 0; i <= 6; i++)
-            P.lut_cost[i] = i + 4;
+            P.lut_cost[i] = i + 1;
+        P.lut_cost[2] = 4;  // -- make LUT2 more expensive
         P.mux_cost = 1;
     }
     float mux_cost = cli.get("mux-cost").float_val;
