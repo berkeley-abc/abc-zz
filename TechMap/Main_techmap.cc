@@ -191,6 +191,29 @@ void printStats(const Gig& N, float delay_fraction)
 }
 
 
+void techMapTune(Gig& N)
+{
+    NewLine;
+    WriteLn "\a*NOTE! Using switch '-tune'; all other options overridden.\a0";
+    NewLine;
+
+    Vec<Params_TechMap> Ps(3);
+    Ps[0].est_power = 1; Ps[0].est_const = 1;
+    Ps[1].est_power = 2; Ps[1].est_const = 3;
+    Ps[2].est_power = 4; Ps[2].est_const = 8;
+
+    Ps[0].exact_local_area = false;
+    Ps[0].lut_cost[2] += 0.5;
+    Ps[0].delay_factor = -1;
+
+    Ps[2].n_iters = 6;
+    Ps[2].recycle_iter = UINT_MAX;
+    Ps[2].refactor = false;
+
+    techMap(N, Ps);
+}
+
+
 void mapWithSignals(Gig& N, const Params_TechMap& P, uint n_rounds, uint sig)
 {
     WMapX<GLit> remap;
@@ -349,6 +372,7 @@ int main(int argc, char** argv)
     cli.add("refact"  , "bool"  , "yes"       , "Refactoring (applied after unmapping)..");
     cli.add("unmap"   , "int[0:15]", "14"     , "Unmap options; see 'Unmap.hh'.");
     cli.add("batch"   , "bool"  , "no"        , "Output summary line at the end (for tabulation).");
+    cli.add("tune"    , "bool"  , "no"        , "Override settings with \"tuned\" parameters.");
 
     cli.parseCmdLine(argc, argv);
 
@@ -411,9 +435,12 @@ int main(int argc, char** argv)
 
     // Map:
     double T0 = cpuTime();
-    if (cli.get("sig").enum_val == 0)
-        techMap(N, P, n_rounds);
-    else
+    if (cli.get("sig").enum_val == 0){
+        if (!cli.get("tune").bool_val)
+            techMap(N, P, n_rounds);
+        else
+            techMapTune(N);
+    }else
         mapWithSignals(N, P, n_rounds, cli.get("sig").enum_val);
 
     if (!P.batch_output){

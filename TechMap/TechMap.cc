@@ -1511,6 +1511,23 @@ void techMap(Gig& N, const Params_TechMap& P, uint n_rounds, WMapX<GLit>* remap)
     //**/Ps[0].delay_factor = 1.0;
     //**/Ps[1].delay_factor = -1;
     //**/Ps[2].delay_factor = 1.0;
+
+#if 0   /*DEBUG*/
+    WriteLn "\a/DON'T FORGET TO REMOVE TUNE HACK!\a/";
+
+    Ps[0].est_power = 1; Ps[0].est_const = 1;
+    Ps[1].est_power = 2; Ps[1].est_const = 3;
+    Ps[2].est_power = 4; Ps[2].est_const = 8;
+
+    Ps[0].lut_cost[2] += 0.5;
+    Ps[0].delay_factor = -1;
+
+    Ps[1].exact_local_area = true;
+
+    Ps[2].n_iters = 6;
+    Ps[2].recycle_iter = UINT_MAX;
+#endif  /*END DEBUG*/
+
     techMap(N, Ps, remap);
 }
 

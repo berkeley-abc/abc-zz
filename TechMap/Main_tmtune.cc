@@ -361,7 +361,7 @@ int main(int argc, char** argv)
 
     ExtCost cost0 = run(design, script);
     ExtCost best = cost0;
-    WriteLn "%>7%t  |%>6%_ %>12%,d  |%>11%,d %>12%,d%s\a0", cost0.runtime, cost0.delay, (uint64)cost0.area, (uint64)cost0.luts, (uint64)cost0.wires, "    (reference)";
+    WriteLn "%>8%t  |%>6%_ %>12%,d  |%>11%,d %>12%,d%s\a0", cost0.runtime, cost0.delay, (uint64)cost0.area, (uint64)cost0.luts, (uint64)cost0.wires, "    (reference)";
 
     for (;;){
         Script old_script = script;
@@ -391,7 +391,7 @@ int main(int argc, char** argv)
         }else
             script = old_script;
 
-        WriteLn "%>7%t  |%>6%_ %>12%,d  |%>11%,d %>12%,d%s\a0", cost.runtime, cost.delay, (uint64)cost.area, (uint64)cost.luts, (uint64)cost.wires, comment;
+        WriteLn "%>8%t  |%>6%_ %>12%,d  |%>11%,d %>12%,d%s\a0", cost.runtime, cost.delay, (uint64)cost.area, (uint64)cost.luts, (uint64)cost.wires, comment;
     }
 
     return 0;
