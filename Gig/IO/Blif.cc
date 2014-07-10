@@ -88,6 +88,11 @@ void writeBlif(Out& out, Gig& N)
             FWriteLn(out) "%_%_ 1", w[0].sign ? 0 : 1, w[1].sign ? 0 : 1;
             break;}
 
+        case gate_Bar:{
+            FWriteLn(out) ".names %_ %_", nam[w[0]], nam[w];
+            FWriteLn(out) "%_ 1", w[0].sign ? 0 : 1;
+            break;}
+
         case gate_Lut6:{
             uint n_inputs = 6;
             while (n_inputs > 0 && w[n_inputs-1] == Wire_NULL)

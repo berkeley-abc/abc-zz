@@ -469,7 +469,8 @@ def setup_cflags(pri, secs, cxx_mode, no_warn):
 
     # General:
     if not no_warn: flags.append("-Wall")
-    flags.append("-ffloat-store -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS -msse2")
+    flags.append("-D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS -msse2")
+#   flags.append("-ffloat-store -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS -msse2")
     flags.append("-DZZ_CONSTANTS_AS_MACROS")
     if popcnt: flags.append("-mpopcnt")
     if has_readline: flags.append("-DZZ_HAS_READLINE")

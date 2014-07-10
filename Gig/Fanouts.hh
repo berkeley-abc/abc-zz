@@ -213,7 +213,8 @@ public:
 // Fanout count (dynamic):
 
 
-struct GigObj_FanoutCount : GigObj, GigLis {
+class GigObj_FanoutCount : public GigObj, public GigLis {
+public:
     WMap<uint> n_fanouts;
 
   //________________________________________

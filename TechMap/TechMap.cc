@@ -100,7 +100,7 @@ void upOrderBfs(Gig& N, Vec<gate_id>& result)
         }
     }
 
-#if 1   /*DEBUG*/
+#if 0   /*DEBUG*/
     For_All_Gates(N, w)
         if (ready[w] != w.size() && !isCI(w))
             Dump(w, ready[w], w.size());

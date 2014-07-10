@@ -1040,24 +1040,24 @@ ZZ_Initializer(sif, 0)
 {
     for (uint i = 0; i < 256; i++) sif_name_char[i] = sif_token_char[i] = 0;
 
-    sif_name_char['_'] = 1;
-    sif_name_char['.'] = 1;
-    sif_name_char['#'] = 1;
-    sif_name_char['%'] = 1;
-    sif_name_char[':'] = 1;
+    sif_name_char[(uchar)'_'] = 1;
+    sif_name_char[(uchar)'.'] = 1;
+    sif_name_char[(uchar)'#'] = 1;
+    sif_name_char[(uchar)'%'] = 1;
+    sif_name_char[(uchar)':'] = 1;
     for (uint i = '0'; i <= '9'; i++) sif_name_char[i] = 1;
     for (uint i = 'A'; i <= 'Z'; i++) sif_name_char[i] = 1;
     for (uint i = 'a'; i <= 'z'; i++) sif_name_char[i] = 1;
 
-    sif_token_char['['] = 1;
-    sif_token_char[']'] = 1;
-    sif_token_char['('] = 1;
-    sif_token_char[')'] = 1;
-    sif_token_char['='] = 1;
-    sif_token_char['^'] = 1;
-    sif_token_char['&'] = 1;
-    sif_token_char['|'] = 1;
-    sif_token_char[';'] = 1;
+    sif_token_char[(uchar)'['] = 1;
+    sif_token_char[(uchar)']'] = 1;
+    sif_token_char[(uchar)'('] = 1;
+    sif_token_char[(uchar)')'] = 1;
+    sif_token_char[(uchar)'='] = 1;
+    sif_token_char[(uchar)'^'] = 1;
+    sif_token_char[(uchar)'&'] = 1;
+    sif_token_char[(uchar)'|'] = 1;
+    sif_token_char[(uchar)';'] = 1;
 }
 
 

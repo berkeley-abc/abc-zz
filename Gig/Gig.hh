@@ -155,7 +155,7 @@ macro Gate& getGate(const Gig_data& N, gate_id id) {
 struct Gig;
 
 class Wire : public GLit {
-    friend class Gig;
+    friend struct Gig;
     friend void write_Wire(Out& out, const Wire& v);
 
     Gig* N;

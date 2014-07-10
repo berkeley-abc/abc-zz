@@ -68,6 +68,8 @@ void readGigForTechmap(String filename, Gig& N)
             Str text = strip(buf.slice());
             if (text.size() == 0)
                 continue;
+            if (eq(text, "%%"))
+                break;
 
             // Split line into components:
             pos = search(text, '=');

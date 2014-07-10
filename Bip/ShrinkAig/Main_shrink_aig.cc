@@ -36,14 +36,37 @@ uint n_tries     = 0;
 template<bool strashed>
 void shrinkAig(NetlistRef N, NetlistRef M, uint64& seed)
 {
+    WSeen remove;
+
     Vec<GLit> all_gates;
-    For_Gates(N, w)
+    Vec<GLit> all_cos;
+    For_Gates(N, w){
         all_gates.push(w);
+        if (type(w) == gate_PO || type(w) == gate_Flop)
+            all_cos.push(w);
+    }
     if (all_gates.size() == 0){
         WriteLn "Empty netlist! Aborting...";
         exit(0);
     }
-    GLit pick = all_gates[irand(seed, all_gates.size())];
+    assert(all_cos.size() > 0);
+
+    switch (irand(seed, 3)){
+    case 0:
+        // Remove a single gate:
+        remove.add(all_gates[irand(seed, all_gates.size())] + N);
+        break;
+    case 1:
+        // Remove 5% of gates:
+        for (uint i = 0; i <= all_gates.size() / 20; i++)
+            remove.add(all_gates[irand(seed, all_gates.size())] + N);
+        break;
+    case 2:
+        // Remove 5% of combinational outputs:
+        for (uint i = 0; i <= all_gates.size() / 20; i++)
+            remove.add(all_cos[irand(seed, all_cos.size())] + N);
+        break;
+    default: assert(false); }
 
     M.clear();
     if (strashed)
@@ -60,11 +83,11 @@ void shrinkAig(NetlistRef N, NetlistRef M, uint64& seed)
         Wire w = N[order[i]];
         Wire m;
 
-        if (w != pick){
+        if (!remove.has(w)){
             // Copy gate:
             if (type(w) == gate_And){
-                /**/if (!+n2m[w[0]]) Dump(w[0], n2m[w[0]], pick);
-                /**/if (!+n2m[w[1]]) Dump(w[1], n2m[w[1]], pick);
+                /**/if (!+n2m[w[0]]) Dump(w[0], n2m[w[0]], w);
+                /**/if (!+n2m[w[1]]) Dump(w[1], n2m[w[1]], w);
                 if (strashed)
                     m = s_And(n2m[w[0]] ^ sign(w[0]), n2m[w[1]] ^ sign(w[1]));
                 else
@@ -109,13 +132,13 @@ void shrinkAig(NetlistRef N, NetlistRef M, uint64& seed)
                 m = M.True();
         }
 
-        /**/if (!(+m != Wire_NULL))Dump(w, pick);
+        /**/if (!(+m != Wire_NULL)) Dump(w);
         /**/assert(+m != Wire_NULL);
         n2m(w) = m;
     }
 
     For_Gatetype(N, gate_Flop, w)
-        if (w != pick)
+        if (!remove.has(w))
             n2m[w].set(0, n2m[w[0]] ^ sign(w[0]));
 
 //    removeUnreach(M);

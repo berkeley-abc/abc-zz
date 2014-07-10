@@ -238,13 +238,13 @@ bool combineCuts_Quad(const Cut& cut0, const Cut& cut1, const Cut& cut2, const C
     assert_debug(cut_size <= 6);  // -- larger cuts not yet supported
     assert_debug(out.inputs.size() == 0);
 
-    if (moreThanKBitsSet(cut0.sig() | cut1.sig() | cut2.sig(), cut_size))
+    if (moreThanKBitsSet(cut0.sig() | cut1.sig() | cut2.sig() | cut3.sig(), cut_size))
         return true;
 
     uint64 ftb0 = cut0.ftb();
     uint64 ftb1 = cut1.ftb();
     uint64 ftb2 = cut2.ftb();
-    uint64 ftb3 = cut2.ftb();
+    uint64 ftb3 = cut3.ftb();
     uint   i0 = 0;
     uint   i1 = 0;
     uint   i2 = 0;
@@ -257,7 +257,7 @@ bool combineCuts_Quad(const Cut& cut0, const Cut& cut1, const Cut& cut2, const C
         gate_id x0 = (i0 == cut0.size()) ? gid_MAX : cut0[i0];
         gate_id x1 = (i1 == cut1.size()) ? gid_MAX : cut1[i1];
         gate_id x2 = (i2 == cut2.size()) ? gid_MAX : cut2[i2];
-        gate_id x3 = (i3 == cut2.size()) ? gid_MAX : cut2[i3];
+        gate_id x3 = (i3 == cut3.size()) ? gid_MAX : cut3[i3];
         gate_id smallest = min_(min_(x0, x1), min_(x2, x3));
 
         if (smallest == gid_MAX) break;
@@ -267,7 +267,7 @@ bool combineCuts_Quad(const Cut& cut0, const Cut& cut1, const Cut& cut2, const C
         if (x0 == smallest){ ftb0 = ftb6_swap(ftb0, k, loc0[i0]); loc0[k] = loc0[i0]; i0++; }
         if (x1 == smallest){ ftb1 = ftb6_swap(ftb1, k, loc1[i1]); loc1[k] = loc1[i1]; i1++; }
         if (x2 == smallest){ ftb2 = ftb6_swap(ftb2, k, loc2[i2]); loc2[k] = loc2[i2]; i2++; }
-        if (x3 == smallest){ ftb3 = ftb6_swap(ftb3, k, loc3[i3]); loc3[k] = loc3[i2]; i3++; }
+        if (x3 == smallest){ ftb3 = ftb6_swap(ftb3, k, loc3[i3]); loc3[k] = loc3[i3]; i3++; }
 
         out.inputs.push(smallest);
     }
@@ -275,10 +275,12 @@ bool combineCuts_Quad(const Cut& cut0, const Cut& cut1, const Cut& cut2, const C
     // Compute FTB:
     uint64 new_ftb = 0;
     for (uint64 m = 1; m != 0; m <<= 1){        //<<== slow, but will have to do for now
-        uint b = uint(bool(ftb0 & m)) | (uint(bool(ftb1 & m)) << 1) | (uint(bool(ftb2 & m)) << 2);
+        uint b = uint(bool(ftb0 & m)) | (uint(bool(ftb1 & m)) << 1) | (uint(bool(ftb2 & m)) << 2) | (uint(bool(ftb3 & m)) << 3);
         if (ftb & (1 << b))
             new_ftb |= m;
     }
+
+    /**/WriteLn "ftb=%x  new_ftb=%x", ftb, new_ftb;
 
     if (!struct_mapping)
         trimSupport(out, new_ftb);

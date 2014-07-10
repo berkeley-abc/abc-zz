@@ -47,6 +47,7 @@ struct Bitmap {
     Bitmap(Bitmap& src, uint x0, uint y0, uint w, uint h) { zero(); slice(src, x0, y0, w, h); }
    ~Bitmap()                                              { clear(); }
 
+    Null_Method(Bitmap) { return data == NULL; }
 
     void clear()
         // -- Restore bitmap to same state as default constructor gives:
