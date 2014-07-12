@@ -1,9 +1,9 @@
-Before compiling any files int the ZZ framework, you need to do the following:
+Before compiling any files in the ZZ framework, you need to do the following:
 
   - Set your path to include 'ZZ/BUILD' or, alternatively, make an alias 'zb'
     to point to 'ZZ/BUILD/zb'.
 
-  - Make sure you have Python version 2.6 (or later) installed.
+  - Make sure you have Python version 2.6 or 2.7 installed.
 
   - Make sure you have developer header files installed for 'libz'.
 
