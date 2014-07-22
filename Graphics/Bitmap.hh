@@ -145,7 +145,7 @@ macro void fill(Bitmap& bm, Color c)
 
 macro void fill(Bitmap& bm, uint x0, uint y0, uint x1, uint y1, Color c)
 {
-    if (x0 >= bm.width || x1 < 0 || y0 >= bm.height || y1 < 0) return;
+    if (x0 >= bm.width || y0 >= bm.height) return;
     newMin(x1, bm.width); newMin(y1, bm.height);
     for (uint y = y0; y < y1; y++)
         for (uint x = x0; x < x1; x++)
@@ -155,7 +155,7 @@ macro void fill(Bitmap& bm, uint x0, uint y0, uint x1, uint y1, Color c)
 
 macro void hline(Bitmap& bm, uint x0, uint y0, uint x1, Color c)
 {
-    if (y0 < 0 || y0 >= bm.height) return;
+    if (y0 >= bm.height) return;
     newMin(x1, bm.width);
     for (uint x = x0; x < x1; x++)
         bm.setQ(x, y0, c);
@@ -163,7 +163,7 @@ macro void hline(Bitmap& bm, uint x0, uint y0, uint x1, Color c)
 
 macro void vline(Bitmap& bm, uint x0, uint y0, uint y1, Color c)
 {
-    if (x0 < 0 || x0 >= bm.width) return;
+    if (x0 >= bm.width) return;
     newMin(y1, bm.height);
     for (uint y = y0; y < y1; y++)
         bm.setQ(x0, y, c);

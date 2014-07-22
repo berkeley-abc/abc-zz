@@ -191,7 +191,7 @@ void printStats(const Gig& N, float delay_fraction)
 }
 
 
-void techMapTune(Gig& N)
+void techMapTune(Gig& N, bool batch_output)
 {
     NewLine;
     WriteLn "\a*NOTE! Using switch '-tune'; all other options overridden.\a0";
@@ -209,6 +209,7 @@ void techMapTune(Gig& N)
     Ps[2].n_iters = 6;
     Ps[2].recycle_iter = UINT_MAX;
     Ps[2].refactor = false;
+    Ps[2].batch_output = batch_output;
 
     techMap(N, Ps);
 }
@@ -397,7 +398,7 @@ int main(int argc, char** argv)
 
     if (P.exact_local_area && P.use_fmux){
         WriteLn "NOTE! Exact local area turned off when using F7 MUXes.";
-        P.use_fmux = false; }
+        P.exact_local_area = false; }
 
     if (cli.get("cost").enum_val == 0){
         for (uint i = 0; i <= 6; i++)
@@ -439,7 +440,7 @@ int main(int argc, char** argv)
         if (!cli.get("tune").bool_val)
             techMap(N, P, n_rounds);
         else
-            techMapTune(N);
+            techMapTune(N, P.batch_output);
     }else
         mapWithSignals(N, P, n_rounds, cli.get("sig").enum_val);
 
