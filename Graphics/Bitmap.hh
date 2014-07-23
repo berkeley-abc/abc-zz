@@ -49,6 +49,8 @@ struct Bitmap {
 
     Null_Method(Bitmap) { return data == NULL; }
 
+    void moveTo(Bitmap& dst) { dst.init(width, height, data, owner, line_sz); zero(); }
+
     void clear()
         // -- Restore bitmap to same state as default constructor gives:
         // (1) Free the current bitmap (if should)
