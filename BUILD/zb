@@ -123,7 +123,7 @@ def try_gcc(arg):
 def try_gcc_alt(arg):   # -- sometimes gcc return 0 even if option is unrecognized
     with os.popen('echo "int main(){ return 0; }" | g++ -xc ' + arg + ' - -o /dev/null 2>&1', "r") as p:
         tmp = p.readline()
-        if "unrecognized" in tmp:
+        if "unrecognized" in tmp or "argument unused" in tmp:
             return False
         else:
             return True
@@ -468,6 +468,7 @@ def setup_cflags(pri, secs, cxx_mode, no_warn):
     flags = []
 
     # General:
+    if os_name == "Darwin": flags.append("-mmacosx-version-min=10.8")       # -- otherwise gets problems with math library
     if not no_warn: flags.append("-Wall")
     flags.append("-D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS -msse2")
 #   flags.append("-ffloat-store -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS -msse2")
