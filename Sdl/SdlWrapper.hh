@@ -47,7 +47,6 @@ struct Tex_data {
 
    ~Tex_data() {
         SDL_DestroyTexture(tex);
-        /**/WriteLn "Destroying texture...";
     }
 
     void update(uint x, uint y, uint w, uint h) {

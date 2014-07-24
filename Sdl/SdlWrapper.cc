@@ -179,7 +179,9 @@ Tex Win::mkTex(TTF_Font* font, Color c_text, String text)
     fg.a = c_text.a;
 
     SDL_Surface* surf = TTF_RenderUTF8_Blended(font, text.c_str(), fg);
-    Bitmap bm(surf->w, surf->h, (Color*)surf->pixels, false, surf->pitch / 4);      // <<== 'surf' will leak memory right now...
+    Bitmap bm_slice(surf->w, surf->h, (Color*)surf->pixels, false, surf->pitch / 4);
+    Bitmap bm(copy_, bm_slice);
+    SDL_FreeSurface(surf);
     return mkTex(bm);
 }
 
