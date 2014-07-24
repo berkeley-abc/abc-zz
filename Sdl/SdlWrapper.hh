@@ -2,6 +2,7 @@
 #define ZZ__Sdl__SdlWrapper_hh
 
 #include <SDL.h>
+#include <SDL_ttf.h>
 #include "ZZ_Graphics.hh"
 #include "ZZ/Generics/RefC.hh"
 
@@ -88,7 +89,7 @@ struct Layer {
     Tex    tex;
     Rect   src;         // }- zero width/height means full size
     Rect   dst;         // }
-    double angle;       // -- in radians
+    double angle;       // -- in degrees
     int    rot_xoff;    // }- point of rotation, offset from center
     int    rot_yoff;    // }
     bool   flip_horz;
@@ -117,6 +118,7 @@ public:
    ~Win();
 
     void close();   // -- dispose window resources and close window
+    Null_Method(Win) { return win == NULL; }
 
     // Update these directly, then call 'present()':
     Color       bg;         // -- if fully transparent, bottom layer will be drawn opaquely.
@@ -133,6 +135,8 @@ public:
     Tex mkTex(uint w, uint h, Color c = Color());   // -- make texture of given size
     Tex mkTex(Color c = Color());                   // -- make a texture of the same size as the window
 
+    Tex mkTex(TTF_Font* font, Color c_text, String text); // -- creates a texture from a piece of text
+
     void present();         // -- flush updates made to textures and layers to the physical display
 };
 
@@ -148,6 +152,10 @@ bool waitEvent(SDL_Event& ev, double timeout = DBL_MAX);
 
 Win* getWin(uint win_id);
     // -- returns NULL if window has been closed.
+
+
+String basePath(String filename);
+    // -- prefix 'filename' with the path of the executable.
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

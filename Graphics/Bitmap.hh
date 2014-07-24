@@ -45,6 +45,8 @@ struct Bitmap {
     Bitmap(uint w, uint h, Color* d, bool own)            { zero(); init(w, h, d, own); }
     Bitmap(uint w, uint h, Color* d, bool own, int lsz)   { zero(); init(w, h, d, own, lsz); }
     Bitmap(Bitmap& src, uint x0, uint y0, uint w, uint h) { zero(); slice(src, x0, y0, w, h); }
+    Bitmap(Tag_copy, Bitmap& src);
+    Bitmap(Tag_copy, Bitmap& src, uint x0, uint y0, uint w, uint h);
    ~Bitmap()                                              { clear(); }
 
     Null_Method(Bitmap) { return data == NULL; }
@@ -120,6 +122,28 @@ protected:
 };
 
 
+inline Bitmap::Bitmap(Tag_copy, Bitmap& src)
+{
+    zero();
+    alloc(src.width, src.height);
+    Color* p = data;
+    for (uint y = 0; y < src.height; y++)
+    for (uint x = 0; x < src.width ; x++)
+        *p++ = src(x, y);
+}
+
+
+inline Bitmap::Bitmap(Tag_copy, Bitmap& src, uint x0, uint y0, uint w, uint h)
+{
+    zero();
+    alloc(w, h);
+    Color* p = data;
+    for (uint y = y0; y < y0 + h; y++)
+    for (uint x = x0; x < x0 + w; x++)
+        *p++ = src(x, y);
+}
+
+
 // Returns x-coordinate (in 'outer') of top-left corner.
 // PRE-CONDITION: 'inner' is a slice of 'outer'.
 macro uint sliceX0(Bitmap& outer, Bitmap& inner) {
@@ -145,8 +169,10 @@ macro void fill(Bitmap& bm, Color c)
 }
 
 
-macro void fill(Bitmap& bm, uint x0, uint y0, uint x1, uint y1, Color c)
+macro void fill(Bitmap& bm, uint x0, uint y0, uint w, uint h, Color c)
 {
+    uint x1 = x0 + w;
+    uint y1 = y0 + h;
     if (x0 >= bm.width || y0 >= bm.height) return;
     newMin(x1, bm.width); newMin(y1, bm.height);
     for (uint y = y0; y < y1; y++)
@@ -169,6 +195,21 @@ macro void vline(Bitmap& bm, uint x0, uint y0, uint y1, Color c)
     newMin(y1, bm.height);
     for (uint y = y0; y < y1; y++)
         bm.setQ(x0, y, c);
+}
+
+
+macro void copy(Bitmap& bm_src, Bitmap& bm_dst, uint x0_dst, uint y0_dst)
+{
+    for (uint y = 0, yy = y0_dst; y < bm_src.height && yy < bm_dst.height; y++, yy++)
+        for (uint x = 0, xx = x0_dst; x < bm_src.width && xx < bm_dst.width; x++, xx++)
+            bm_dst.setQ(xx, yy, bm_src(x, y));
+}
+
+
+macro void copy(Bitmap& bm_src, uint x0_src, uint y0_src, uint w, uint h, Bitmap& bm_dst, uint x0_dst, uint y0_dst)
+{
+    Bitmap bm(bm_src, x0_src, y0_src, w, h);
+    copy(bm, bm_dst, x0_dst, y0_dst);
 }
 
 

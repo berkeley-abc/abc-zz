@@ -23,6 +23,9 @@ using namespace std;
 // Initialize SDL:
 
 
+static String base_path;
+
+
 ZZ_Initializer(SDL, 0) {
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0){
         ShoutLn "SDL_Init failed: %_", SDL_GetError();
@@ -31,10 +34,19 @@ ZZ_Initializer(SDL, 0) {
 
 //  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");
+
+    char* path = SDL_GetBasePath();
+    base_path = path ? path : ".";
+    base_path += '/';
+
+    if (TTF_Init() == -1){
+        ShoutLn "TTF_Init() failed: %_", TTF_GetError();
+        exit(1); }
 }
 
 
 ZZ_Finalizer(SDL, 0) {
+    TTF_Quit();
     SDL_Quit();
 }
 
@@ -158,33 +170,46 @@ Tex Win::mkTex(Color c)
 }
 
 
+Tex Win::mkTex(TTF_Font* font, Color c_text, String text)
+{
+    SDL_Color fg;
+    fg.r = c_text.b;      // -- TTF uses BGR, we use RGB...
+    fg.g = c_text.g;
+    fg.b = c_text.r;
+    fg.a = c_text.a;
+
+    SDL_Surface* surf = TTF_RenderUTF8_Blended(font, text.c_str(), fg);
+    Bitmap bm(surf->w, surf->h, (Color*)surf->pixels, false, surf->pitch / 4);      // <<== 'surf' will leak memory right now...
+    return mkTex(bm);
+}
+
+
 void Win::present()
 {
-    if (bg.a != 0){
-        assert(bg.a == 255);    // -- must be one or the other
-        SDL_SetRenderDrawColor(ren, bg.r, bg.g, bg.b, 255);
-        SDL_RenderFillRect(ren, NULL);
-    }
+    SDL_SetRenderDrawColor(ren, bg.r, bg.g, bg.b, 255);
+    SDL_RenderFillRect(ren, NULL);
 
-    bool first = true;
     for (uint i = 0; i < layers.size(); i++){
         if (!layers[i].tex) continue;
 
-        SDL_BlendMode blend_mode = (first && bg.a == 0) ? SDL_BLENDMODE_NONE : SDL_BLENDMODE_BLEND;
-        first = false;
-        SDL_SetTextureBlendMode(layers[i].tex->tex, blend_mode);
+        SDL_SetTextureBlendMode(layers[i].tex->tex, SDL_BLENDMODE_BLEND);
 
         SDL_Rect src = layers[i].src;
         if (src.w == 0) src.w = layers[i].tex->bm.width;
         if (src.h == 0) src.h = layers[i].tex->bm.height;
 
+        SDL_Rect dst = layers[i].dst;
+      #if 0
         int win_w = 0, win_h = 0;
         SDL_GetWindowSize(win, &win_w, &win_h);
-        SDL_Rect dst = layers[i].dst;
         if (dst.w == 0) dst.w = win_w;
         if (dst.h == 0) dst.h = win_h;
+      #else
+        if (dst.w == 0) dst.w = layers[i].tex->bm.width;
+        if (dst.h == 0) dst.h = layers[i].tex->bm.height;
+      #endif
 
-        int angle = int(layers[i].angle * 180 / M_PI + 0.5);
+        int angle = floor(layers[i].angle + 0.5);
 
         SDL_Point center;
         center.x = dst.w / 2 + layers[i].rot_xoff;
@@ -241,12 +266,15 @@ bool waitEvent(SDL_Event& ev, double timeout /*= DBL_MAX*/)
     }else if (ret && ev.type == SDL_QUIT)
         exit(0);
 
-
-    /**/if (ev.type != SDL_MOUSEMOTION) Dump(ev);
+    //**/if (ev.type != SDL_MOUSEMOTION) Dump(ev);
 
     return ret;
-        // <<== deal with window visibiliy here!
-        // <<== deal with window closing here?
+}
+
+
+String basePath(String filename)
+{
+    return base_path + filename;
 }
 
 
