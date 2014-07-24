@@ -20,6 +20,12 @@ struct Rect : SDL_Rect {
 };
 
 
+template<> fts_macro void write_(Out& out, const SDL_Rect& v)
+{
+    FWrite(out) "Rect{x=%_; y=%_; w=%_; h=%_}", v.x, v.y, v.w, v.h;
+}
+
+
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Textures:
 
@@ -40,6 +46,7 @@ struct Tex_data {
 
    ~Tex_data() {
         SDL_DestroyTexture(tex);
+        /**/WriteLn "Destroying texture...";
     }
 
     void update(uint x, uint y, uint w, uint h) {
@@ -63,10 +70,11 @@ public:
     Tex() {}
     Bitmap& bm() { return (*this)->bm; }            // -- returns the bitmap backing data for the texture
 
+    void update(const Rect& rect)               { (*this)->update(rect.x, rect.y, rect.w, rect.h); }
     void update(uint x, uint y, uint w, uint h) { (*this)->update(x, y, w, h); }
-        // -- write portion of bitmap backing back to SDL texture (in graphics memory)
-
-    // <<= + set new backing bitmap (after resizing)
+        // -- write portion of bitmap backing to SDL texture (in graphics memory)
+    void update()                               { (*this)->update(0, 0, bm().width, bm().height); }
+        // -- write entire bitmap backing to SDL texture
 };
 
 
@@ -98,21 +106,25 @@ struct Layer {
 class Win {
     SDL_Window*   win;
     SDL_Renderer* ren;
+    uint          win_id;
 
     uint w;
     uint h;
 
 public:
-    Win();                                                              // -- full-screen
-    Win(uint w_, uint h_, String title = "", bool borderless = false);  // -- normal window
+    Win();          // -- full-screen
+    Win(uint w_, uint h_, String title = "", bool resizable = true, bool borderless = false);
    ~Win();
+
+    void close();   // -- dispose window resources and close window
 
     // Update these directly, then call 'present()':
     Color       bg;         // -- if fully transparent, bottom layer will be drawn opaquely.
     Vec<Layer>  layers;     // -- drawn with alpha-blend, starting with 'layers[0]'.
 
+    Tex operator[](uint i) { return layers[i].tex; } // -- returns texture of layer 'i'
 
-    uint id() const { return SDL_GetWindowID(win); }
+    uint id() const { return win_id; }
 
     uint width () const { return w; }
     uint height() const { return h; }
@@ -129,10 +141,10 @@ public:
 // Global functions:
 
 
-bool sdlWaitEvent(SDL_Event& ev, double timeout = DBL_MAX);
+bool waitEvent(SDL_Event& ev, double timeout = DBL_MAX);
     // -- may call 'present()' on windows that are made fully or partially visible.
     // Window resizing must be handled by caller (update 'layers' and call 'present()').
-    // Returns TRUE if event 'ev' was populated with new event.
+    // Returns FALSE if timeout was reached (no timeout => always returns TRUE).xs
 
 Win* getWin(uint win_id);
     // -- returns NULL if window has been closed.
