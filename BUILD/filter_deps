@@ -12,7 +12,7 @@ import re
 def systemHeader(filename):
     if re.match(r'/usr/.*', filename): return True
     if re.match(r'/grid/common/.*/gcc.*/include/.*', filename): return True
-    if re.match(r'/Applications/.*/include/.*', filename): return True
+    if re.match(r'/Applications/.*/XCode.app/.*', filename): return True
     return False
 
 

@@ -919,6 +919,8 @@ bool verifyInvariant(NetlistRef N, const Vec<Wire>& props, NetlistRef H, /*out*/
         assert(nl(props[0]) == nl(props[i])); // -- all properties must come from the same netlist
 
     SatStd S;
+    //**/OutFile debug_out("debug.txt");
+    //**/S.debug_api_out = &debug_out;
     WMap<Lit> n2s, i2s, j2s;
 
     Vec<Wire> flop, flop_in;
@@ -1879,6 +1881,7 @@ void foldConstraints(NetlistRef N)
             properties[i] = +properties[i];
             properties[i].set(0, ~N.add(And_(), ~properties[i][0] ^ s, ~w_cfail));
                 // -- a property is true if it holds or constraints have failed
+            if (s){ properties[i] = ~properties[i]; properties[i].set(0, ~properties[i][0]); }  // -- quick fix; 'verifyInvariant()' unhappy if gate change meaning
         }
     }
 

@@ -23,7 +23,7 @@
 #include "PostProcess.hh"
 #include "Refactor.hh"
 
-#define ELA_GLOBAL_LIM 200      // -- if nodes costing mroe than this are dereferenced, MFFC is too big to consider
+#define ELA_GLOBAL_LIM 200      // -- if nodes costing more than this are dereferenced, MFFC is too big to consider
 
 namespace ZZ {
 using namespace std;
