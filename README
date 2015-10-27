@@ -1,15 +1,33 @@
-Before compiling any files in the ZZ framework, you need to do the following:
+The ZZ framework uses CMake to build the system.
 
-  - Set your path to include 'ZZ/BUILD' or, alternatively, make an alias 'zb'
-    to point to 'ZZ/BUILD/zb'.
+- Create a new directory 'build' under the abc-zz main directory
 
-  - Make sure you have Python version 2.6 or 2.7 installed.
+  mkdir build
+  cd build
 
-  - Make sure you have developer header files installed for 'libz'.
+- Run CMake
 
-Now you can compile any binary by going into the appropriate directory, e.g.
-'ZZ/Bip', and typing 'zb'. Most binaries are put into 'zz/bin/<machine>', but
-some "debug" binaries are put into the local directory. This is determined by
-the contents of 'MODULE.conf' in each directory (where a '@' in front of the
-name in the 'PUBLISH_BIN' line indicates a local installation). For more
-information on the 'zb' tool, see ZZ/BUILD/build_system.txt'.
+  cmake ..
+
+- Build the target you are interested in (e.g. bip.exe)
+
+  make bip.exe (builds the bip executable)
+  make Bip (build the Bip library and its dependencies)
+  make Bip-pic (build the Bip library and its dependencies with -fPIC)
+  make Bip-exe (build all exectuables in module Bip)
+
+  make zz_all (builds all libraries and executables)
+  make zz_pic (build all libraries with -fPIC)
+  make zz_static (build all static libraries)
+
+
+Build ZZ requires the following:
+
+- CMake version 3.0.0 or above
+- Python 2.6 (or later)
+- Developer header files and libraries for 'zlib' (e.g. zlibg1-dev package on Ubuntu)
+
+Recommended:
+
+- GNU Readline developer header files and libraries (e.g. readline-dev on Ubuntu)
+- libpng developer header files and libraries (e.g. libpng12-dev on Ubuntu)

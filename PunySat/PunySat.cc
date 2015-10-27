@@ -602,8 +602,8 @@ PS_(void) reduceDB()
         locked.push((clauses[i].bcp(assign, p) && reason[BV::var(p)] == i) ? 1 : 0);
     }
 
-    Array<float> acts = slice(c_activ[first_learned], c_activ.end());
-    Array<BV>    clas = slice(clauses[first_learned], clauses.end());
+    Array<float> acts = slice(c_activ[first_learned], c_activ.end_());
+    Array<BV>    clas = slice(clauses[first_learned], clauses.end_());
     sobSort(ordReverse(ordByFirst(ordLexico(sob(locked), sob(acts)), ordByFirst(sob(cl_map), sob(clas))))); // <<== add "ordCombine"?
 
     Vec<uint>  rev_map(clauses.size());
