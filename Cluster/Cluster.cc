@@ -52,22 +52,22 @@ void Job::serialize(Out& out) const
     putu(out, id);
     putu(out, prio);
     putu(out, conc);
-    puts(out, batch);
+    putz(out, batch);
 
-    puts(out, exec);
-    putu(out, args.size()); for (uint i = 0; i < args.size(); i++) puts(out, args[i]);
-    puts(out, dir);
-    putu(out, env .size()); for (uint i = 0; i < env .size(); i++) puts(out, env [i]);
+    putz(out, exec);
+    putu(out, args.size()); for (uint i = 0; i < args.size(); i++) putz(out, args[i]);
+    putz(out, dir);
+    putu(out, env .size()); for (uint i = 0; i < env .size(); i++) putz(out, env [i]);
 
     putF(out, real);
     putF(out, cpu);
     putu(out, mem);
 
-    puts(out, stdin);
-    puts(out, stdout);
-    puts(out, stderr);
-    puts(out, status);
-    puts(out, topmon);
+    putz(out, stdin);
+    putz(out, stdout);
+    putz(out, stderr);
+    putz(out, status);
+    putz(out, topmon);
 
     putF(out, ztrig);
     putF(out, zpause);
