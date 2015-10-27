@@ -1103,13 +1103,13 @@ void LibertyParser::parse(LibertyListener& lis)
 
 double SC_Lib::ff(double cap) const
 {
-    return cap * unit_cap.fst * pow(10, 15 - unit_cap.snd);
+    return cap * unit_cap.fst * pow(10.0, 15 - unit_cap.snd);
 }
 
 
 double SC_Lib::ps(double time) const
 {
-    return time * pow(10, 12 - unit_time);
+    return time * pow(10.0, 12 - unit_time);
 }
 
 
