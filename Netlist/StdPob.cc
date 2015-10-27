@@ -28,7 +28,6 @@ using namespace std;
 Register_Pob(strash, Strash);
 Register_Pob(fanouts, Fanouts);
 Register_Pob(fanout_count, FanoutCount);
-Register_Pob(dyn_fanouts, DynFanouts);
 Register_Pob(up_order, UpOrder);
 Register_Pob(flop_init, FlopInit);
 Register_Pob(aiger_comment, RawData);

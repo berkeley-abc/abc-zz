@@ -204,6 +204,7 @@ void Pec_DynFanouts::remove(Wire w)
 
 
 Register_Pec(DynFanouts);
+Register_Pob(dyn_fanouts, DynFanouts);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
