@@ -115,6 +115,7 @@ void test()
 
 int myTab(int count, int key)
 {
+#ifdef ZZ_HAS_READLINE
     uint start = rl_point;
     while (start > 0 && isIdentChar0(rl_line_buffer[start-1])) start--;
     Str tail = slice(rl_line_buffer[start], rl_line_buffer[rl_point]);
@@ -127,7 +128,7 @@ int myTab(int count, int key)
         rl_point--;
     }
 #endif
-
+#endif
     return 0;
 }
 

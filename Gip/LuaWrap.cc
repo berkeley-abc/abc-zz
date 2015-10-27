@@ -228,7 +228,7 @@ int l_lutmap(lua_State* L_)
 
 int rlfun_loadStd(int count, int key)
 {
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && defined(ZZ_HAS_READLINE)
     rl_replace_line("dofile(\"std.lua\")", true);
     rl_redisplay();
     rl_crlf();
@@ -240,7 +240,7 @@ int rlfun_loadStd(int count, int key)
 
 int rlfun_wrapPrint(int count, int key)
 {
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && defined(ZZ_HAS_READLINE)
     String text;
     FWrite(text) "print(%_)", rl_line_buffer;
     rl_replace_line(text.c_str(), true);
@@ -251,7 +251,7 @@ int rlfun_wrapPrint(int count, int key)
     return 0;
 }
 
-
+#ifdef ZZ_HAS_READLINE
 void rl_bindFunctionKey(int key, rl_command_func_t* fun)
 {
     static cchar* key_seq[12][2] = {
@@ -275,6 +275,7 @@ void rl_bindFunctionKey(int key, rl_command_func_t* fun)
     if (key_seq[key-1][1])
         rl_generic_bind(ISFUNC, key_seq[key-1][1], (char*)fun, rl_get_keymap());
 }
+#endif
 
 
 void testLua()
@@ -286,8 +287,10 @@ void testLua()
     //    WriteLn "%_: %_ %_", i, (uint)m[i].type, (void*)m[i].function;
     //exit(0);
 
+#ifdef ZZ_HAS_READLINE
     rl_bindFunctionKey(1, rlfun_loadStd);
     rl_generic_bind(ISFUNC, "\\e[27;5;13~", (char*)rlfun_wrapPrint, rl_get_keymap());
+#endif
 
     // ^[OP (Q R ...)
     //rl_bind_key_in_map ('P', rlLoadStd, Keymap map)
