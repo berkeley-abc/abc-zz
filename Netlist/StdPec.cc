@@ -14,6 +14,7 @@
 #include "Prelude.hh"
 #include "StdPec.hh"
 #include "StdLib.hh"
+#include "StdPob.hh"
 
 namespace ZZ {
 using namespace std;
@@ -339,4 +340,20 @@ Register_Pec(MemInfo);
 
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+
+Register_Pob(strash, Strash);
+Register_Pob(fanouts, Fanouts);
+Register_Pob(fanout_count, FanoutCount);
+Register_Pob(up_order, UpOrder);
+Register_Pob(flop_init, FlopInit);
+Register_Pob(aiger_comment, RawData);
+Register_Pob(properties, VecWire);
+Register_Pob(constraints, VecWire);
+Register_Pob(fair_properties, VecVecWire);
+Register_Pob(fair_constraints, VecWire);
+Register_Pob(init_bad, VecWire);
+Register_Pob(init_nl, Netlist);
+Register_Pob(reset, Wire);
+Register_Pob(mem_info, MemInfo);
+
 }
