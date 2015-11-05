@@ -103,7 +103,7 @@ add_custom_command(
 set_source_files_properties("${siertsat_header}" PROPERTIES GENERATED TRUE)
 
 zz_module(SiertSat HEADERS "${siertsat_header}")
-zz_target_link_libraries(SiertSat PUBLIC glucose glucored minisat minired)
+zz_target_link_libraries(SiertSat PUBLIC ZZ_LIBRARIES glucose glucored minisat minired)
 
 find_package (Threads)
 zz_target_link_libraries(SiertSat PUBLIC ${CMAKE_THREAD_LIBS_INIT})

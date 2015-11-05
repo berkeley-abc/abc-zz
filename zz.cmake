@@ -209,9 +209,18 @@ function(zz_target_compile_options target)
 endfunction()
 
 
-function(zz_target_link_libraries target)
-    target_link_libraries(${target} ${ARGN})
-    target_link_libraries(${target}-pic ${ARGN})
+function(zz_target_link_libraries target visibility)
+
+    cmake_parse_arguments(zz "" "" "ZZ_LIBRARIES" ${ARGN})
+
+    foreach( zzlib ${zz_ZZ_LIBRARIES} )
+        target_link_libraries(${target} ${visibility} ${zzlib})
+        target_link_libraries(${target}-pic ${visibility} ${zzlib}-pic)
+    endforeach()
+
+    target_link_libraries(${target} ${visibility} ${zz_UNPARSED_ARGUMENTS})
+    target_link_libraries(${target}-pic ${visibility} ${zz_UNPARSED_ARGUMENTS})
+
 endfunction()
 
 
