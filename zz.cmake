@@ -180,7 +180,7 @@ function( zz_module name )
 
         string( REGEX REPLACE "^.*/Main_(.*)\\.(cpp|cc|c)$" "\\1.exe" target ${main})
 
-        add_executable( ${target} EXCLUDE_FROM_ALL ${main} )
+        add_executable( ${target} ${main} )
         target_link_libraries( ${target} PRIVATE ${name} )
 
         add_dependencies( zz_exe ${target} )
