@@ -191,26 +191,29 @@ def create_header():
             ]
 
     out_filename = z("INCLUDE_DIR") + "/"+ module_name + ".hh"
-    tmp_filename = z("INCLUDE_DIR") + "/"+ module_name + ".hh.tmp"
-    out = open(tmp_filename, "wt")
 
-    for filename in order:
-        remove_protected = (filename.endswith("Solver.h"))
-        if filename.startswith("solver-reducer-g"): out.write("#define GLUCORED\n"); filename = "solver-reducer" + filename[16:]
-        if filename.startswith("solver-reducer-r"):  out.write("#define MINIRED\n"); filename = "solver-reducer" + filename[16:]
-        with open(filename) as f:
-            for line in f:
-                if not skip_line(line, remove_protected):
-                    out.write(subst_defines(line))
-        if filename.startswith("glucored"): out.write("#undef GLUCORED\n")
-        if filename.startswith("minired"):  out.write("#undef MINIRED\n")
-    out.close()
+    with open(out_filename, 'wt') as out:
 
-    # Report file creation only if different:
-    if not os.path.exists(out_filename) or os.system("diff " + out_filename + " " + tmp_filename + " >/dev/null") != 0:
-        os.system("mv " + tmp_filename + " " + out_filename)
-        print "`` Created header: " + module_name + ".hh"
+        for filename in order:
 
+            remove_protected = (filename.endswith("Solver.h"))
+
+            if filename.startswith("solver-reducer-g"):
+                out.write("#define GLUCORED\n"); filename = "solver-reducer" + filename[16:]
+
+            if filename.startswith("solver-reducer-r"):
+                out.write("#define MINIRED\n"); filename = "solver-reducer" + filename[16:]
+
+            with open(filename) as f:
+                for line in f:
+                    if not skip_line(line, remove_protected):
+                        out.write(subst_defines(line))
+
+            if filename.startswith("glucored"):
+                out.write("#undef GLUCORED\n")
+
+            if filename.startswith("minired"):
+                out.write("#undef MINIRED\n")
 
 ##mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 ## Clean up:
