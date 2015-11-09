@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0.0)
 
-include(zz.cmake)
+include(cmake/zz.cmake)
 
 project(ZZ)
 

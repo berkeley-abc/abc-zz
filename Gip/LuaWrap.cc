@@ -12,10 +12,9 @@
 //|________________________________________________________________________________________________
 
 #if defined(ZZ_HAS_READLINE)
-extern "C"{
+#include <cstdio>
 #include <readline/readline.h>
 #include <readline/history.h>
-}
 #endif
 
 #include "Prelude.hh"

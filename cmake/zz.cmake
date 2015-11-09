@@ -1,3 +1,5 @@
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
+
 include(CMakeParseArguments)
 find_package(PythonInterp 2.6 REQUIRED)
 
