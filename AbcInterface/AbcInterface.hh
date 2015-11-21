@@ -17,13 +17,23 @@
 #include "ZZ_Netlist.hh"
 #include "ZZ_Bip.Common.hh"     // -- get type declaration for 'Cex' 
 
+#ifdef ZZ_USE_EXTERNAL_LIBABC
+#include <misc/util/abc_namespace.h>
+#else
+#include <misc,util,abc_namespace.h>
+#endif
+
+ABC_NAMESPACE_HEADER_START
+
 struct Gia_Man_t_;
 typedef struct Gia_Man_t_ Gia_Man_t;
+
+ABC_NAMESPACE_HEADER_END
 
 namespace ZZ {
 using namespace std;
 
-
+ABC_NAMESPACE_USING_NAMESPACE
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 

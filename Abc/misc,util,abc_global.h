@@ -81,33 +81,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
-////////////////////////////////////////////////////////////////////////
-///                         NAMESPACES                               ///
-////////////////////////////////////////////////////////////////////////
-
-//#define ABC_NAMESPACE xxx
-
-#ifdef __cplusplus
-#  ifdef ABC_NAMESPACE
-#    define ABC_NAMESPACE_HEADER_START namespace ABC_NAMESPACE {
-#    define ABC_NAMESPACE_HEADER_END }
-#    define ABC_NAMESPACE_IMPL_START namespace ABC_NAMESPACE {
-#    define ABC_NAMESPACE_IMPL_END }
-#    define ABC_NAMESPACE_PREFIX ABC_NAMESPACE::
-#  else
-#    define ABC_NAMESPACE_HEADER_START extern "C" {
-#    define ABC_NAMESPACE_HEADER_END }
-#    define ABC_NAMESPACE_IMPL_START
-#    define ABC_NAMESPACE_IMPL_END
-#    define ABC_NAMESPACE_PREFIX
-#  endif // #ifdef ABC_NAMESPACE
-#else
-#  define ABC_NAMESPACE_HEADER_START
-#  define ABC_NAMESPACE_HEADER_END
-#  define ABC_NAMESPACE_IMPL_START
-#  define ABC_NAMESPACE_IMPL_END
-#  define ABC_NAMESPACE_PREFIX
-#endif // #ifdef __cplusplus
+#include "misc,util,abc_namespaces.h"
 
 ////////////////////////////////////////////////////////////////////////
 ///                         PARAMETERS                               ///

@@ -14,11 +14,15 @@
 #include "Prelude.hh"
 #include "AbcInterface.hh"
 
-extern "C" {
-#include "ZZ/Abc/abc.h"
-#include "ZZ/Abc/mainInt.h"
-#include "ZZ/Abc/main.h"
-}
+#ifdef ZZ_USE_EXTERNAL_LIBABC
+#  include "base/abc/abc.h"
+#  include "base/main/mainInt.h"
+#  include "base/main/main.h"
+#else
+#  include "ZZ/Abc/abc.h"
+#  include "ZZ/Abc/mainInt.h"
+#  include "ZZ/Abc/main.h"
+#endif
 
 namespace ZZ {
 using namespace std;
@@ -27,6 +31,7 @@ using namespace std;
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 // Global state:
 
+ABC_NAMESPACE_USING_NAMESPACE
 
 static Abc_Frame_t* A;
 
