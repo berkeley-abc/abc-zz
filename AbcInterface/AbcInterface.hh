@@ -20,7 +20,7 @@
 #ifdef ZZ_USE_EXTERNAL_LIBABC
 #include <misc/util/abc_namespaces.h>
 #else
-#include <misc,util,abc_namespaces.h>
+#include "ZZ/Abc/misc,util,abc_namespaces.h"
 #endif
 
 ABC_NAMESPACE_HEADER_START
