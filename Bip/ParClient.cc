@@ -471,7 +471,7 @@ void streamOut_Netlist(Vec<uchar>& data, NetlistRef N)
         putu(data, properties.size());
         for (uint i = 0; i < properties.size(); i++){
             Wire w = properties[i]; assert(type(w) == gate_PO);
-            putu(data, xlat[w[0]] ^ (int)sign(w[0]));
+            putu(data, xlat[w[0]] ^ (int)sign(w[0]) ^ (int)sign(w));
         }
     }else
         putu(data, 0);  // -- no properties
