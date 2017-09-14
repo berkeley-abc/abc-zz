@@ -80,6 +80,8 @@ void sendMsg_Abort(String text);
 
 void sendMsg_ClauseInvar(const Vec<int>& clauses);
 
+void streamIn_Netlist(const uchar* in, const uchar* end, NetlistRef N);
+void streamOut_Netlist(Vec<uchar>& data, NetlistRef N);
 
 //mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 }

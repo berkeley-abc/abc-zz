@@ -359,7 +359,6 @@ macro void putu32(Vec<uchar>& out, uint x)
 // Netlist marshalling: [internal]
 
 
-static
 void streamOut_Netlist(Vec<uchar>& data, NetlistRef N)
 {
     WMap<uint> xlat(UINT_MAX);
@@ -536,7 +535,6 @@ void streamOut_Netlist(Vec<uchar>& data, NetlistRef N)
 }
 
 
-static
 void streamIn_Netlist(const uchar* in, const uchar* end, NetlistRef N)
     // throw(Excp_EOF)
 {
