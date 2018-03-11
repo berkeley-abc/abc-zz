@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/berkeley-abc/abc-zz.svg?branch=master)](https://travis-ci.org/berkeley-abc/abc-zz)
+
 The ZZ framework uses CMake to build the system.
 
 - Create a new directory 'build' under the abc-zz main directory
@@ -25,7 +27,7 @@ Build ZZ requires the following:
 
 - CMake version 3.0.0 or above
 - Python 2.6 (or later)
-- Developer header files and libraries for 'zlib' (e.g. zlibg1-dev package on Ubuntu)
+- Developer header files and libraries for 'zlib' (e.g. zlib1g-dev package on Ubuntu)
 
 Recommended:
 

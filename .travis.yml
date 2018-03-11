@@ -1,0 +1,26 @@
+language: cpp
+
+matrix:
+  include:
+
+    - os: linux
+      addons:
+        apt:
+          packages:
+            - libreadline-dev
+            - zlib1g-dev
+            - ninja-build
+
+    - os: osx
+      osx_image: xcode8
+      before_install:
+        - brew update
+        - brew install zlib readline ninja
+
+script:
+  
+  - mkdir build
+  - cd build 
+  
+  - cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
+  - cmake --build . --target zz_all
