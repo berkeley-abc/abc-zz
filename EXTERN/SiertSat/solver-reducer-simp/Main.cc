@@ -54,24 +54,24 @@ void printStats(SolRed& solver)
 {
     double cpu_time = cpuTime();
     double mem_used = memUsedPeak();
-    printf("c restarts              : %"PRIu64"\n", solver.starts);
-    printf("c conflicts             : %-12"PRIu64"   (%.0f /sec)\n", solver.conflicts   , solver.conflicts   /cpu_time);
-    printf("c decisions             : %-12"PRIu64"   (%4.2f %% random) (%.0f /sec)\n", solver.decisions, solver.decisions?((float)solver.rnd_decisions*100 / (float)solver.decisions): 0, solver.decisions   /cpu_time);
-    printf("c propagations          : %-12"PRIu64"   (%.0f /sec)\n", solver.propagations, solver.propagations/cpu_time);
-    printf("c conflict literals     : %-12"PRIu64"   (%4.2f %% deleted)\n", solver.tot_literals, (solver.max_literals - solver.tot_literals)*100 / (double)solver.max_literals);
+    printf("c restarts              : %" PRIu64 "\n", solver.starts);
+    printf("c conflicts             : %-12" PRIu64 "   (%.0f /sec)\n", solver.conflicts   , solver.conflicts   /cpu_time);
+    printf("c decisions             : %-12" PRIu64 "   (%4.2f %% random) (%.0f /sec)\n", solver.decisions, solver.decisions?((float)solver.rnd_decisions*100 / (float)solver.decisions): 0, solver.decisions   /cpu_time);
+    printf("c propagations          : %-12" PRIu64 "   (%.0f /sec)\n", solver.propagations, solver.propagations/cpu_time);
+    printf("c conflict literals     : %-12" PRIu64 "   (%4.2f %% deleted)\n", solver.tot_literals, (solver.max_literals - solver.tot_literals)*100 / (double)solver.max_literals);
 
     printf("\nc -- solver/reducer statistics --\n");
-    printf("c workset inserts       : %-12"PRIu64"\n", solver.workset_in);
-    printf("c workset inserts lits  : %-12"PRIu64"\n", solver.workset_in_lits);
-    printf("c workset deletions     : %-12"PRIu64"\n", solver.workset_deleted);
-    printf("c workset deletions lits: %-12"PRIu64"\n", solver.workset_deleted_lits);
-    printf("c reducer inputs        : %-12"PRIu64"\n", solver.reducer_in);
-    printf("c reducer inputs lits   : %-12"PRIu64"\n", solver.reducer_in_lits);
-    printf("c reducer outputs       : %-12"PRIu64"\n", solver.reducer_out);
-    printf("c reducer outputs lits  : %-12"PRIu64"\n", solver.reducer_out_lits); 
-    printf("c reducer not outp. lits: %-12"PRIu64"\n", solver.reducer_notout_lits); 
-    printf("c reducer forced backtr.: %-12"PRIu64"   (avg. %1.f levels from level %.1f)\n", solver.reducer_backtracks, solver.reducer_backtracks?((float)solver.reducer_backtrack_levels / (float)solver.reducer_backtracks):0, solver.reducer_backtracks?(solver.reducer_backtrack_level_before / (float)solver.reducer_backtracks):0);
-    printf("c reducer f.backtr. to 0: %-12"PRIu64"\n\n", solver.reducer_backtracks_tozero);
+    printf("c workset inserts       : %-12" PRIu64 "\n", solver.workset_in);
+    printf("c workset inserts lits  : %-12" PRIu64 "\n", solver.workset_in_lits);
+    printf("c workset deletions     : %-12" PRIu64 "\n", solver.workset_deleted);
+    printf("c workset deletions lits: %-12" PRIu64 "\n", solver.workset_deleted_lits);
+    printf("c reducer inputs        : %-12" PRIu64 "\n", solver.reducer_in);
+    printf("c reducer inputs lits   : %-12" PRIu64 "\n", solver.reducer_in_lits);
+    printf("c reducer outputs       : %-12" PRIu64 "\n", solver.reducer_out);
+    printf("c reducer outputs lits  : %-12" PRIu64 "\n", solver.reducer_out_lits);
+    printf("c reducer not outp. lits: %-12" PRIu64 "\n", solver.reducer_notout_lits);
+    printf("c reducer forced backtr.: %-12" PRIu64 "   (avg. %1.f levels from level %.1f)\n", solver.reducer_backtracks, solver.reducer_backtracks?((float)solver.reducer_backtrack_levels / (float)solver.reducer_backtracks):0, solver.reducer_backtracks?(solver.reducer_backtrack_level_before / (float)solver.reducer_backtracks):0);
+    printf("c reducer f.backtr. to 0: %-12" PRIu64 "\n\n", solver.reducer_backtracks_tozero);
 
     if (mem_used != 0) printf("c Memory used           : %.2f MB\n", mem_used);
     printf("c CPU time              : %g s\n", cpu_time); 

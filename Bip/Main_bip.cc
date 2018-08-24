@@ -508,8 +508,8 @@ static
 void writeCex(Out& out, NetlistRef N, const Cex& cex, uint orig_num_pis)
 {
     Vec<Pair<int,GLit> > ffs, pis;
-    For_Gatetype(N, gate_Flop, w) ffs.push(tuple(attr_Flop(w).number, w));
-    For_Gatetype(N, gate_PI  , w) pis.push(tuple(attr_PI  (w).number, w));
+    For_Gatetype(N, gate_Flop, w) ffs.push(ZZ::tuple(attr_Flop(w).number, w));
+    For_Gatetype(N, gate_PI  , w) pis.push(ZZ::tuple(attr_PI  (w).number, w));
     sort(ffs);
     sort(pis);
 
