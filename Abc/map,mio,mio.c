@@ -16,6 +16,7 @@
 
 ***********************************************************************/
 
+#define _DEFAULT_SOURCE
 #define _BSD_SOURCE
 
 #ifndef WIN32
