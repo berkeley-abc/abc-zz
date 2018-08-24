@@ -346,7 +346,7 @@ struct ExcpFormater {
         assert(*fmt == 0);  // -- Fails if too FEW arguments are provided for given format
         X excp(*out);
         delete out;
-        throw excp; }
+        std::terminate(); }
 };
 
 
