@@ -1400,7 +1400,7 @@ void MiniSat<pfl>::clearFilter()
 #define H1 "\a*"
 #define H2 "\a*"
 #define SEP0 "|"
-#define SEP "\a0\a/"SEP0"\a0"
+#define SEP "\a0\a/" SEP0 "\a0"
 #define SEPH1 SEP H1
 #define SEPH2 SEP H2
 
@@ -1434,7 +1434,7 @@ void MiniSat<pfl>::printProgressLine(bool newline) const
         if (lit_ratio_text.size() > 5) lit_ratio_text = (FMT "%>5%,'D", (int64)lit_ratio);
     }
 
-    String text = (FMT "\r%>5%,'D  %>5%,'D  %>5%,'D  "SEP0" %>5%,'D  %>5%,'D  "SEP0" %>5%,'D  %>5%,'D  %_  "SEP0" %>6%^DB%>10%t",
+    String text = (FMT "\r%>5%,'D  %>5%,'D  %>5%,'D  " SEP0 " %>5%,'D  %>5%,'D  " SEP0 " %>5%,'D  %>5%,'D  %_  " SEP0 " %>6%^DB%>10%t",
         stats.conflicts,
         stats.decisions,
         stats.propagations,
