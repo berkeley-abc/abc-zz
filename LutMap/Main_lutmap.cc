@@ -823,7 +823,7 @@ int main(int argc, char** argv)
 
         Vec<Pair<uint, uint64> > list;
         For_Map(ftbs)
-            list.push(tuple(Map_Value(ftbs), Map_Key(ftbs)));
+            list.push(ZZ::tuple(Map_Value(ftbs), Map_Key(ftbs)));
         sort_reverse(list);
 
         OutFile out(cli.get("ftbs").string_val);
