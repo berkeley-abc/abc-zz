@@ -54,8 +54,8 @@ void createDualRailModel(NetlistRef N, const FlopSet& abstr, /*in+out*/Vec<Wire>
     hi_flop_offset = reset_num + 1;
 
     WMap<Pair<GLit,GLit> > n2m;
-    n2m(N.True ()) = tuple( M.True(),  M.True());
-    n2m(N.False()) = tuple(~M.True(), ~M.True());
+    n2m(N.True ()) = make_tuple( M.True(),  M.True());
+    n2m(N.False()) = make_tuple(~M.True(), ~M.True());
 
     // Copy logic from 'N' to 'M':
     Vec<Pair<GLit,GLit> > flops;
@@ -65,7 +65,7 @@ void createDualRailModel(NetlistRef N, const FlopSet& abstr, /*in+out*/Vec<Wire>
         switch (type(w)){
         case gate_PI:{
             Wire m = M.add(PI_(attr_PI(w).number));
-            n2m(w) = tuple(m, m);
+            n2m(w) = make_tuple(m, m);
             break;}
 
         case gate_Flop:
@@ -73,7 +73,7 @@ void createDualRailModel(NetlistRef N, const FlopSet& abstr, /*in+out*/Vec<Wire>
                 int num = attr_Flop(w).number;
                 Wire flop_lo = M.add(Flop_(num));
                 Wire flop_hi = M.add(Flop_(num + hi_flop_offset));
-                flops(num) = tuple(flop_lo.lit(), flop_hi.lit());
+                flops(num) = make_tuple(flop_lo.lit(), flop_hi.lit());
 
                 lbool init = flop_init_N[w];
                 flop_init(flop_lo) = init;
@@ -83,11 +83,11 @@ void createDualRailModel(NetlistRef N, const FlopSet& abstr, /*in+out*/Vec<Wire>
                     flop_lo = s_Mux(reset, pseudo, flop_lo);    // -- must make sure both rails are initialized to the same random value
                     flop_hi = s_Mux(reset, pseudo, flop_hi);
                 }
-                n2m(w) = tuple(flop_lo, flop_hi);
+                n2m(w) = make_tuple(flop_lo, flop_hi);
 
             }else{
                 // <<== blanda in 'reset' här...
-                n2m(w) = tuple(~M.True(), M.True());
+                n2m(w) = make_tuple(~M.True(), M.True());
             }
             break;
 
@@ -99,14 +99,14 @@ void createDualRailModel(NetlistRef N, const FlopSet& abstr, /*in+out*/Vec<Wire>
             Wire m1_hi = M[ n2m[w[1]].snd ^ sign(w[1]) ];
             if (sign(w[1])) swp(m1_lo, m1_hi);
 
-            n2m(w) = tuple(s_And(m0_lo, m1_lo), s_And(m0_hi, m1_hi));
+            n2m(w) = make_tuple(s_And(m0_lo, m1_lo), s_And(m0_hi, m1_hi));
             break;}
 
         case gate_PO:{
             // Convert property from dual-rail to single-rail (0 -> 0, 1/X -> 1)
             Wire m = sign(w[0]) ? ~M[n2m[w[0]].fst] : M[n2m[w[0]].snd];
             Wire m_hi = M.add(PO_(attr_PO(w).number), m);
-            n2m(w) = tuple(m_hi, m_hi);
+            n2m(w) = make_tuple(m_hi, m_hi);
             break;}
 
         default:

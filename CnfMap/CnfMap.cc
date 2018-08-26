@@ -30,9 +30,9 @@ macro Pair<Cut, Array<Cut> > getCuts(Wire w, const WMap<Array<Cut> >& cutmap)
 {
     assert(!sign(w));
     if (type(w) == gate_Const)
-        return tuple(Cut(cut_empty_, id(w) == gid_True), Array<Cut>(empty_));
+        return make_tuple(Cut(cut_empty_, id(w) == gid_True), Array<Cut>(empty_));
     else
-        return tuple(Cut(+w), cutmap[w]);
+        return make_tuple(Cut(+w), cutmap[w]);
 }
 
 
@@ -145,7 +145,7 @@ float CnfMap::evaluateCuts(Array<Cut> cuts)
         Vec<Pair<uint,float> >& cut_level = tmp_cut_level;
         cut_level.setSize(cuts.size());
         for (uint i = 0; i < cuts.size(); i++){
-            cut_level[i] = tuple(0u, 0.0f);
+            cut_level[i] = make_tuple(0u, 0.0f);
             for (uint j = 0; j < cuts[i].size(); j++){
                 Wire w = cuts[i][j] + N;
                 newMax(cut_level[i].fst, level[w]);
@@ -177,7 +177,7 @@ float CnfMap::evaluateCuts(Array<Cut> cuts)
         static Vec<Quad<float,uint,uint,uint> > eval;
         eval.setSize(cuts.size());
         for (uint i = 0; i < cuts.size(); i++){
-            eval[i] = tuple(0.0f, cuts[i].size(), 0, i);
+            eval[i] = make_tuple(0.0f, cuts[i].size(), 0, i);
             for (uint j = 0; j < cuts[i].size(); j++){
                 Wire w = cuts[i][j] + N;
                 newMax(eval[i].trd, level[w]);

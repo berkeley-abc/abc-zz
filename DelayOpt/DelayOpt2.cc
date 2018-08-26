@@ -1122,7 +1122,7 @@ void DelayOpt::continuousResizing()
                 if (length + epsilon >= crit_len_cont){
                     crit.add(w);
                     if (maxAltNo(w) > 0)
-                        ps.push(tuple(0, w));
+                        ps.push(make_tuple(0, w));
                 }
                 // <<== beräkna generösare crit region här för softmax?
             }

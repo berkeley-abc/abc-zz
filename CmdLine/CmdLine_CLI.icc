@@ -69,7 +69,7 @@ void CLI::add(String arg_name, String arg_signature, String default_value, Strin
             goto Error; }
     }
 
-    args.push(tuple(CLI_Arg(arg_name, sig, default_value, arg_pos, help_text), val));
+    args.push(make_tuple(CLI_Arg(arg_name, sig, default_value, arg_pos, help_text), val));
     return;
 
 Error:
@@ -129,7 +129,7 @@ bool CLI::has(String arg_name)
 
 void CLI::embed(CLI& cli_, String prefix)
 {
-    embedded.push(tuple(&cli_, prefix));
+    embedded.push(make_tuple(&cli_, prefix));
 }
 
 

@@ -269,8 +269,8 @@ void Refactor::addConj(GLit w_top, const Vec<GLit>& elems)
     // Hash pairs:
     for (uint i = 0; i+1 < sz; i++){
         for (uint j = i+1; j < sz; j++){
-            if (tmp[i] < tmp[j]) pairs.push(tuple(tuple(tmp[i], tmp[j]), cid));
-            else                 pairs.push(tuple(tuple(tmp[j], tmp[i]), cid));
+            if (tmp[i] < tmp[j]) pairs.push(make_tuple(make_tuple(tmp[i], tmp[j]), cid));
+            else                 pairs.push(make_tuple(make_tuple(tmp[j], tmp[i]), cid));
         }
     }
 }
@@ -295,7 +295,7 @@ void Refactor::addPairs()
                 cs[n] = pairs[i + n].snd;
             pair_occur.push(cs);
             pair_occur_sz.push(j - i);
-            prio.push(tuple(j - i, max_(sec_prio[pairs[i].fst.fst], sec_prio[pairs[i].fst.snd])));
+            prio.push(make_tuple(j - i, max_(sec_prio[pairs[i].fst.fst], sec_prio[pairs[i].fst.snd])));
             Q.add(pid);
 
             i = j;
@@ -345,7 +345,7 @@ void Refactor::combine(pair_id pid)
                 GLit u = c[i], v = x[j];
                 if (u > v) swp(u, v);
                 pair_id pid_gone;
-                if (pair2id.peek(tuple(u, v), pid_gone)){
+                if (pair2id.peek(make_tuple(u, v), pid_gone)){
                     // Remove 'cid' from 'pair_occur[pid_gone]' (which will decrease 'pair_occur_sz', so perculate or remove from 'Q'):
                     assert(pid_gone != pid);
 
@@ -372,8 +372,8 @@ void Refactor::combine(pair_id pid)
 
         // Push new pairs involving 'w' on buffer:
         for (uint i = 0; i < sz; i++){
-            if (c[i] < w.lit()) pairs.push(tuple(tuple(c[i], w), cid));
-            else          pairs.push(tuple(tuple(w, c[i]), cid));
+            if (c[i] < w.lit()) pairs.push(make_tuple(make_tuple(c[i], w), cid));
+            else          pairs.push(make_tuple(make_tuple(w, c[i]), cid));
         }
 
         // Add 'w' to conjunction:

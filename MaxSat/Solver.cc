@@ -112,7 +112,7 @@ struct CmpGig {
     CmpGig(Gig& N_, Vec<GLit>& result_) : N(N_), result(result_) {}
 
     void operator()(uint i, uint j) {
-        l_tuple(result[i], result[j]) = tuple(mkOr (result[i] + N, result[j] + N),
+        l_tuple(result[i], result[j]) = make_tuple(mkOr (result[i] + N, result[j] + N),
                                               mkAnd(result[i] + N, result[j] + N));
     }
 };
@@ -436,7 +436,7 @@ void coreMaxSat(MaxSatProb& P)
         // Sort 'act' on score:
         Vec<Pair<double, Lit> > as;
         for (uint i = 0; i < act.size(); i++)
-            as.push(tuple(-score(act[i].id, 0.0), act[i]));
+            as.push(make_tuple(-score(act[i].id, 0.0), act[i]));
         sort(as);
         for (uint i = 0; i < as.size(); i++)
             act[i] = as[i].snd;

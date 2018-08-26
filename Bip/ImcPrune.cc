@@ -206,7 +206,7 @@ Wire ImcPrune::prune(Wire w_init, Wire w_itp, uint k)
             int num = attr_Flop(wi).number;
             Wire wn = ff[num][0]; assert(!sign(ff[num]));
             Wire wh = insertH(wn);
-            num_so_pairs.push(tuple(num, wh));
+            num_so_pairs.push(make_tuple(num, wh));
         }
 
         Wire wh_init = copyFormula(w_init, H);  // -- insert 'init' signal into 'H':

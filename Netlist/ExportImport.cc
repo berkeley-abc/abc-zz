@@ -302,9 +302,9 @@ void readAiger_(In& in, NetlistRef N, bool store_comment)
         else if (type == 'j') /*ignore*/;
         else throw Excp_AigerParseError("Expected symbol prefix: i l o b c j f");
 
-        xnames.push(tuple(p, String(buf.base())));
+        xnames.push(make_tuple(p, String(buf.base())));
         if (buf[0] == '@' && buf[1] == type)
-            xnums.push(tuple(p, (int)stringToInt64(&buf[2])));
+            xnums.push(make_tuple(p, (int)stringToInt64(&buf[2])));
         else
             use_xnums = false;
     }

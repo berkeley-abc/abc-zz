@@ -295,7 +295,7 @@ Wire BddCutOff::build(uint idx, double sum, double material_left)
 #endif
     // <<== need to handle numeric imprecision here!
 
-    Pair<uint, double> key = tuple(idx, lo_lim);
+    Pair<uint, double> key = make_tuple(idx, lo_lim);
     GLit* ret;
 
     //**/Dump(idx, sum, material_left, lo_lim, hi_lim, cutoff_lo, cutoff_hi);

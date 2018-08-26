@@ -264,7 +264,7 @@ Lit Pmc::clausify(uint d, GLit p, uint side)
 
     if (!+n2s[d][side][p]){
         Vec<Pair<uint,GLit> > roots;
-        roots.push(tuple(side, p));
+        roots.push(make_tuple(side, p));
         lutClausify(N, roots, false, S[d], n2s[d]);
     }
 
@@ -276,7 +276,7 @@ Lit Pmc::clausifyInit(GLit p)
 {
     if (!+n2z[0][p]){
         Vec<Pair<uint,GLit> > roots;
-        roots.push(tuple(0, p));
+        roots.push(make_tuple(0, p));
         lutClausify(N, roots, true, Z, n2z);
     }
 
@@ -288,7 +288,7 @@ Lit Pmc::clausifyInvar(GLit p, uint side)
 {
     if (!+n2r[side][p]){
         Vec<Pair<uint,GLit> > roots;
-        roots.push(tuple(side, p));
+        roots.push(make_tuple(side, p));
         lutClausify(N, roots, false, R, n2r);
     }
 
@@ -442,7 +442,7 @@ void Pmc::justify(const Cube& c, /*outputs:*/WSeen seen[2], Vec<GLit>& sources, 
 {
     ZZ_PTimer_Scope(pmc_justify);
 
-    #define Push(w, d) (seen[d].add(+(w)) || (Q.push(tuple(+(w).lit(), d)), true))
+    #define Push(w, d) (seen[d].add(+(w)) || (Q.push(make_tuple(+(w).lit(), d)), true))
 
     // Justify:
     Vec<Pair<GLit,uint> > Q;
@@ -588,7 +588,7 @@ public:
     Pair<uint, Wire> pop() {
         GLit p = Q.popC();
         in_Q.exclude(p + N);
-        return tuple(uint(p.sign), N[+p]);
+        return make_tuple(uint(p.sign), N[+p]);
     }
 
     uint size() const { return Q.size(); }
@@ -658,7 +658,7 @@ Cube Pmc::weakenBySim(WSeen seen[2], Cube src, Cube snk)
             cube[i] = glit_NULL;        // -- we assume initial state does not depend on PIs
             continue; }
 
-        undo.push(tuple(0, w0, sim[0][w0]));
+        undo.push(make_tuple(0, w0, sim[0][w0]));
         sim[0](w0) = l_Undef;
         enqueueFanouts(fanouts[w0], 0, Q, seen);
 
@@ -666,7 +666,7 @@ Cube Pmc::weakenBySim(WSeen seen[2], Cube src, Cube snk)
             uint d; Wire w; l_tuple(d, w) = Q.pop();
             if (sim[d][w] == l_Undef) continue;
 
-            undo.push(tuple(d, w, sim[d][w]));
+            undo.push(make_tuple(d, w, sim[d][w]));
             evalGate(w, d, sim);
             if (sim[d][w] == l_Undef && snk_set.has(w)){
                 // Undo:

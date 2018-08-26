@@ -58,7 +58,7 @@ void verifyInterpolant(NetlistRef N, Wire w_itp, uint cut_depth, uint total_dept
         Vec<Pair<uint,GLit> > roots;
         For_Gatetype(A, gate_Flop, w)
             if (cone.has(w))
-                roots.push(tuple(cut_depth, ff_N[attr_Flop(w).number]));
+                roots.push(make_tuple(cut_depth, ff_N[attr_Flop(w).number]));
 
         // Clausify unrolling:
         lutClausify(N, roots, true, S, n2s);
@@ -126,7 +126,7 @@ void verifyInterpolant(NetlistRef N, Wire w_itp, uint cut_depth, uint total_dept
         Vec<LLMap<GLit,Lit> > n2s;
         Vec<Pair<uint,GLit> > roots;
         for (uint i = 0; i < properties.size(); i++)
-            roots.push(tuple(total_depth - cut_depth, properties[i]));
+            roots.push(make_tuple(total_depth - cut_depth, properties[i]));
         lutClausify(N, roots, true, S, n2s);
 
         // Assert disjunction of 'bad':
@@ -576,7 +576,7 @@ bool ISift::runBmc(uint depth)
     // Clausify bounded cone of influence:
     Vec<Pair<uint,GLit> > roots;
     for (uint i = 0; i < properties.size(); i++)
-        roots.push(tuple(0, properties[i]));
+        roots.push(make_tuple(0, properties[i]));
 
     for (int d = depth; d >= 0; d--){
         lutClausify(N, roots, d == 0, Z, n2z(d));
@@ -591,7 +591,7 @@ bool ISift::runBmc(uint depth)
         roots.clear();
         For_Gatetype(N, gate_Flop, w)
             if (last[w] != lit_Undef)
-                roots.push(tuple(0, w[0]));
+                roots.push(make_tuple(0, w[0]));
     }
 
     //*D*/WriteLn "Design clausification:";
@@ -749,7 +749,7 @@ bool ISift::pushClauses()
     For_Gatetype(A, gate_Flop, w){
         if (!a2s[w]) continue;
         Wire wn = ff_N[attr_Flop(w).number] + N;
-        roots[0] = tuple(0, wn[0]);
+        roots[0] = make_tuple(0, wn[0]);
         lutClausify(N, roots, false, S, n2s);
         b2s(w) = n2s[0][wn[0]];
     }
@@ -815,7 +815,7 @@ bool ISift::terminationCheck()
     Get_Pob(N, properties);
     Vec<Pair<uint,GLit> > roots;
     for (uint i = 0; i < properties.size(); i++)
-        roots.push(tuple(0, properties[i]));        // <<== target enlargement here?
+        roots.push(make_tuple(0, properties[i]));        // <<== target enlargement here?
     lutClausify(N, roots, false, S, n2s);
 
     Vec<Lit> tmp;

@@ -222,7 +222,7 @@ struct SC_Lib {
     NamedSet<SC_Cell>        cells;
 
     // Constructor:
-    SC_Lib() : default_max_out_slew(-1), unit_time(9), unit_cap(tuple(1,12)) {
+    SC_Lib() : default_max_out_slew(-1), unit_time(9), unit_cap(make_tuple(1,12)) {
         cells.add(slize("NULL_GATE")); cells.add(slize("PI_GATE")); cells[0].unsupp = cells[1].unsupp = true; }
    ~SC_Lib() { dispose(text); }
     Array<char> text;       // -- all 'Str's refer to substrings of this array

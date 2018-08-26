@@ -96,7 +96,7 @@ public:
     Key               peekKey()                   { return heap.peek().fst; }
     Value             peekValue()                 { return heap.peek().snd; }
     Pair<Key_,Value_> pop()                       { return heap.pop(); }
-    void              add(Key_ key, Value_ val)   { heap.add(tuple(key, val)); }
+    void              add(Key_ key, Value_ val)   { heap.add(make_tuple(key, val)); }
     void              add(Pair<Key_,Value_> elem) { heap.add(elem); }
 
     const Vec<Pair<Key_,Value_> >& base() const { return heap.base(); }

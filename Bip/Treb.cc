@@ -785,7 +785,7 @@ void Treb::dumpInvar()
                     Wire w = N[c[i]];
                     /*EXP*/act(w)++;
                     if (!vars.add(w))
-                        rename.push(tuple(attr_Flop(w).number, w));
+                        rename.push(make_tuple(attr_Flop(w).number, w));
                 }
             }
         }
@@ -990,7 +990,7 @@ void Treb::semanticCoi(uint k0)
             if (zact(frame)(index, lit_Undef) == lit_Undef){            \
                 Lit a = S.addLit();                                     \
                 zact[frame][index] = a;                                 \
-                zact_inv(var(a), tuple(frame_NULL, 0)) = tuple(frame, index); \
+                zact_inv(var(a), make_tuple(frame_NULL, 0)) = make_tuple(frame, index); \
                                                                         \
                 Cube c = F[frame][index];                               \
                 tmp.clear();                                            \
@@ -1061,7 +1061,7 @@ void Treb::semanticCoi(uint k0)
         // Enqueue new cube proof-obligations:
         for (uint j = 0; j < assumps.size(); j++){
             uint d, i;
-            l_tuple(d, i) = zact_inv(var(assumps[j]), tuple(frame_NULL, 0));
+            l_tuple(d, i) = zact_inv(var(assumps[j]), make_tuple(frame_NULL, 0));
             if (d != frame_NULL){
                 if (!coi(d).add(i)){      // ('cs' is invalidated here)
                     qhead(d, 0)++; }
@@ -1232,7 +1232,7 @@ bool Treb::pdrRefine(ProofObl po, Cex* cex)
                 fixed.push(w[0] ^ (val == l_False));
             }else{
                 // Abstract flop, add to 'roots':
-                roots.push(tuple(w, n2s[w]));
+                roots.push(make_tuple(w, n2s[w]));
             }
         }
 
@@ -1677,7 +1677,7 @@ bool Treb::run(Cex* cex_out, NetlistRef N_invar)
                 if (P.use_abstr){
                     Vec<Pair<float,GLit> > act_ff;
                     For_Gatetype(N, gate_Flop, w){
-                        act_ff.push(tuple(activity[w], w.lit()));
+                        act_ff.push(make_tuple(activity[w], w.lit()));
                         activity(w) *= 0.9;
                     }
                     sort(act_ff);

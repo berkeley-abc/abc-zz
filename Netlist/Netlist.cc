@@ -208,7 +208,7 @@ void allocBlock(Netlist_data& N, GateType type, serial_t serial0, uint size = 0)
         N.gates[recycle_id] = ret;              \
         N.type_count[gate_NULL]--;              \
     }                                           \
-    return tuple(ret + 1, ret[0].id);
+    return make_tuple(ret + 1, ret[0].id);
 
 
 // Allocate a gate in netlist 'N', but don't initialize inputs. Returns a pointer to the

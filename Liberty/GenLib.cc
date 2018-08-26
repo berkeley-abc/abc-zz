@@ -96,7 +96,7 @@ bool writeGenlibFile(String filename, const SC_Lib& L, bool quiet = false)
         const SC_Cell& cell = L.cells[i];
         if (cell.unsupp)        { ignored_unsupp++; continue; }
         if (cell.seq)           { ignored_seq++;    continue; }
-        sz_idx.push(tuple(cell.area, i));
+        sz_idx.push(make_tuple(cell.area, i));
     }
     sort(sz_idx);
 

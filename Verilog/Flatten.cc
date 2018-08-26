@@ -90,7 +90,7 @@ void flatten(uint mod, const Vec<VerilogModule>& modules, NetlistRef N_flat,
                 GLit x = xlat[v];
                 if (!+x){
                     x = N_flat.add(Buf_());
-                    backpatch.push(tuple(x, v));
+                    backpatch.push(make_tuple(x, v));
                 }
                 uif_pis.push(x);
             }

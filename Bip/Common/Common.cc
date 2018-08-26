@@ -676,7 +676,7 @@ void XSimulate::propagate(XSimAssign assign, const WZetL* abstr, XSimAssign abor
 
     undo.push(XSimAssign(d0, w0, sim[d0][w0]));
     sim[d0](w0) = value;
-    Q.push(tuple(d0, id(w0)));
+    Q.push(make_tuple(d0, id(w0)));
 
     // Propagate:
     while (Q.size() > 0){
@@ -695,7 +695,7 @@ void XSimulate::propagate(XSimAssign assign, const WZetL* abstr, XSimAssign abor
                         if (sim[d][wc] != value){ undo.push(XSimAssign(d, wc, sim[d][wc])); }
                         sim[d](wc) = v;
                         seen[d].add(wc);
-                        Q.push(tuple(d, id(wc)));
+                        Q.push(make_tuple(d, id(wc)));
                     }
                 }
 
@@ -706,7 +706,7 @@ void XSimulate::propagate(XSimAssign assign, const WZetL* abstr, XSimAssign abor
                         if (sim[d+1][wc] != value){ undo.push(XSimAssign(d+1, wc, sim[d+1][wc])); }
                         sim[d+1](wc) = v;
                         seen[d+1].add(wc);
-                        Q.push(tuple(d+1, id(wc)));
+                        Q.push(make_tuple(d+1, id(wc)));
                     }
                 }
 
@@ -717,7 +717,7 @@ void XSimulate::propagate(XSimAssign assign, const WZetL* abstr, XSimAssign abor
                         if (sim[d][wc] != value){ undo.push(XSimAssign(d, wc, sim[d][wc])); }
                         sim[d](wc) = v;
                         seen[d].add(wc);
-                        Q.push(tuple(d, id(wc)));
+                        Q.push(make_tuple(d, id(wc)));
 
                         if (d == abort.depth && id(wc) == abort.gate && v.value == abort.value)
                             return;     // -- abort early
@@ -835,10 +835,10 @@ void dumpCex(NetlistRef N, const Cex& cex, Out& out)
 {
     Vec<Pair<int,Wire> > pis, ffs;
     For_Gatetype(N, gate_PI, w)
-        pis.push(tuple(attr_PI(w).number, w));
+        pis.push(make_tuple(attr_PI(w).number, w));
     sort(pis);
     For_Gatetype(N, gate_Flop, w)
-        ffs.push(tuple(attr_Flop(w).number, w));
+        ffs.push(make_tuple(attr_Flop(w).number, w));
     sort(ffs);
 
     for (uind d = 0; d < cex.size(); d++){
@@ -1702,7 +1702,7 @@ Wire insertUnrolled_(Wire w, uint k, NetlistRef F, Vec<MAP>& n2f, const Params_U
         case gate_Pin:{
             assert(P.memu != NULL);
             Wire w_read = w[0]; assert(type(w_read) == gate_MRead);
-            ret = insertUnrolledMemory(w_read[0], k, tuple(w_read[1], k), attr_Pin(w).number, F, n2f, P);
+            ret = insertUnrolledMemory(w_read[0], k, make_tuple(w_read[1], k), attr_Pin(w).number, F, n2f, P);
             break;}
         default:
             ShoutLn "INTERNAL ERROR! Unsupported gate type reached in 'insertUnrolled()': %_", GateType_name[type(w)];
@@ -1781,7 +1781,7 @@ void lutClausify_(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized,
                 Q.pop();
                 m2s[d](w) = m2s[d][w[0]];
             }else
-                Q.push(tuple(d, +w[0]));
+                Q.push(make_tuple(d, +w[0]));
             break;
 
         case gate_Flop:
@@ -1799,7 +1799,7 @@ void lutClausify_(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized,
                     Q.pop();
                     m2s[d](w) = m2s[d-1][w[0]];
                 }else
-                    Q.push(tuple(d-1, +w[0]));
+                    Q.push(make_tuple(d-1, +w[0]));
             }
             break;
 
@@ -1807,7 +1807,7 @@ void lutClausify_(NetlistRef M, Vec<Pair<uint,GLit> >& roots, bool initialized,
             bool ready = true;
             For_Inputs(w, v){
                 if (!m2s[d][+v]){
-                    Q.push(tuple(d, +v));
+                    Q.push(make_tuple(d, +v));
                     ready = false;
                 }
             }

@@ -214,7 +214,7 @@ struct Hash_Strash {
     Hash_Strash(netlist_id nl_) : nl(nl_) {}
 
     static uint64 hash(GLit p, GLit q) {
-        return defaultHash(tuple(p, q)); }
+        return defaultHash(make_tuple(p, q)); }
 
     uint64 hash(GLit p) const {
         Wire w = netlist(nl)[p];

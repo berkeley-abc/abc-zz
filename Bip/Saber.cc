@@ -156,7 +156,7 @@ void deriveConstraints(NetlistRef N, Wire bad, uint target_enl, uint n_flops, /*
 #if 1
     Vec<Pair<int,Wire> > flops;
     For_Gatetype(N, gate_Flop, w)
-        flops.push(tuple(attr_Flop(w).number, w));
+        flops.push(make_tuple(attr_Flop(w).number, w));
     sort(flops);
     for (uint n = 0; n < flops.size(); n++){
         Wire w = flops[n].snd;

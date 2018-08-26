@@ -99,7 +99,7 @@ void upOrder_helper(Vec<Pair<GLit,uint> >& Q, Vec<uchar>& seen, Vec<GLit>& order
     if (seen[w0.id]) return;
 
     assert_debug(Q.size() < w0.gig()->size());
-    Q.pushQ(tuple(w0, 0));
+    Q.pushQ(make_tuple(w0, 0));
 
     Gig& N = *w0.gig();
     Wire w = +w0;
@@ -121,7 +121,7 @@ void upOrder_helper(Vec<Pair<GLit,uint> >& Q, Vec<uchar>& seen, Vec<GLit>& order
             if (v && !seen[id(v)] && v.type() != gate_Seq){
                 Q.last().snd = i;
                 assert_debug(Q.size() < N.size());
-                Q.pushQ(tuple(v, 0));
+                Q.pushQ(make_tuple(v, 0));
                 w = v;
                 i = 0;
             }

@@ -284,7 +284,7 @@ Lit Pdr2::clausify(uint d, GLit p, uint side)
     ZZ_PTimer_Scope(pdr2_clausify);
     if (!+n2s[d][side][p]){
         Vec<Pair<uint,GLit> > roots;
-        roots.push(tuple(side, p));
+        roots.push(make_tuple(side, p));
         lutClausify(N, roots, false, S[d], n2s[d]);
     }
 
@@ -297,7 +297,7 @@ Lit Pdr2::clausifyInit(GLit p)
     ZZ_PTimer_Scope(pdr2_clausify);
     if (!+n2z[0][p]){
         Vec<Pair<uint,GLit> > roots;
-        roots.push(tuple(0, p));
+        roots.push(make_tuple(0, p));
         lutClausify(N, roots, true, Z, n2z);
     }
 
@@ -405,7 +405,7 @@ void Pdr2::justify(const Cube& c, /*outputs:*/WSeen seen[2], Vec<GLit>& sources,
 {
     ZZ_PTimer_Scope(pdr2_justify);
 
-    #define Push(w, d) (seen[d].add(+(w)) || (Q.push(tuple(+(w).lit(), d)), true))
+    #define Push(w, d) (seen[d].add(+(w)) || (Q.push(make_tuple(+(w).lit(), d)), true))
 
     // Justify:
     Vec<Pair<GLit,uint> > Q;
@@ -827,7 +827,7 @@ public:
     Pair<uint, Wire> pop() {
         GLit p = Q.popC();
         in_Q.exclude(p + N);
-        return tuple(uint(p.sign), N[+p]);
+        return make_tuple(uint(p.sign), N[+p]);
     }
 
     uint size() const { return Q.size(); }
@@ -918,7 +918,7 @@ Cube Pdr2::weakenBySim(WSeen seen[2], Cube src, Cube snk)
             continue;
 
         //*Tr*/WriteLn "\a*== seed:\a* %_ @0 = %_ -> ?", w0, sim[0][w0];
-        undo.push(tuple(0, w0, sim[0][w0]));
+        undo.push(make_tuple(0, w0, sim[0][w0]));
         sim[0](w0) = l_Undef;
         enqueueFanouts(fanouts[w0], 0, Q, seen);
 
@@ -926,7 +926,7 @@ Cube Pdr2::weakenBySim(WSeen seen[2], Cube src, Cube snk)
             uint d; Wire w; l_tuple(d, w) = Q.pop();
             if (sim[d][w] == l_Undef) continue;
 
-            undo.push(tuple(d, w, sim[d][w]));
+            undo.push(make_tuple(d, w, sim[d][w]));
             evalGate(w, d, sim);
             //*Tr*/WriteLn "-- eval: %_ @%_ = %_ (was %_)", w, d, sim[d][w], undo.last().trd;
             if (sim[d][w] == l_Undef && snk_set.has(w)){

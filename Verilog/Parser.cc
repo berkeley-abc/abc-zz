@@ -398,7 +398,7 @@ macro VExprType       type (const VExpr& e)           { return (VExprType)e->typ
 macro bool            sign (const VExpr& e)           { return e->sign; }
 macro Str             name (const VExpr& e)           { assert(type(e) == vx_Var || type(e) == vx_Bitsel || type(e) == vx_Slice); return Str(e->sig_name, e->name_sz); }
 macro uint            index(const VExpr& e)           { assert(type(e) == vx_Bitsel); return e->extra; }
-macro Pair<uint,uint> range(const VExpr& e)           { assert(type(e) == vx_Slice); return tuple(e->extra, e->extra2); }
+macro Pair<uint,uint> range(const VExpr& e)           { assert(type(e) == vx_Slice); return make_tuple(e->extra, e->extra2); }
 macro uint            nbits(const VExpr& e)           { assert(type(e) == vx_Const); return e->extra; }
 macro bool            bit  (const VExpr& e, uint idx) { assert(type(e) == vx_Const);  assert(idx < e->extra); return (e->const_bits[idx / 32] >> (idx & 31)) & 1; }
 macro uint            size (const VExpr& e)           { assert(isComposite(type(e))); return e->extra; }
@@ -1491,12 +1491,12 @@ void BuildModules::getCompositeNets(const VExpr& e, /*out*/Vec<int>& ns, /*out*/
         uint var_id = lookup(name(e));
         for (uint j = 0; j < width[var_id]; j++){
             ns.push(var_id + j);
-            names.push(tuple(name(e), (width[var_id] > 1) ? j : UINT_MAX)); }
+            names.push(make_tuple(name(e), (width[var_id] > 1) ? j : UINT_MAX)); }
         break;}
 
     case vx_Bitsel:
         ns.push(getSimpleNet(e));
-        names.push(tuple(name(e), index(e)));
+        names.push(make_tuple(name(e), index(e)));
         break;
 
     case vx_Slice:{
@@ -1509,13 +1509,13 @@ void BuildModules::getCompositeNets(const VExpr& e, /*out*/Vec<int>& ns, /*out*/
 
         for (uint j = rng.snd; j <= rng.fst; j++){
             ns.push(var_id + j);
-            names.push(tuple(name(e), j)); }
+            names.push(make_tuple(name(e), j)); }
         break;}
 
     case vx_Const:
         for (uint j = 0; j < nbits(e); j++){
             ns.push(bit(e, j) ? ~gid_True : ~gid_False);
-            names.push(tuple(Str_NULL, UINT_MAX)); }
+            names.push(make_tuple(Str_NULL, UINT_MAX)); }
         break;
 
     case vx_Concat:
@@ -2096,10 +2096,10 @@ Pair<uint,uint> VerilogParser::parseOptionalRange(Tok*& p)
         if (TOK != tok_RBrack) throw Excp_ParseError((FMT "[%_] Expected ']' at end of range description, not: %_", LOC, STR));
         NEXT;
 
-        return tuple(rng[0], rng[1]);
+        return make_tuple(rng[0], rng[1]);
 
     }else
-        return tuple(0u, 0u);
+        return make_tuple(0u, 0u);
 }
 
 
@@ -2272,16 +2272,16 @@ Pair<Str,VExpr> VerilogParser::parseConnect(Tok*& p)
 
         if (TOK == tok_RParen){     // -- special case, unconnected (presumably output) signal
             NEXT;
-            return tuple(port_name, VExpr_NULL()); }
+            return make_tuple(port_name, VExpr_NULL()); }
 
         VExpr expr = parseExpr(p);
         if (TOK != tok_RParen) throw Excp_ParseError((FMT "[%_] Expected ')' after connection argument, not: %_", LOC, STR));
         NEXT;
 
-        return tuple(port_name, expr);
+        return make_tuple(port_name, expr);
 
     }else
-        return tuple(Str(), parseExpr(p));
+        return make_tuple(Str(), parseExpr(p));
 }
 
 
@@ -2290,7 +2290,7 @@ void VerilogParser::parse(ParserListener& pl)
     // Setup module item map:
     Map<Str,Pair<uint,uint> > imap;
     for (uind i = 0; i < elemsof(module_items); i++)
-        imap.set(slize(module_items[i].sym), tuple((uint)module_items[i].item, (uint)module_items[i].sub));
+        imap.set(slize(module_items[i].sym), make_tuple((uint)module_items[i].item, (uint)module_items[i].sub));
 
     // Parse modules:
     Tok* p = toks.base();

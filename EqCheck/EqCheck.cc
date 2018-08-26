@@ -51,7 +51,7 @@ void matchInputs(NetlistRef N1, NetlistRef N2, Vec<Pair<GLit,GLit> >& pi_pairs)
                 char* name = N2.names().get(w, buf, i);
                 Wire v = N1.names().lookup(name) + N1;
                 if (v != Wire_NULL){
-                    pi_pairs.push(tuple(v, w));
+                    pi_pairs.push(make_tuple(v, w));
                     goto Found;
                 }
             }
@@ -96,7 +96,7 @@ void matchOutputs(NetlistRef N1, NetlistRef N2, Vec<Pair<GLit,GLit> >& po_pairs)
                 char* name = N2.names().get(w, buf, i);
                 Wire v = N1.names().lookup(name) + N1;
                 if (v != Wire_NULL){
-                    po_pairs.push(tuple(v, w));
+                    po_pairs.push(make_tuple(v, w));
                     goto Found;
                 }
             }

@@ -375,7 +375,7 @@ void streamOut_Netlist(Vec<uchar>& data, NetlistRef N)
         Vec<Pair<int,GLit> > nums;
         For_Gatetype(N, gate_PI, w){
             int num = attr_PI(w).number; assert(num >= 0);
-            nums.push(tuple(num, w));
+            nums.push(make_tuple(num, w));
             newMax(n_pis, uint(num + 1));
         }
 
@@ -396,7 +396,7 @@ void streamOut_Netlist(Vec<uchar>& data, NetlistRef N)
         Vec<Pair<int,GLit> >& nums = ff_nums;
         For_Gatetype(N, gate_Flop, w){
             int num = attr_Flop(w).number; assert(num >= 0);
-            nums.push(tuple(num, w));
+            nums.push(make_tuple(num, w));
             newMax(n_ffs, uint(num + 1));
         }
 

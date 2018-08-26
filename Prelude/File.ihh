@@ -206,7 +206,11 @@ struct InFile : In {
         if (!reader.null()) init(reader, gzipped);
         if (!gzipped && reader.null()){     // -- try adding '.gz' and open in gzipped mode
             reader.open(filename + ".gz", "r");
-            if (!reader.null()) init(reader, true); gzipped = true; } }
+            if (!reader.null()) 
+                init(reader, true); 
+            gzipped = true; 
+        } 
+    }
 
    ~InFile() { clear(); }
 

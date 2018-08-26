@@ -339,11 +339,11 @@ void mergeInputLists(const Cut& c, const Cut& d, Pair<uchar,uchar> where[8], uin
     if (d.size() == 0) goto FlushD;
     for(;;){
         if (c[i] < d[j]){
-            where[sz] = tuple(i, 255);
+            where[sz] = make_tuple(i, 255);
             sz++; i++;
             if (i == c.size()) goto FlushD;
         }else{
-            where[sz] = tuple(255, j);
+            where[sz] = make_tuple(255, j);
             if (c[i] == d[j]){
                 where[sz].fst = i;
                 i++;
@@ -358,13 +358,13 @@ void mergeInputLists(const Cut& c, const Cut& d, Pair<uchar,uchar> where[8], uin
 
   FlushC:
     while (i < c.size()){
-        where[sz] = tuple(i, 255);
+        where[sz] = make_tuple(i, 255);
         sz++, i++; }
     return;
 
   FlushD:
     while (j < d.size()){
-        where[sz] = tuple(255, j);
+        where[sz] = make_tuple(255, j);
         sz++; j++; }
 }
 
@@ -376,7 +376,7 @@ macro Pair<ushort, ushort> quantPin(ushort ftb_lo, ushort ftb_hi, uint pin)
     hi |= hi >> s;
     ushort lo = (ftb_lo & proj[pin]) & ((ftb_lo & (0xFFFF^proj[pin])) << s);
     lo |= lo >> s;
-    return tuple(lo, hi);
+    return make_tuple(lo, hi);
 }
 
 
@@ -958,7 +958,7 @@ Pair<uint,uint> tempDecomp(NetlistRef N, NetlistRef M, uint max_cycle_len, uint 
 
     applyTempDecomp(N, M, pfx, cyc, reduced_state);
 
-    return tuple(pfx, cyc);
+    return make_tuple(pfx, cyc);
 }
 
 

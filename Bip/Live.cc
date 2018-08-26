@@ -133,7 +133,7 @@ void liveToSafe(NetlistRef N, const Params_Liveness& P, int n_orig_flops, Wire f
         if (num != num_NULL && num < n_orig_flops){
             Wire ws = N.add(Flop_());     // -- implicitly initialized to 'l_Undef' (which is what we want)
             ws.set(0, ws);
-            ff_pairs.push(tuple(w, ws));
+            ff_pairs.push(make_tuple(w, ws));
         }
     }
 

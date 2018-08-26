@@ -370,7 +370,7 @@ lbool bddReach(NetlistRef N0, const Vec<Wire>& props, const Params_BddReach& P)
 #if 1
         Vec<Pair<uint,GLit> > ffs;
         For_Gatetype(N, gate_Flop, w)
-            ffs.push(tuple(Cudd_DagSize(part[attr_Flop(w).number].node), w.lit()));
+            ffs.push(make_tuple(Cudd_DagSize(part[attr_Flop(w).number].node), w.lit()));
         sort_reverse(ffs);
 
         // <<== mix into the order that we prefer to actually eliminate variables sooner rather than later...

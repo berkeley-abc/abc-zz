@@ -133,7 +133,7 @@ void computeGroupInvert(const Vec<Vec<uint> >& groups, /*out*/Vec<Pair<uint,uint
 
     for (uint i = 0; i < groups.size(); i++){
         for (uint j = 0; j < groups[i].size(); j++)
-            group_inv(groups[i][j], tuple(UINT_MAX, UINT_MAX)) = tuple(i, j);
+            group_inv(groups[i][j], make_tuple(UINT_MAX, UINT_MAX)) = make_tuple(i, j);
     }
 }
 
@@ -473,7 +473,7 @@ void splitMultiOutputCells(NetlistRef N, const SC_Lib& L, Vec<Vec<uint> >& group
         next_output(v) = id(w);
 
         if (next_output[w] == gid_NULL)
-            bp.push(tuple(w, v));
+            bp.push(make_tuple(w, v));
     }
 
     for (uint i = 0; i < bp.size(); i++){
@@ -536,7 +536,7 @@ void mergeMultiOutputCells(NetlistRef N, const SC_Lib& L, Vec<Vec<uint> >& group
 
         uint orig_sym = dcells[attr_Uif(w).sym].idx_L;
         For_Inputs(w, u)
-            inputs.push(tuple(Iter_Var(u), u));
+            inputs.push(make_tuple(Iter_Var(u), u));
 
         Wire v = w;
         do{

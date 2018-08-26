@@ -19,7 +19,7 @@
 //|         Cmp(Netlist& N_, Vec<Wire>& result_) : N(N_), result(result_) {}
 //| 
 //|         void operator()(uint i, uint j) {
-//|             l_tuple(result[i], result[j]) = tuple(mkMin(N, result[i], result[j]), 
+//|             l_tuple(result[i], result[j]) = make_tuple(mkMin(N, result[i], result[j]), 
 //|                                                   mkMax(N, result[i], result[j])); 
 //|         }
 //|     };

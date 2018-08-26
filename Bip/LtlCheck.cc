@@ -257,9 +257,9 @@ Wire ltlNormalize(Wire w, WMapS<GLit>& memo, LtlStrash& strash)
     if (!a) swp(a, b);  // -- to be consistent with paper, let prefix operators name their input 'a' rather than 'b'
 
     #define N(w) ltlNormalize(w, memo, strash)
-    #define INF(op, arg0, arg1) mkLtl(NS, tuple(arg0.lit(), arg1.lit(), op), strash)
-    #define PRE(op, arg) mkLtl(NS, tuple(glit_NULL, arg.lit(), op), strash)
-    #define CNS(op) mkLtl(NS, tuple(glit_NULL, glit_NULL, op), strash)
+    #define INF(op, arg0, arg1) mkLtl(NS, make_tuple(arg0.lit(), arg1.lit(), op), strash)
+    #define PRE(op, arg) mkLtl(NS, make_tuple(glit_NULL, arg.lit(), op), strash)
+    #define CNS(op) mkLtl(NS, make_tuple(glit_NULL, glit_NULL, op), strash)
 
     Wire ret;
     bool s = sign(w);

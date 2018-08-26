@@ -16,7 +16,7 @@
 //| Pairs, triplets and quadruplets are supported. Fields are named: fst, snd, trd, fth.
 //| Factory functions allow creating tuples without explicitly stating types:
 //| 
-//|     tuple(12, "niklas");      vs.    Pair<int,const char*>(12, "niklas")
+//|     make_tuple(12, "niklas");      vs.    Pair<int,const char*>(12, "niklas")
 //| 
 //| Variables can be temporary wrapped as a tuple l-value to receiving return values:
 //|

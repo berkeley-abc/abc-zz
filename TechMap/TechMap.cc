@@ -185,7 +185,7 @@ inline Trip<float,float,bool> cutImpl_bestArea(CUT cut, const Vec<WMap<CutImpl> 
         total_area_est += area_est;
     }
 
-    return tuple(arrival, total_area_est, late);
+    return make_tuple(arrival, total_area_est, late);
 }
 
 
@@ -196,7 +196,7 @@ inline Pair<float,float> cutImpl_bestDelay(CUT cut, const Vec<WMap<CutImpl> >& i
 {
     Trip<float,float,bool> t = cutImpl_bestArea(cut, impl, -FLT_MAX, skip_last);
     assert(!t.trd);
-    return tuple(t.fst, t.snd);
+    return make_tuple(t.fst, t.snd);
 }
 
 
@@ -226,7 +226,7 @@ inline Pair<float,float> cutImpl_bestAreaMux(Gig& N, Cut cut, const Vec<WMap<Cut
     }
 
     if (arrival == -FLT_MAX) arrival = FLT_MAX;
-    return tuple(arrival, total_area_est);
+    return make_tuple(arrival, total_area_est);
 }
 
 
@@ -1397,7 +1397,7 @@ void techMap(Gig& N, const Vec<Params_TechMap>& Ps, WMapX<GLit>* remap)
             if (!isLogic(w)){
                 For_Inputs(w, v){
                     if (isLogic(v) && !seen.has(v)){
-                        co_srcs.push(tuple(w, v, Iter_Var(v)));
+                        co_srcs.push(make_tuple(w, v, Iter_Var(v)));
                         seen.add(v);
                     }
                 }

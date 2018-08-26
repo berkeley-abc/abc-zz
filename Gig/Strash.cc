@@ -25,9 +25,9 @@ using namespace std;
 
 
 // Pre-hash: gate does not yet exist
-macro uint64 prehash_Bin(GLit p, GLit q) { return defaultHash(tuple(p, q)); }
-macro uint64 prehash_Tri(GLit p, GLit q, GLit r) { return defaultHash(tuple(p, q, r)); }
-macro uint64 prehash_Lut(GLit p, GLit q, GLit r, GLit s, uint arg) { return defaultHash(tuple(tuple(p, q, r, s), arg)); }
+macro uint64 prehash_Bin(GLit p, GLit q) { return defaultHash(make_tuple(p, q)); }
+macro uint64 prehash_Tri(GLit p, GLit q, GLit r) { return defaultHash(make_tuple(p, q, r)); }
+macro uint64 prehash_Lut(GLit p, GLit q, GLit r, GLit s, uint arg) { return defaultHash(make_tuple(make_tuple(p, q, r, s), arg)); }
 
 
 // Re-hash: gate exists in netlist

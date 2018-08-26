@@ -32,7 +32,7 @@ void computeReach(NetlistRef N, Vec<uchar>& seen)
     For_Gates(N, w0){
         if (isGlobalSink(w0)){
             assert(Q.size() < N.gateCount());
-            Q.pushQ(tuple(w0, 0));
+            Q.pushQ(make_tuple(w0, 0));
 
             Wire w = w0;
             uint i = 0;
@@ -54,7 +54,7 @@ void computeReach(NetlistRef N, Vec<uchar>& seen)
                         }else{
                             Q.last().snd = i;
                             assert(Q.size() < N.gateCount());
-                            Q.pushQ(tuple(v, 0));
+                            Q.pushQ(make_tuple(v, 0));
                             w = v;
                             i = 0;
                         }
@@ -128,7 +128,7 @@ template<class IsSrc>
 void upOrder_helper(Vec<Pair<Wire,uint> >& Q, Vec<uchar>& seen, Vec<gate_id>& order, Wire w0, IsSrc& stop_at, bool flops_last)
 {
     assert(Q.size() < netlist(w0).size());
-    Q.pushQ(tuple(w0, 0));
+    Q.pushQ(make_tuple(w0, 0));
 
     Wire w = +w0;
     uint i = 0;
@@ -155,7 +155,7 @@ void upOrder_helper(Vec<Pair<Wire,uint> >& Q, Vec<uchar>& seen, Vec<gate_id>& or
                 }else{
                     Q.last().snd = i;
                     assert(Q.size() < netlist(w0).size());
-                    Q.pushQ(tuple(v, 0));
+                    Q.pushQ(make_tuple(v, 0));
                     w = v;
                     i = 0;
                 }
@@ -260,7 +260,7 @@ void topoOrder_helper(Vec<Pair<GLit,uint> >& Q, Vec<uchar>& seen, Vec<GLit>& ord
 {
     if (seen[id(w0)]) return;
 
-    Q.pushQ(tuple(w0, 0));
+    Q.pushQ(make_tuple(w0, 0));
 
     NetlistRef N = netlist(w0); assert_debug(Q.size() < N.size());
     Wire w = +w0;
@@ -282,7 +282,7 @@ void topoOrder_helper(Vec<Pair<GLit,uint> >& Q, Vec<uchar>& seen, Vec<GLit>& ord
             if (v && !seen[id(v)]){
                 Q.last().snd = i;
                 assert_debug(Q.size() < N.size());
-                Q.pushQ(tuple(v, 0));
+                Q.pushQ(make_tuple(v, 0));
                 w = v;
                 i = 0;
             }

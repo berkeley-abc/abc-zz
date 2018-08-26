@@ -214,14 +214,14 @@ char startProcess(const String& cmd, const Vec<String>& args, int& out_pid, int 
         if (p == NULL){
             char* val = getenv(key);
             if (val != NULL){
-                restore.push(tuple(String(key), String(val)));
+                restore.push(make_tuple(String(key), String(val)));
                 unsetenv(key);
             }
         }else{
             *p = '\0';
             char* val = getenv(key);
             if (val != NULL)
-                restore.push(tuple(String(key), String(val)));
+                restore.push(make_tuple(String(key), String(val)));
             else
                 clear.push(String(key));
 

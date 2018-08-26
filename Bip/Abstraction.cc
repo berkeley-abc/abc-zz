@@ -107,7 +107,7 @@ void AbsTrace::checkReachConsistency(const Vec<Pair<int,Wire> >& srcs)
     // Accumulate into 'Q' what should be defined in 'n2f':
     OrdSet<Pair<int,Wire> > Q;
     for (uind i = 0; i < srcs.size(); i++)
-        Q.add(tuple(srcs[i].fst, +srcs[i].snd));
+        Q.add(make_tuple(srcs[i].fst, +srcs[i].snd));
 
     for (uind q = 0; q < Q.size(); q++){
         int  frame = Q.list()[q].fst;
@@ -116,20 +116,20 @@ void AbsTrace::checkReachConsistency(const Vec<Pair<int,Wire> >& srcs)
         if (type(w) == gate_Flop){
             if (frame == 0){
                 // <<== jump to initialization netlist here...
-                Q.add(tuple(frame, N.True()));
+                Q.add(make_tuple(frame, N.True()));
             }else if (abstr_.has(w))
-                Q.add(tuple(frame - 1, +w[0]));
+                Q.add(make_tuple(frame - 1, +w[0]));
 
         }else{
             For_Inputs(w, v)
-                Q.add(tuple(frame, +v));
+                Q.add(make_tuple(frame, +v));
         }
     }
 
     // Check 'n2f' correspondence:
     for (uind i = 0; i < n2f.size(); i++){
         For_Gates(N, w){
-            if (n2f[i][w] != glit_NULL && !Q.has(tuple(int(i)-1, +w))){
+            if (n2f[i][w] != glit_NULL && !Q.has(make_tuple(int(i)-1, +w))){
                 WriteLn "CONSISTENCY ERROR! 'n2f' has %_ @ %_, but not 'Q'.", w, int(i)-1;
                 exit(1);
             }

@@ -34,9 +34,9 @@ macro Pair<Cut, Array<Cut> > getCuts(Wire w, const WMap<Array<Cut> >& cutmap)
 {
     assert(!sign(w));
     if (w == gate_Const)
-        return tuple(Cut(cut_empty_, id(w) == gid_True), Array<Cut>(empty_));
+        return make_tuple(Cut(cut_empty_, id(w) == gid_True), Array<Cut>(empty_));
     else
-        return tuple(Cut(+w), cutmap[w]);
+        return make_tuple(Cut(+w), cutmap[w]);
 }
 
 

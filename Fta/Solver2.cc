@@ -265,11 +265,11 @@ double FtaBound::estimateTop(const Cube& bbox)
     Vec<Pair<GLit,PrRange> > undo;
     for (uint i = 0; i < bbox.size(); i++){
         GLit w = aig_node[bbox[i].id];
-        undo.push(tuple(w, apx[w]));
+        undo.push(make_tuple(w, apx[w]));
         apx(w) = 1.0;
 
         w = aig_node[flip[bbox[i].id].id];
-        undo.push(tuple(w, apx[w]));
+        undo.push(make_tuple(w, apx[w]));
         apx(w) = 0.0;
     }
 

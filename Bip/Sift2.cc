@@ -55,7 +55,7 @@ template<> fts_macro void write_(Out& out, const TLit& v) {
     FWrite(out) "%_:%_", v.glit, v.frame; }
 
 template<> fts_macro uint64 hash_<TLit>(const TLit& p) {
-    return defaultHash(tuple(p.glit, p.frame)); }
+    return defaultHash(make_tuple(p.glit, p.frame)); }
 
 typedef Pack<TLit> TClause;
 static const TClause TClause_NULL;
@@ -140,7 +140,7 @@ void Sift::satReset(bool pfl_)
 Lit Sift::satInsert(GLit w, uint d)
 {
     tmp_roots.setSize(1);
-    tmp_roots[0] = tuple(d, w);
+    tmp_roots[0] = make_tuple(d, w);
     if (pfl)
         lutClausify(N, tmp_roots, false, SP, n2s);
     else

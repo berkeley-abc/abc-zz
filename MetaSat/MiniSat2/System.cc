@@ -20,6 +20,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #include <signal.h>
 #include <stdio.h>
+#include <cstdlib>
 
 #include "System.hh"
 
@@ -27,7 +28,6 @@ namespace Minisat {
 
 #if defined(__linux__)
 
-#include <stdlib.h>
 
 static inline int memReadStat(int field)
 {

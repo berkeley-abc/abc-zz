@@ -530,7 +530,7 @@ void LibertyListener::complexAttr(Str name, Str args)
 
             uint   n_fanouts = (uint)stringToUInt64(tmp[0], 0, UINT_MAX);
             double wire_size = stringToDouble(tmp[1]);
-            lib.wire_load.last().fanout_len.push(tuple(n_fanouts, wire_size));
+            lib.wire_load.last().fanout_len.push(make_tuple(n_fanouts, wire_size));
         }
 
     }else if (scope.last() == S_wire_load_selection){
@@ -542,7 +542,7 @@ void LibertyListener::complexAttr(Str name, Str args)
             double from = stringToDouble(tmp[0]);
             double upto = stringToDouble(tmp[1]);
             Str    sel  = stripQuotes(tmp[2]);
-            lib.wire_load_sel.last().sel.push(tuple(from, upto, sel));
+            lib.wire_load_sel.last().sel.push(make_tuple(from, upto, sel));
         }
 
     }else if (scope.last() == S_lu_table_template){
