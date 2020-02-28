@@ -32,7 +32,7 @@ def guards():
 
     for hh in headers:
         guard = find_guard(hh)
-        hh = os.path.join('ZZ', os.path.relpath(hh, zz_dir))
+        hh = os.path.relpath(hh, zz_dir)
         if guard:
             yield TEMPLATE.format(guard=guard, header=hh)
 

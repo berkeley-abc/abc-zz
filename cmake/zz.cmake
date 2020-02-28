@@ -11,11 +11,7 @@ set(_ZZ_BINARY_ROOT "${CMAKE_CURRENT_BINARY_DIR}")
 
 # a directory with a symbolic link named ZZ to the main ZZ directory
 # this is done to enable #include "ZZ/...."
-set(_ZZ_PSEUDO_ROOT "${_ZZ_BINARY_ROOT}/__pseudo_root__")
-
-execute_process(COMMAND "${CMAKE_COMMAND}" -E remove_directory "${_ZZ_PSEUDO_ROOT}" )
-execute_process(COMMAND "${CMAKE_COMMAND}" -E make_directory "${_ZZ_PSEUDO_ROOT}" )
-execute_process(COMMAND "${CMAKE_COMMAND}" -E create_symlink "${_ZZ_SOURCE_ROOT}" "${_ZZ_PSEUDO_ROOT}/ZZ" )
+set(_ZZ_PSEUDO_ROOT "${_ZZ_SOURCE_ROOT}")
 
 # directory for generated include files
 set(ZZ_INCLUDE_ROOT "${_ZZ_BINARY_ROOT}/__zz_include__")
