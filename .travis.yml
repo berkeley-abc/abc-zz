@@ -12,7 +12,7 @@ matrix:
             - ninja-build
 
     - os: osx
-      osx_image: xcode8
+      osx_image: xcode10
       before_install:
         - brew update
         - brew install zlib readline ninja
