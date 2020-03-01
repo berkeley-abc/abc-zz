@@ -8,4 +8,6 @@ if( READLINE_FOUND )
     zz_target_link_libraries(Lua PUBLIC ${READLINE_LIBRARIES})
 endif()
 
-zz_target_link_libraries(Lua PUBLIC -ldl -lm)
+if( NOT WIN32 )
+    zz_target_link_libraries(Lua PUBLIC -ldl -lm)
+endif()

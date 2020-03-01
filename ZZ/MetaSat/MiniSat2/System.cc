@@ -93,6 +93,7 @@ double memUsedPeak(bool strictlyPeak) { return memUsed(); }
 #else
 double memUsed()     { return 0; }
 double memUsedPeak() { return 0; }
+double memUsedPeak(bool) { return 0; }
 #endif
 
 

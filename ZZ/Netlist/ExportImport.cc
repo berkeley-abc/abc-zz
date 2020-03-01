@@ -1195,7 +1195,9 @@ struct SifStream : XP_TokenStream {
         return toExpr(~toGLit(expr)); }
 
     void* applyPostfix(uint, void*) {
-        assert(false); }
+        assert(false); 
+        return 0;
+    }
 
     void* applyInfix(uint op_tag, void* expr0, void* expr1) {
         return (op_tag == '&') ? toExpr(s_And(toGLit(expr0) + N, toGLit(expr1) + N)) :

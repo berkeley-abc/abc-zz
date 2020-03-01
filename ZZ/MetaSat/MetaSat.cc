@@ -764,6 +764,7 @@ void AbcSat::setVerbosity(int verb_level)
 bool AbcSat::exportCnf(const String& filename)
 {
     assert(false);
+    return false;
 }
 
 
@@ -955,6 +956,7 @@ void GluSat::setVerbosity(int verb_level)
 bool GluSat::exportCnf(const String& filename)
 {
     assert(false);
+    return false;
 }
 
 
@@ -1146,6 +1148,7 @@ void GlrSat::setVerbosity(int verb_level)
 bool GlrSat::exportCnf(const String& filename)
 {
     assert(false);
+    return false;
 }
 
 
@@ -1338,6 +1341,7 @@ void MiniRedSat::setVerbosity(int verb_level)
 bool MiniRedSat::exportCnf(const String& filename)
 {
     assert(false);
+    return false;
 }
 
 

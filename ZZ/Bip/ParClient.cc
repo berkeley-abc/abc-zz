@@ -16,6 +16,10 @@
 #include "ZZ_Netlist.hh"
 #include "ZZ/Generics/Sort.hh"
 
+#if defined(_MSC_VER)
+    #include <winsock.h>
+#endif
+
 namespace ZZ {
 using namespace std;
 

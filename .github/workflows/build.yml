@@ -1,0 +1,55 @@
+on: [push]
+
+jobs:
+
+  build:
+
+    strategy:
+      matrix:
+        os:
+          - ubuntu-16.04
+          - macos-latest
+          - windows-latest
+        include:
+          - os: ubuntu-16.04
+            cmake-generator: '-G Ninja'
+            cmake-options: '-DCMAKE_BUILD_TYPE=Release'
+          - os: macos-latest
+            cmake-generator: '-G Ninja'
+            cmake-options: '-DCMAKE_BUILD_TYPE=Release'
+          - os: windows-latest
+            cmake-generator: '-G "Visual Studio 16 2019" -A x64'
+            cmake-options: '-DCMAKE_TOOLCHAIN_FILE=${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static-md'
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+
+    - uses: actions/checkout@v2
+
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 2.7
+        
+    - name: Install Ninja
+      if: contains(matrix.cmake-generator, 'Ninja')
+      run: |
+        pip install ninja
+
+    - name: Run vcpkg
+      if: startsWith(matrix.os, 'windows')
+      run: |
+        vcpkg install dirent:x64-windows-static-md zlib:x64-windows-static-md
+
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake ${{ matrix.cmake-generator }} ${{ matrix.cmake-options }} ..
+      shell: bash
+
+    - name: Build
+      run: |
+        cmake --build build --target Bip-exe
+      shell: bash

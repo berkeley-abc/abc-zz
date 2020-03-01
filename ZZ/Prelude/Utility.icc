@@ -217,6 +217,12 @@ int tmpFile(cchar* prefix, String& out_name)
 #endif
 }
 
+#if defined(_MSC_VER)
+void ctime_r(time_t* t, char* buf)
+{
+    ctime_s(buf, 26, t);
+}
+#endif
 
 String dateAndTimeText()
 {

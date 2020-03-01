@@ -19,6 +19,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 **************************************************************************************************/
 
 #include <math.h>
+#include <inttypes.h>
 
 #include "mtl/Alg.hh"
 #include "mtl/Sort.hh"

@@ -741,6 +741,8 @@ void printAbcHelp(CLI& cli_, String& orig_msg)
 
 void increaseStackSize()
 {
+#if !defined(_MSC_VER)
+
     const rlim_t stack_size = 64 * rlim_t(1024*1024);
     struct rlimit r;
     int st;
@@ -758,6 +760,7 @@ void increaseStackSize()
 #endif
         }
     }
+#endif
 }
 
 

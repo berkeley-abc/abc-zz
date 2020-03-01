@@ -1,4 +1,5 @@
 
+find_package(ZLIB REQUIRED)
 #add_definitions( -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -DMinisat=SiertMS )
 
 zz_add_library(
@@ -12,6 +13,7 @@ zz_add_library(
 zz_target_include_directories( glucose PRIVATE glucose )
 zz_target_compile_definitions( glucose PRIVATE -DGLUCORED -DMinisat=SiertMS -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS  )
 zz_target_compile_options( glucose PRIVATE -ffloat-store )
+zz_target_link_libraries( glucose PUBLIC pthreads ZLIB::ZLIB )
 
 zz_add_library(
         glucored
@@ -26,6 +28,7 @@ zz_add_library(
 zz_target_include_directories( glucored PRIVATE glucose )
 zz_target_compile_definitions( glucored PRIVATE -DGLUCORED -DMinisat=SiertMS -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS  )
 zz_target_compile_options( glucored PRIVATE -ffloat-store )
+zz_target_link_libraries( glucored PUBLIC pthreads ZLIB::ZLIB )
 
 zz_add_library(
         minisat
@@ -38,6 +41,7 @@ zz_add_library(
 zz_target_include_directories( minisat PRIVATE minisat )
 zz_target_compile_definitions( minisat PRIVATE -DMINIRED -DMinisat=SiertMS -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS )
 zz_target_compile_options( minisat PRIVATE -ffloat-store )
+zz_target_link_libraries( minisat PUBLIC pthreads ZLIB::ZLIB )
 
 zz_add_library(
         minired
@@ -52,6 +56,7 @@ zz_add_library(
 zz_target_include_directories( minired PRIVATE minisat )
 zz_target_compile_definitions( minired PRIVATE -DMINIRED -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -DMinisat=SiertMS )
 zz_target_compile_options( minired PRIVATE -ffloat-store )
+zz_target_link_libraries(minired PUBLIC pthreads ZLIB::ZLIB )
 
 set(siertsat_header "${ZZ_INCLUDE_ROOT}/SiertSat.hh")
 
@@ -95,7 +100,7 @@ set(source_headers
 
 add_custom_command(
     OUTPUT "${siertsat_header}"
-    COMMAND ZB_INCLUDE_DIR=${ZZ_INCLUDE_ROOT} ZB_CMD=header ${PYTHON_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/../build_SiertSat"
+    COMMAND ${CMAKE_COMMAND} -E env ZB_INCLUDE_DIR=${ZZ_INCLUDE_ROOT} ZB_CMD=header ${PYTHON_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/../build_SiertSat"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/.."
     DEPENDS ${source_headers}
 )
@@ -103,7 +108,4 @@ add_custom_command(
 set_source_files_properties("${siertsat_header}" PROPERTIES GENERATED TRUE)
 
 zz_module(SiertSat HEADERS "${siertsat_header}")
-zz_target_link_libraries(SiertSat PUBLIC ZZ_LIBRARIES glucose glucored minisat minired)
-
-find_package (Threads)
-zz_target_link_libraries(SiertSat PUBLIC ${CMAKE_THREAD_LIBS_INIT})
+zz_target_link_libraries(SiertSat PUBLIC pthreads ZLIB::ZLIB ZZ_LIBRARIES glucose glucored minisat minired)

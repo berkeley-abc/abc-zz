@@ -439,6 +439,11 @@ macro Formater<0,0,0> operator, (Out& out, Pre_Formater P) { return Formater<0,0
 #if defined(__GNUC__) || defined(sun)
     #define Dump(args...) std_out |= formatDumpArgs(#args).c_str(), args
     String formatDumpArgs(cchar* text);
+#elif __cplusplus > 199711L
+    #define Dump(...) std_out |= formatDumpArgs(#__VA_ARGS__).c_str(), __VA_ARGS__
+    String formatDumpArgs(cchar* text);
+#else
+    #define Dump(args)
 #endif
 
 

@@ -89,10 +89,10 @@ struct XP_TokenStream {
     virtual void disposeExpr(void* expr) = 0;
 
     // Optional methods for error messages:
-    virtual String nameLParen(uint paren_tag) { assert(false); }
-    virtual String nameRParen(uint paren_tag) { assert(false); }
-    virtual String nameOp    (uint op_tag)    { assert(false); }
-    virtual String namePos   (uint pos)       { assert(false); }
+    virtual String nameLParen(uint paren_tag) { assert(false); return ""; }
+    virtual String nameRParen(uint paren_tag) { assert(false); return ""; }
+    virtual String nameOp    (uint op_tag)    { assert(false); return ""; }
+    virtual String namePos   (uint pos)       { assert(false); return ""; }
 
   //________________________________________
   //  Run functions -- call to parse:

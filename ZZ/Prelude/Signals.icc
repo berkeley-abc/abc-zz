@@ -42,7 +42,7 @@ static void catchInterrupt(SignalHandler handler);
 static void catchCrash(SignalHandler handler);
 
 
-#if defined(sun) || defined(__hpux) || defined(__APPLE__)
+#if defined(sun) || defined(__hpux) || defined(__APPLE__) || defined(_MSC_VER)
 extern "C" void normalExit(){ int exit_code = 0;
 #else
 #ifdef __ICC
@@ -109,7 +109,9 @@ extern "C" void crashHandler(int signum)
 static void catchInterrupt(SignalHandler handler)
 {
     signal(SIGINT , handler);
+#if !defined(_MSC_VER)
     signal(SIGHUP , handler);
+#endif
     signal(SIGTERM, handler);
     catching_interrupt = true;
 }
@@ -120,7 +122,9 @@ static void catchCrash(SignalHandler handler)
 {
     signal(SIGABRT, handler);
     signal(SIGSEGV, handler);
+#if !defined(_MSC_VER)
     signal(SIGBUS , handler);
+#endif
     catching_crash = true;
 }
 
@@ -143,7 +147,7 @@ static ExitList* exit_list = NULL;
 ZZ_Initializer(exit_list, -10000) {
     exit_list = NULL;
 
-  #if defined(sun) || defined(__hpux) || defined(__APPLE__)
+  #if defined(sun) || defined(__hpux) || defined(__APPLE__) || defined(_MSC_VER)
     atexit(normalExit);
   #else
     on_exit(normalExit, NULL);

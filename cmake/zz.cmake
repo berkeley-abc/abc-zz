@@ -179,6 +179,11 @@ function( zz_module name )
         string( REGEX REPLACE "^.*/Main_(.*)\\.(cpp|cc|c)$" "\\1.exe" target ${main})
 
         add_executable( ${target} ${main} )
+
+        if( WIN32 )
+            set_target_properties( ${target} PROPERTIES SUFFIX "")
+        endif()
+
         target_link_libraries( ${target} PRIVATE ${name} )
 
         add_dependencies( zz_exe ${target} )
