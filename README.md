@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/berkeley-abc/abc-zz.svg?branch=master)](https://travis-ci.org/berkeley-abc/abc-zz)
+![.github/workflows/build.yml](https://github.com/berkeley-abc/abc-zz/workflows/.github/workflows/build.yml/badge.svg)
 
 The ZZ framework uses CMake to build the system.
 
