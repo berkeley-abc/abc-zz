@@ -109,7 +109,7 @@ typedef const char     cchar;
   #define INT64_MAX  (int64(9223372036854775807))
   #define UINT64_MAX (uint64(18446744073709551615))
 
-  #if defined(LP64)
+  #if defined(_WIN64)
     typedef int64  intp;
     typedef uint64 uintp;
     #define INTP_MIN  INT64_MIN
