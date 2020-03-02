@@ -99,7 +99,11 @@ Defines that control compilation:
   #include <process.h>
   #include <time.h>
   #include <direct.h>
-  typedef int ssize_t;
+
+  namespace ZZ
+  {
+    typedef int ssize_t;
+  }
 #endif
 
 #if defined(ZZ_PTHREADS)
