@@ -1,7 +1,7 @@
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
 
 include(CMakeParseArguments)
-find_package(PythonInterp 2.6 REQUIRED)
+find_package(PythonInterp REQUIRED)
 
 # main ZZ directory
 set(_ZZ_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
